@@ -8,6 +8,7 @@ import { TeachersView } from './components/TeachersView';
 import { ReportsView } from './components/ReportsView';
 import { SchoolProfileView } from './components/SchoolProfileView';
 import { MobileCheckinView } from './components/MobileCheckinView';
+import { AdminPinModal } from './components/AdminPinModal';
 import { SupabaseModal } from './components/SupabaseModal';
 import { VercelDeployModal } from './components/VercelDeployModal';
 import { WahaModal } from './components/WahaModal';
@@ -16,19 +17,23 @@ import {
   fetchAttendances,
   fetchMeetings,
   fetchSchoolProfile,
+  fetchSingleMeeting,
   fetchTeachers,
+  getCachedAttendances,
+  getCachedMeetings,
+  getCachedProfile,
+  getCachedTeachers,
   initLocalStorage,
 } from './lib/storage';
-import { getSupabase, testSupabaseConnection } from './lib/supabase';
-import { INITIAL_SCHOOL_PROFILE } from './lib/demoData';
-import { Menu, Database, AlertTriangle, ArrowRight, CheckCircle2, Copy } from 'lucide-react';
+import { getSupabase } from './lib/supabase';
+import { Menu, Database, AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Check if current URL is a teacher mobile checkin link (e.g. ?checkin=<meetingId>)
-  const [mobileCheckinMeetingId, setMobileCheckinMeetingId] = useState<string | null>(() => {
+  const [mobileCheckinMeetingId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       return params.get('checkin');
@@ -36,12 +41,11 @@ export default function App() {
     return null;
   });
 
-  // Core Data State
-  const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(INITIAL_SCHOOL_PROFILE);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [attendances, setAttendances] = useState<Attendance[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Local-First Synchronous State Initialization (0ms startup latency)
+  const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(() => getCachedProfile());
+  const [teachers, setTeachers] = useState<Teacher[]>(() => getCachedTeachers());
+  const [meetings, setMeetings] = useState<Meeting[]>(() => getCachedMeetings());
+  const [attendances, setAttendances] = useState<Attendance[]>(() => getCachedAttendances());
 
   // Connection & Modals
   const [supabaseStatus, setSupabaseStatus] = useState<'demo' | 'tables_missing' | 'connected'>('demo');
@@ -49,9 +53,86 @@ export default function App() {
   const [isVercelModalOpen, setIsVercelModalOpen] = useState(false);
   const [isWahaModalOpen, setIsWahaModalOpen] = useState(false);
 
-  // Selected meeting for projector or scanner
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string>('');
+  // Admin PIN Protection Gate
+  const [adminPin, setAdminPin] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('smp_admin_pin') || '1234';
+    }
+    return '1234';
+  });
 
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('smp_admin_unlocked') === 'true';
+    }
+    return false;
+  });
+
+  const handleAdminUnlock = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('smp_admin_unlocked', 'true');
+    }
+    setIsAdminUnlocked(true);
+  };
+
+  const handleAdminLock = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('smp_admin_unlocked');
+    }
+    setIsAdminUnlocked(false);
+  };
+
+  const handleUpdateAdminPin = (newPin: string) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('smp_admin_pin', newPin);
+    }
+    setAdminPin(newPin);
+  };
+
+  // Selected meeting for projector or scanner
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string>(() => {
+    const initialMeetings = getCachedMeetings();
+    const active = initialMeetings.find((m) => m.status === 'active') || initialMeetings[0];
+    return active?.id || '';
+  });
+
+  // Fast Mobile Meeting Resolver
+  const [mobileMeeting, setMobileMeeting] = useState<Meeting | undefined>(() => {
+    if (mobileCheckinMeetingId) {
+      return getCachedMeetings().find((m) => m.id === mobileCheckinMeetingId);
+    }
+    return undefined;
+  });
+  const [isLoadingMobileMeeting, setIsLoadingMobileMeeting] = useState<boolean>(
+    Boolean(mobileCheckinMeetingId && !mobileMeeting)
+  );
+
+  useEffect(() => {
+    if (!mobileCheckinMeetingId) return;
+
+    const existing = meetings.find((m) => m.id === mobileCheckinMeetingId);
+    if (existing) {
+      setMobileMeeting(existing);
+      setIsLoadingMobileMeeting(false);
+      return;
+    }
+
+    let isMounted = true;
+    fetchSingleMeeting(mobileCheckinMeetingId).then((found) => {
+      if (isMounted) {
+        if (found) {
+          setMobileMeeting(found);
+        }
+        setIsLoadingMobileMeeting(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [mobileCheckinMeetingId, meetings]);
+
+  // Fast Background Stale-While-Revalidate without blocking render
   const loadAllData = useCallback(async () => {
     try {
       initLocalStorage();
@@ -60,15 +141,7 @@ export default function App() {
       if (!client) {
         setSupabaseStatus('demo');
       } else {
-        // Test health of Supabase & check tables
-        const health = await testSupabaseConnection();
-        if (health.success && health.tablesExist) {
-          setSupabaseStatus('connected');
-        } else if (health.success && !health.tablesExist) {
-          setSupabaseStatus('tables_missing');
-        } else {
-          setSupabaseStatus('demo');
-        }
+        setSupabaseStatus('connected');
       }
 
       const [profileData, teacherData, meetingData, attendanceData] = await Promise.all([
@@ -88,9 +161,7 @@ export default function App() {
         setSelectedMeetingId(active.id);
       }
     } catch (err) {
-      console.error('Error loading dePresent data:', err);
-    } finally {
-      setIsLoading(false);
+      console.error('Error syncing dePresent data:', err);
     }
   }, [selectedMeetingId]);
 
@@ -99,24 +170,47 @@ export default function App() {
   }, [loadAllData]);
 
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || meetings[0];
-  const targetCheckinMeeting = mobileCheckinMeetingId
-    ? meetings.find((m) => m.id === mobileCheckinMeetingId) || currentMeeting
-    : currentMeeting;
+  const targetCheckinMeeting = mobileMeeting || meetings.find((m) => m.id === mobileCheckinMeetingId);
 
-  // If in direct mobile checkin mode (from scanning the projector QR with a smartphone camera)
+  // -------------------------------------------------------------------------
+  // MOBILE CHECKIN MODE (Isolated Sandboxed View for Teachers via QR Scan)
+  // -------------------------------------------------------------------------
   if (mobileCheckinMeetingId) {
+    if (isLoadingMobileMeeting) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
+          <div className="bg-white p-7 rounded-2xl border border-slate-200 shadow-md max-w-sm w-full space-y-4">
+            <div className="w-12 h-12 rounded-xl bg-blue-900 text-white font-black flex items-center justify-center text-lg mx-auto animate-pulse">
+              dP
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-slate-800">Menghubungkan ke Presensi...</h3>
+              <p className="text-xs text-slate-500">Memuat data agenda rapat & daftar guru</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <MobileCheckinView
         meeting={targetCheckinMeeting}
         teachers={teachers}
         schoolProfile={schoolProfile}
         onSuccess={loadAllData}
-        onExitToCheckin={() => {
-          setMobileCheckinMeetingId(null);
-          if (typeof window !== 'undefined' && window.history.replaceState) {
-            window.history.replaceState({}, '', window.location.pathname);
-          }
-        }}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // ADMIN PIN GATE: If not unlocked, display the PIN lock screen
+  // -------------------------------------------------------------------------
+  if (!isAdminUnlocked) {
+    return (
+      <AdminPinModal
+        schoolProfile={schoolProfile}
+        correctPin={adminPin}
+        onSuccess={handleAdminUnlock}
       />
     );
   }
@@ -128,7 +222,7 @@ export default function App() {
     meetings: { title: 'Agenda Rapat & Kegiatan', subtitle: 'Kelola jadwal rapat kedinasan, pimpinan & notulis' },
     teachers: { title: 'Data Guru & ID Card Portrait', subtitle: 'Manajemen PTK ber-NIY dan cetak ID Card format tegak' },
     reports: { title: 'Laporan Resmi Kedinasan', subtitle: 'Format siap cetak Kop Surat Yayasan dan ekspor spreadsheet XLSX' },
-    profile: { title: 'Profil Yayasan & Sekolah', subtitle: 'Konfigurasi identitas yayasan, sekolah dan upload logo dePresent' },
+    profile: { title: 'Profil Yayasan & Sekolah', subtitle: 'Konfigurasi identitas yayasan, sekolah, logo & PIN admin' },
   };
 
   return (
@@ -186,25 +280,25 @@ export default function App() {
               </span>
             )}
 
-            {supabaseStatus === 'tables_missing' && (
-              <button
-                onClick={() => setIsSupabaseModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-colors animate-pulse"
-              >
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                <span>Tabel Belum Dibuat</span>
-              </button>
-            )}
-
             {supabaseStatus === 'demo' && (
               <button
                 onClick={() => setIsSupabaseModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors cursor-pointer"
               >
                 <Database className="w-3.5 h-3.5 text-slate-500" />
                 <span>Mode Demo</span>
               </button>
             )}
+
+            {/* Lock Admin Screen Button */}
+            <button
+              onClick={handleAdminLock}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors cursor-pointer"
+              title="Kunci Panel Admin"
+            >
+              <Lock className="w-3.5 h-3.5 text-slate-600" />
+              <span className="hidden sm:inline">Kunci Admin</span>
+            </button>
           </div>
         </header>
 
@@ -220,125 +314,93 @@ export default function App() {
               </div>
               <button
                 onClick={() => setIsSupabaseModalOpen(true)}
-                className="px-3 py-1 bg-slate-950 text-white rounded font-bold hover:bg-slate-900 transition-colors shrink-0"
+                className="px-3 py-1 bg-slate-950 text-white rounded-md text-xs font-bold hover:bg-slate-800 transition-colors"
               >
-                Salin & Buat Tabel Sekarang
+                Buka SQL Schema
               </button>
             </div>
           </aside>
         )}
 
-        {supabaseStatus === 'demo' && activeTab !== 'projector' && (
-          <aside aria-label="Status database" className="no-print bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900">
-            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 truncate">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span className="truncate">
-                  <strong>Penyimpanan Demo:</strong> Hubungkan Supabase untuk menyimpan data rapat secara permanen & sinkronisasi multi-perangkat.
-                </span>
-              </div>
-              <button
-                onClick={() => setIsSupabaseModalOpen(true)}
-                className="text-xs font-bold text-amber-900 underline hover:text-amber-950 flex items-center gap-1 shrink-0"
-              >
-                <span>Hubungkan Supabase</span>
-                <ArrowRight className="w-3 h-3" />
-              </button>
-            </div>
-          </aside>
-        )}
-
-        {/* Main Content Body */}
+        {/* 3. Dynamic Active View Content Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          {isLoading ? (
-            <div className="py-24 text-center space-y-3">
-              <div className="w-10 h-10 border-3 border-blue-900 border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-xs font-medium text-slate-500">Memuat data dePresent...</p>
-            </div>
-          ) : (
-            <>
-              {activeTab === 'dashboard' && (
-                <DashboardView
-                  meetings={meetings}
-                  teachers={teachers}
-                  attendances={attendances}
-                  schoolProfile={schoolProfile}
-                  onRefresh={loadAllData}
-                  onNavigateToReports={() => setActiveTab('reports')}
-                  onNavigateToScanner={() => setActiveTab('scanner')}
-                />
-              )}
+          <div className="transition-all duration-150">
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                meetings={meetings}
+                teachers={teachers}
+                attendances={attendances}
+                schoolProfile={schoolProfile}
+                onRefresh={loadAllData}
+                onNavigateToReports={() => setActiveTab('reports')}
+                onNavigateToScanner={() => setActiveTab('scanner')}
+              />
+            )}
 
-              {activeTab === 'scanner' && (
-                <ScannerView
-                  meetings={meetings}
-                  teachers={teachers}
-                  onAttendanceRecorded={loadAllData}
-                />
-              )}
+            {activeTab === 'scanner' && (
+              <ScannerView
+                meetings={meetings}
+                teachers={teachers}
+                onAttendanceRecorded={loadAllData}
+              />
+            )}
 
-              {activeTab === 'projector' && (
-                <ProjectorView
-                  meeting={currentMeeting}
-                  teachers={teachers}
-                  attendances={attendances}
-                  schoolProfile={schoolProfile}
-                  onAttendanceRecorded={loadAllData}
-                  onOpenMobileCheckin={(meetingId) => setMobileCheckinMeetingId(meetingId)}
-                />
-              )}
+            {activeTab === 'projector' && (
+              <ProjectorView
+                meeting={currentMeeting}
+                teachers={teachers}
+                attendances={attendances}
+                schoolProfile={schoolProfile}
+                onAttendanceRecorded={loadAllData}
+                onOpenMobileCheckin={(meetingId) => {
+                  window.open(`?checkin=${meetingId}`, '_blank');
+                }}
+              />
+            )}
 
-              {activeTab === 'meetings' && (
-                <MeetingsView
-                  meetings={meetings}
-                  teachers={teachers}
-                  onRefresh={loadAllData}
-                  onSelectActiveMeeting={(id) => setSelectedMeetingId(id)}
-                />
-              )}
+            {activeTab === 'meetings' && (
+              <MeetingsView
+                meetings={meetings}
+                teachers={teachers}
+                onRefresh={loadAllData}
+                onSelectActiveMeeting={(id) => setSelectedMeetingId(id)}
+              />
+            )}
 
-              {activeTab === 'teachers' && (
-                <TeachersView
-                  teachers={teachers}
-                  schoolProfile={schoolProfile}
-                  onRefresh={loadAllData}
-                />
-              )}
+            {activeTab === 'teachers' && (
+              <TeachersView
+                teachers={teachers}
+                schoolProfile={schoolProfile}
+                onRefresh={loadAllData}
+              />
+            )}
 
-              {activeTab === 'reports' && (
-                <ReportsView
-                  meetings={meetings}
-                  teachers={teachers}
-                  attendances={attendances}
-                  schoolProfile={schoolProfile}
-                />
-              )}
+            {activeTab === 'reports' && (
+              <ReportsView
+                meetings={meetings}
+                teachers={teachers}
+                attendances={attendances}
+                schoolProfile={schoolProfile}
+              />
+            )}
 
-              {activeTab === 'profile' && (
-                <SchoolProfileView
-                  profile={schoolProfile}
-                  onRefresh={loadAllData}
-                />
-              )}
-            </>
-          )}
+            {activeTab === 'profile' && (
+              <SchoolProfileView
+                profile={schoolProfile}
+                onRefresh={loadAllData}
+                adminPin={adminPin}
+                onUpdateAdminPin={handleUpdateAdminPin}
+              />
+            )}
+          </div>
         </main>
-
-        {/* 3. Simple & Clean Footer */}
-        <footer className="no-print border-t border-slate-200 bg-white py-3 px-6 text-center text-xs text-slate-500">
-          <p>
-            <strong>dePresent</strong> · Sistem Presensi Kegiatan &copy; {new Date().getFullYear()}
-          </p>
-        </footer>
       </div>
 
-      {/* Global Modals */}
+      {/* 4. Global Modals */}
       <SupabaseModal
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
-        onConnectionSuccess={() => {
-          loadAllData();
-        }}
+        onConnectionSuccess={loadAllData}
       />
 
       <VercelDeployModal

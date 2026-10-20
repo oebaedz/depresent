@@ -24,7 +24,6 @@ interface MobileCheckinViewProps {
   teachers: Teacher[];
   schoolProfile: SchoolProfile;
   onSuccess: () => void;
-  onExitToCheckin?: () => void;
 }
 
 interface DeviceLockInfo {
@@ -41,7 +40,6 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
   teachers,
   schoolProfile,
   onSuccess,
-  onExitToCheckin,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('');
@@ -99,18 +97,29 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
   if (!meeting) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-sm w-full space-y-3">
-          <p className="text-sm font-bold text-slate-800">Rapat Tidak Ditemukan</p>
-          <p className="text-xs text-slate-500">Tautan QR presensi rapat tidak valid atau rapat telah berakhir.</p>
-          {onExitToCheckin && (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-center">
+        <div className="bg-white p-7 rounded-2xl border border-slate-200 shadow-md max-w-sm w-full space-y-4">
+          <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-base font-bold text-slate-900">Rapat Tidak Ditemukan</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Tautan presensi rapat tidak valid, agenda telah ditutup, atau kode QR dinamis telah kedaluwarsa.
+            </p>
+          </div>
+          <div className="pt-2">
             <button
-              onClick={onExitToCheckin}
-              className="px-4 py-2 bg-blue-900 text-white rounded-lg text-xs font-semibold"
+              onClick={() => window.location.reload()}
+              className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs"
             >
-              Buka Aplikasi Utama
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>Muat Ulang Halaman</span>
             </button>
-          )}
+          </div>
+          <p className="text-[11px] text-slate-400">
+            Silakan pindai ulang kode QR dinamis terbaru di layar proyektor atau hubungi panitia di ruangan rapat.
+          </p>
         </div>
       </div>
     );
@@ -248,16 +257,6 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
               </span>
             </div>
           </div>
-
-          {onExitToCheckin && (
-            <button
-              onClick={onExitToCheckin}
-              className="text-xs text-slate-500 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100"
-              title="Ke Halaman Utama"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         {/* Meeting Info Card */}

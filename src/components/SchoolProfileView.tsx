@@ -1,19 +1,32 @@
 import React, { useState, useRef } from 'react';
-import { School, Save, Check, Globe, Phone, Mail, MapPin, User, Shield, MessageSquare, Image, Upload, Trash2, Building2 } from 'lucide-react';
+import { School, Save, Check, Globe, Phone, Mail, MapPin, User, Shield, MessageSquare, Image, Upload, Trash2, Building2, Lock, KeyRound, AlertCircle } from 'lucide-react';
 import { SchoolProfile } from '../types';
 import { saveSchoolProfile } from '../lib/storage';
 
 interface SchoolProfileViewProps {
   profile: SchoolProfile;
   onRefresh: () => void;
+  adminPin?: string;
+  onUpdateAdminPin?: (newPin: string) => void;
 }
 
-export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({ profile, onRefresh }) => {
+export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
+  profile,
+  onRefresh,
+  adminPin = '1234',
+  onUpdateAdminPin,
+}) => {
   const [formData, setFormData] = useState<SchoolProfile>({ ...profile });
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Admin PIN management state
+  const [currentPinInput, setCurrentPinInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState('');
+  const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [pinMessage, setPinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
@@ -53,6 +66,35 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({ profile, o
     setSaveSuccess(true);
     onRefresh();
     setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleUpdatePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinMessage(null);
+
+    if (currentPinInput !== adminPin) {
+      setPinMessage({ type: 'error', text: 'PIN lama tidak sesuai.' });
+      return;
+    }
+
+    if (newPinInput.length < 4) {
+      setPinMessage({ type: 'error', text: 'PIN baru minimal 4 angka.' });
+      return;
+    }
+
+    if (newPinInput !== confirmPinInput) {
+      setPinMessage({ type: 'error', text: 'Konfirmasi PIN baru tidak cocok.' });
+      return;
+    }
+
+    if (onUpdateAdminPin) {
+      onUpdateAdminPin(newPinInput);
+    }
+    setPinMessage({ type: 'success', text: 'PIN Admin berhasil diubah!' });
+    setCurrentPinInput('');
+    setNewPinInput('');
+    setConfirmPinInput('');
+    setTimeout(() => setPinMessage(null), 3000);
   };
 
   return (
@@ -402,6 +444,88 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({ profile, o
                 <p>Kop surat ini akan otomatis tercetak di lembar laporan resmi presensi (PDF).</p>
               </div>
             </div>
+          </div>
+
+          {/* Keamanan & PIN Akses Admin */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+              <Lock className="w-4 h-4 text-blue-900" />
+              <span>Keamanan & PIN Akses Admin</span>
+            </div>
+            <p className="text-xs text-slate-500">
+              PIN ini digunakan untuk mengunci konsol admin agar guru yang melakukan scan presensi tidak dapat membuka menu pengaturan atau data sekolah.
+            </p>
+
+            <form onSubmit={handleUpdatePinSubmit} className="space-y-3 pt-1">
+              {pinMessage && (
+                <div
+                  className={`p-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 ${
+                    pinMessage.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : 'bg-rose-50 text-rose-800 border border-rose-200'
+                  }`}
+                >
+                  {pinMessage.type === 'success' ? (
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  )}
+                  <span>{pinMessage.text}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  PIN Lama
+                </label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={currentPinInput}
+                  onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
+                  placeholder="PIN saat ini (default: 1234)"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-900 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    PIN Baru (4-6 Angka)
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    value={newPinInput}
+                    onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="PIN baru"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-900 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Ulangi PIN Baru
+                  </label>
+                  <input
+                    type="password"
+                    maxLength={6}
+                    value={confirmPinInput}
+                    onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Konfirmasi"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-900 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!currentPinInput || !newPinInput || !confirmPinInput}
+                className="w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>Simpan Perubahan PIN</span>
+              </button>
+            </form>
           </div>
         </div>
       </div>

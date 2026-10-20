@@ -3,9 +3,43 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const STORAGE_KEY_URL = 'smp_presensi_supabase_url';
 const STORAGE_KEY_KEY = 'smp_presensi_supabase_anon_key';
 
+export function encodeSupabaseCredentials(url: string, anonKey: string): string {
+  try {
+    return btoa(JSON.stringify({ u: url.trim(), k: anonKey.trim() }));
+  } catch {
+    return '';
+  }
+}
+
+export function decodeSupabaseCredentials(token: string): { url: string; anonKey: string } | null {
+  try {
+    const raw = atob(token.trim());
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.u === 'string' && typeof parsed.k === 'string') {
+      return { url: parsed.u, anonKey: parsed.k };
+    }
+  } catch {
+    // fallback or invalid
+  }
+  return null;
+}
+
 export function getSupabaseCredentials(): { url: string; anonKey: string } {
   const envUrl = import.meta.env.VITE_SUPABASE_URL || '';
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+  // Auto-extract from URL query parameter ?sc= if provided from projector QR scan
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    const syncCred = params.get('sc');
+    if (syncCred) {
+      const decoded = decodeSupabaseCredentials(syncCred);
+      if (decoded && decoded.url && decoded.anonKey) {
+        localStorage.setItem(STORAGE_KEY_URL, decoded.url);
+        localStorage.setItem(STORAGE_KEY_KEY, decoded.anonKey);
+      }
+    }
+  }
 
   const storedUrl = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_URL) || '' : '';
   const storedKey = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_KEY) || '' : '';

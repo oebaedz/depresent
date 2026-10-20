@@ -1,123 +1,158 @@
-# dePresent - Sistem Presensi Kegiatan Yayasan / Sekolah (Revisi Arsitektur)
+# Rencana Akselerasi Performa & Pengamanan dePresent (Revisi)
 
-Penyempurnaan sistem presensi dePresent dengan rotasi **Dynamic Rolling QR Code tiap 15 detik** (tanpa PIN), standarisasi identitas **NIY (Nomor Induk Yayasan)**, kop surat resmi berbasis **Yayasan & Sekolah**, fleksibilitas **Pimpinan Rapat & Notulis per Agenda**, serta perbaikan tuntas mekanisme **sinkronisasi data real-time Supabase**.
+Mengatasi kendala kelambatan penarikan data Supabase (*loading latency*), mengeliminasi *flash* data sekolah lama dengan strategi **Local-First (Stale-While-Revalidate)** berkecepatan 0ms, menuntaskan masalah "Rapat Tidak Ditemukan" pada Vercel, serta menerapkan proteksi PIN admin dan isolasi antarmuka presensi guru.
+
+---
 
 ### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> Ringkasan spesifikasi revisi yang telah dikonfirmasi oleh pengguna:
+> **Penyebab Utama Kelambatan yang Ditemukan**:
+> 1. **Redundansi 8x HTTP Request per Aksi**: Setiap kali aplikasi dibuka atau data disimpan/diperbarui, aplikasi memanggil `testSupabaseConnection()` (4 query HTTP beruntun) lalu memanggil `fetch*()` (4 query HTTP lagi). Di jaringan cloud Supabase, ini memakan waktu 3–7 detik.
+> 2. **State React Menggunakan Data Dummy Awal**: `App.tsx` menginisialisasi state dengan objek dummy (`INITIAL_SCHOOL_PROFILE`), alih-alih membaca memori `localStorage` yang sudah tersimpan di browser secara sinkron.
+> 3. **Non-Optimistic Writes**: Fungsi `saveTeacher` dan `saveMeeting` melakukan `await fetchTeachers()` (HTTP query ke server) sebelum menyimpan, sehingga tombol simpan/hapus terasa lambat.
+>
+> **Solusi Revisi Arsitektur**:
+> - **Local-First Stale-While-Revalidate**: State awal langsung dimuat dari `localStorage` dalam **0 milidetik** saat pertama kali dibuka. Tidak ada jeda atau kedip nama sekolah lama.
+> - **Eliminasi Network Overhead**: `testSupabaseConnection()` hanya dijalankan di dalam modal pengaturan Supabase, bukan di jalur render utama aplikasi.
+> - **Optimistic UI Updates**: Tambah, ubah, dan hapus data langsung memperbarui tampilan dalam hitungan milidetik tanpa menunggu respon round-trip jaringan cloud.
+> - **Sinkronisasi Instan Vercel**: Tautan QR proyektor membawa token kredensial publik Supabase sehingga HP guru langsung mengenali database sekolah seketika tanpa error "Rapat Tidak Ditemukan".
+> - **Proteksi PIN Admin & Isolasi Presensi**: Dashboard admin terkunci PIN; halaman presensi di HP guru tidak memiliki tombol akses ke admin.
 
-1. **Dynamic Rolling QR 15 Detik (Tanpa Perlu PIN)**:
-   - Proyektor menampilkan kode QR dinamis dengan rotasi cepat setiap **15 detik**.
-   - Dilengkapi visual hitung mundur melingkar (*countdown timer ring*) 15 &rarr; 0 detik.
-   - Karena token hanya bertahan 15 detik (+ toleransi jaringan 10 detik), tautan atau foto QR tidak mungkin dibagikan ke teman di luar ruangan.
-   - Guru tidak perlu menghafal atau menginput PIN sehingga proses presensi berlangsung secepat kilat (1-2 detik setelah scan).
-   - Skema database tabel guru tidak perlu diubah.
-2. **Penggantian Istilah NIP Menjadi NIY (Nomor Induk Yayasan)**:
-   - Seluruh antarmuka, tabel, pencarian, ID Card, dan berkas cetak diubah dari NIP menjadi **NIY (Nomor Induk Yayasan)** sesuai standar institusi yayasan/swasta.
-3. **Kop Surat Berbasis Yayasan**:
-   - Kolom `foundation_name` (Nama Yayasan, contoh: *YAYASAN PENDIDIKAN DAN SOSIAL HARAPAN BANGSA*) ditambahkan pada profil.
-   - Pada Kop Surat, Nama Yayasan dicetak tegas di atas Nama Sekolah.
-4. **Pimpinan Rapat & Notulis Spesifik Per Agenda Rapat**:
-   - Setiap agenda rapat di `smp_meetings` memiliki penanggung jawab masing-masing: `leader_name`, `leader_niy`, `secretary_name`, dan `secretary_niy`.
-   - Pada lembar cetak laporan resmi dan SPJ, titimangsa penandatangan menggunakan pimpinan dan notulis dari rapat bersangkutan.
-5. **Perbaikan Masalah Sinkronisasi Database Supabase**:
-   - *Akar Masalah*: Pada sistem sebelumnya, jika tabel Supabase baru dibuat dan masih bernilai kosong (`length === 0`), fungsi fetch secara keliru menganggap data gagal lalu memunculkan data dummy lokal. Selain itu, penyimpanan data baru tidak menampilkan pesan kesalahan jika terhambat izin RLS atau perbedaan nama kolom.
-   - *Solusi Tuntas*:
-     - Perbaikan logika fetch: jika Supabase terhubung, data kosong dari server dihormati (bukan dipaksa kembali ke dummy).
-     - Tombol 1-klik **"Migrasi & Sinkronkan Data Awal ke Supabase"** di modal Supabase agar pengguna bisa langsung menyuntikkan data sekolah dan guru ke Supabase dengan satu ketukan.
-     - Penanganan error eksplisit: setiap operasi insert/update ke Supabase yang gagal akan memunculkan notifikasi galat yang jelas (RLS, koneksi, atau skema) sehingga panitia mengetahui status riil data.
+- **Keputusan 1**: Gunakan arsitektur *Local-First* agar nama yayasan, sekolah, agenda rapat, dan guru tampil instan (0ms).
+- **Keputusan 2**: Terapkan *Optimistic Updates* pada simpan/edit/hapus data agar interaksi UI responsif seketika.
+- **Keputusan 3**: Kunci menu admin dengan PIN (default: `1234`) dan isolasi total halaman presensi HP guru.
 
 ---
 
 ### 1. Overview & Core Concept
 
-- **What It Does**: dePresent dirancang khusus untuk sekolah di bawah naungan yayasan pendidikan. Mengakomodasi presensi rapat dinas, briefing, dan workshop menggunakan kartu pengenal fisik guru ber-NIY atau scan proyektor ber-token 15 detik, terintegrasi penuh ke database Supabase dan notifikasi WAHA.
-- **Key Value**: Mencegah titip absen tanpa memperlambat antrean, laporan SPJ resmi ber-kop yayasan, data rapat tersimpan aman di cloud Supabase.
+- **Apa yang Dilakukan**:
+  - Mengubah paradigma pemuatan data menjadi **Local-First & Optimistic**: aplikasi membaca dan menampilkan data lokal seketika, lalu menyinkronkan pembaruan ke cloud Supabase di latar belakang (*background sync*).
+  - Menyematkan konfigurasi publik Supabase pada link QR dinamis sehingga saat guru memindai proyektor di Vercel, HP langsung terhubung ke database dan menampilkan rapat tanpa *delay*.
+  - Menghilangkan jeda *loading* yang sebelumnya menyebabkan HP guru sempat menampilkan "Rapat Tidak Ditemukan".
+  - Memasang gerbang autentikasi PIN pada konsol admin dePresent dan menghapus semua tombol kembali/Home di layar presensi guru.
+- **Target Pengguna**:
+  - **Operator / Panitia**: Merasakan aplikasi dePresent yang sangat cepat, responsif saat input/edit/hapus rapat & guru, dan aman dari akses guru.
+  - **Guru**: Memindai QR di layar panggung, halaman presensi terbuka cepat dalam hitungan detik, mengisi presensi dengan lancar, dan perangkat HP terkunci dari titip absen.
 
 ---
 
 ### 2. User Experience & Visual Design
 
-- **Alur Presensi Layar Proyektor (15 Detik Rolling)**:
-  1. Layar proyektor menampilkan QR Code besar dengan timer cincin yang berputar dari 15 ke 0 detik.
-  2. Guru mengarahkan kamera HP ke layar &rarr; membuka tautan `?checkin=ID_RAPAT&t=TOKEN`.
-  3. Form presensi memverifikasi usia token (maks 25 detik). Jika valid, guru memilih namanya dan langsung menekan **"Konfirmasi Kehadiran"**.
-  4. Seketika nama guru muncul di live feed layar proyektor dan tersimpan ke Supabase.
-  5. Jika tautan difoto/dikirim via WhatsApp ke orang lain, saat dibuka token sudah lewat dari 25 detik dan sistem menampilkan peringatan: *"Kode QR telah kadaluarsa. Silakan scan ulang kode terbaru di layar proyektor."*
-- **Kop Surat Yayasan**:
-  - Baris 1: Nama Yayasan (misal: *YAYASAN PENDIDIKAN ISLAM / MA'ARIF / DLL*)
-  - Baris 2: Nama Sekolah (misal: *SMP ...*)
-  - Baris 3: Alamat, NSS/NPSN, Kontak, Website
-  - Garis ganda pembatas kop surat.
+#### A. Startup Instan Aplikasi (Admin & Proyektor)
+- Saat membuka aplikasi dePresent di laptop sekolah:
+  - Nama yayasan dan sekolah Anda langsung muncul dalam **0 milidetik** tanpa jeda (*zero layout shift*).
+  - Agenda rapat aktif langsung terpilih dari cache lokal.
+  - Penarikan data terbaru dari Supabase berjalan tenang di latar belakang (*silent revalidation*).
+
+#### B. Akselerasi Simpan, Edit, dan Hapus (0ms Latency)
+- Saat operator menambah agenda rapat, mengedit data guru ber-NIY, atau menghapus item:
+  - Antarmuka tabel/kartu langsung terupdate seketika (*optimistic update*).
+  - Data di-push ke Supabase secara asinkron tanpa memblokir interaksi pengguna.
+  - Modal dialog konfirmasi hapus in-app yang aman dan cepat.
+
+#### C. Alur Presensi Guru via Scan QR (Cepat & Terisolasi)
+1. Guru memindai QR dinamis di layar proyektor.
+2. HP guru langsung membaca token data & kredensial Supabase dari parameter URL.
+3. Rapat langsung terdeteksi tanpa pesan "Rapat Tidak Ditemukan".
+4. Guru mencari nama/NIY dan menekan tombol presensi.
+5. Muncul tanda sukses resmi berlogo yayasan; HP terkunci untuk 1 guru (mencegah titip absen).
+6. **Keamanan**: Tidak ada tombol Home atau menu navigasi admin di layar HP guru.
+
+#### D. Gerbang PIN Admin
+- Tampilan dialog kunci PIN yang elegan bergaya institusional.
+- Keypad angka cepat dan dukungan input keyboard.
+- Fitur ganti PIN di menu Profil Yayasan & Sekolah.
 
 ---
 
 ### 3. Key Product Decisions & Trade-Offs
 
-- **Kenapa 15 Detik & Tanpa PIN?**:
-  - Pengalaman guru tetap sangat cepat dan mudah (tanpa lupa PIN), namun celah titip absen tertutup karena jendela waktu 15 detik tidak memungkinkan pengiriman screenshot dan pembukaan link oleh pihak di luar ruangan.
-- **Sinkronisasi Supabase yang Handal**:
-  - Menyediakan modal Supabase dengan diagnostik lengkap:
-    1. Tes koneksi aktif.
-    2. Cek eksistensi tabel `smp_school_profile`, `smp_teachers`, `smp_meetings`, `smp_attendances`.
-    3. Tombol *Seed / Sinkron Data Awal* ke Supabase jika tabel masih kosong.
-    4. Feedback real-time saat data disimpan ke Supabase.
+- **Keputusan 1: Local-First Stale-While-Revalidate (SWR)**
+  - *Pendekatan*: Inisialisasi state React langsung dari `localStorage`:
+    ```ts
+    const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(() => getCachedProfile());
+    const [meetings, setMeetings] = useState<Meeting[]>(() => getCachedMeetings());
+    const [teachers, setTeachers] = useState<Teacher[]>(() => getCachedTeachers());
+    ```
+  - *Alasan*: Menghilangkan keluhan "proses tarik data sangat lama sehingga app menampilkan nama sekolah mode lama". Aplikasi langsung menampilkan identitas sekolah asli pengguna sejak frame pertama.
+- **Keputusan 2: Pemisahan Jalur Diagnostic vs. Data Fetching**
+  - *Pendekatan*: Mencabut pemanggilan `testSupabaseConnection()` dari siklus `loadAllData()`. Pengecekan tabel hanya dilakukan ketika operator membuka modal Supabase.
+  - *Alasan*: Mengurangi 50% beban kueri HTTP dan memangkas waktu muat hingga beberapa detik.
+- **Keputusan 3: Penulisan Optimistik (Optimistic Writes)**
+  - *Pendekatan*: Pada `saveTeacher`, `saveMeeting`, `deleteTeacher`, dan `deleteMeeting`, simpan ke `localStorage` dan perbarui state seketika, lalu jalankan `upsert`/`delete` ke Supabase tanpa melakukan query `fetch` ganda.
+  - *Alasan*: Pengguna tidak merasakan *freeze* atau *loading spinner* yang mengganggu saat mengelola data rapat dan guru.
 
 ---
 
 ### 4. Technical Architecture & Data Strategy
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        PROYECTOR (ROLLING 15S)                         │
-│                                                                        │
-│   • Loop 15 Detik: Generate Token Berwaktu                             │
-│   • Tautan: ?checkin=MEETING_ID&tok=TIMESTAMP_BASE64                   │
-│   • Visual Ring Animation: 15s ... 0s                                  │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │ Scan Langsung di Ruangan
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                        FORM PRESENSI MANDIRI HP                        │
-│                                                                        │
-│   • Cek Usia Token <= 25 Detik                                         │
-│   • Pilih Nama Guru / Masukkan NIY                                     │
-│   • Klik Konfirmasi -> Tersimpan Langsung ke Supabase                 │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-                                   ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                        SUPABASE DATABASE LAYER                         │
-│                                                                        │
-│   • smp_school_profile (foundation_name, school_name, npsn, ...)       │
-│   • smp_teachers (id, ptk_id, niy, name, phone_wa, role_title)        │
-│   • smp_meetings (id, title, leader_name, leader_niy, notulis_name)   │
-│   • smp_attendances (meeting_id, teacher_id, check_in_time, status)    │
-└────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                      LOCAL STORAGE CACHE                        │
+│  - Profil Sekolah & Yayasan (Kop Surat)                         │
+│  - Daftar Guru & NIY                                            │
+│  - Agenda Rapat & Kegiatan                                      │
+│  - Riwayat Presensi                                             │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │ Baca Sinkron (0 ms) pada Startup
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    REACT STATE INITIALIZATION                   │
+│  - UI langsung render identitas sekolah asli                    │
+│  - Tanpa kedip / tanpa data dummy lama                          │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │ Revalidasi Asinkron di Background
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       SUPABASE POSTGRESQL                       │
+│  - Tarik data pembaruan (Promise.all paralel)                   │
+│  - Update cache lokal jika ada data baru                        │
+│  - Tulis langsung (Optimistic Upsert tanpa query ganda)         │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│              ALUR QR PROYEKTOR -> HP GURU DI VERCEL             │
+│  1. Proyektor buat link: ?checkin={id}&tok={hash}&sc={cred}     │
+│  2. HP Guru buka link -> parse {cred} -> konek Supabase instan  │
+│  3. Cari rapat di database -> Rapat Ditemukan seketika          │
+│  4. Layar sandboxed: Tanpa tombol kembali ke Home/Admin         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-#### Modifikasi File yang Akan Dilakukan:
-1. `src/types/index.ts`:
-   - Mengganti `nip` & `headmaster_nip` & `secretary_nip` menjadi `niy`, `headmaster_niy`, `secretary_niy`.
-   - Menambahkan `foundation_name` pada `SchoolProfile`.
-   - Menambahkan `secretary_name` dan `secretary_niy` pada `Meeting`.
-2. `src/lib/storage.ts`:
-   - Memperbaiki logika pembacaan Supabase agar data kosong tidak fallback ke dummy data.
-   - Menambahkan fungsi `syncInitialDataToSupabase()` untuk menyuntikkan data sekolah dan guru ke Supabase dengan 1 klik.
-   - Memastikan error Supabase tertangkap dan dilaporkan dengan jelas.
-3. `src/lib/supabase.ts`:
-   - Memperbarui skrip SQL generator dengan kolom `foundation_name` dan `niy`.
+#### File & Komponen yang Dioptimalkan:
+1. `src/lib/storage.ts`:
+   - Implementasi getter sinkron: `getCachedProfile()`, `getCachedTeachers()`, `getCachedMeetings()`, `getCachedAttendances()`.
+   - Refactoring `save*` dan `delete*` menjadi *optimistic*: simpan ke cache lokal langsung, kirim satu kueri tunggal ke Supabase tanpa re-fetch internal yang lambat.
+2. `src/lib/supabase.ts`:
+   - Penambahan `encodeSupabaseCredentials` dan `decodeSupabaseCredentials` untuk parameter `sc`.
+   - Otomatis inisialisasi kredensial jika parameter `sc` terdeteksi di URL HP guru.
+3. `src/App.tsx`:
+   - Gunakan lazy initial state dari cache lokal (0ms rendering).
+   - Jalankan `loadAllData()` sebagai proses *background revalidation* tanpa blocking.
+   - Pemasangan `AdminPinGate` (PIN default `1234` atau PIN tersimpan).
+   - Penanganan khusus rute `checkin`: tidak menampilkan tombol navigasi admin.
 4. `src/components/ProjectorView.tsx`:
-   - Rotasi QR Code dinamis setiap 15 detik dengan indikator cincin visual melingkar.
+   - Menyertakan token kredensial publik Supabase pada string QR dinamis.
 5. `src/components/MobileCheckinView.tsx`:
-   - Memvalidasi token waktu 15 detik (+ toleransi 10 detik) dan menampilkan pesan expired jika lewat batas.
-   - Menampilkan input NIY (tanpa PIN agar cepat).
+   - Menghapus total tombol Home / "Buka Aplikasi Utama".
+   - Tampilan loading skeleton dan error yang rapi dan tertutup.
 6. `src/components/SchoolProfileView.tsx`:
-   - Menambahkan kolom input **Nama Yayasan** dan memperbarui Kop Surat.
-7. `src/components/MeetingsView.tsx`:
-   - Menambahkan kolom input Pimpinan Rapat (Nama & NIY) dan Notulis Rapat (Nama & NIY) khusus per agenda.
-8. `src/components/ReportsView.tsx`:
-   - Menampilkan Kop Surat dengan Nama Yayasan di atas Nama Sekolah, serta tanda tangan Pimpinan dan Notulis yang sesuai dengan agenda rapat yang dipilih.
-9. `src/components/SupabaseModal.tsx`:
-   - Menambahkan tombol *Sinkronkan Data Awal ke Supabase* dan indikator status sinkronisasi.
+   - Menambahkan pengaturan ubah PIN Admin dengan verifikasi.
+
+---
+
+### 5. Verification Plan
+
+1. **Uji Coba Kecepatan Render Awal**:
+   - Refresh aplikasi di browser dan pastikan nama yayasan/sekolah yang sudah diinput langsung tampil tanpa menampilkan teks dummy default sama sekali.
+2. **Uji Coba Respon Input/Edit/Hapus**:
+   - Tambah/edit/hapus agenda rapat dan guru; verifikasi aksi berlangsung instan tanpa jeda tunggu.
+3. **Uji Coba Presensi HP Guru di Vercel**:
+   - Buka tautan presensi hasil scan QR di perangkat lain; verifikasi bahwa informasi rapat langsung tampil dengan cepat tanpa tulisan "Rapat Tidak Ditemukan".
+4. **Uji Coba Keamanan PIN**:
+   - Buka konsol admin pada tab baru atau sesi baru dan pastikan PIN diminta.
+   - Cek halaman presensi guru dan pastikan tidak ada jalan keluar menuju dashboard admin.
+5. **Kompilasi & Lint**:
+   - Menjalankan `compile_applet` dan `lint_applet` untuk memastikan kode bebas galat.

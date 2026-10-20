@@ -4,6 +4,7 @@ import { Maximize2, Minimize2, Tv, Users, CheckCircle2, Clock, Calendar, MapPin,
 import { Attendance, Meeting, Teacher, SchoolProfile } from '../types';
 import { recordAttendance } from '../lib/storage';
 import { sound } from '../lib/audio';
+import { encodeSupabaseCredentials, getSupabaseCredentials } from '../lib/supabase';
 
 const ROTATION_INTERVAL_SECONDS = 15;
 
@@ -41,13 +42,24 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Generate Rolling QR Token every 15 seconds
+  // Generate Rolling QR Token every 15 seconds with embedded Supabase sync token
   const generateRollingQr = (meetingObj: Meeting) => {
     if (typeof window === 'undefined') return;
     const timestamp = Date.now();
     // Compact base64 token containing timestamp and meetingId
     const token = btoa(`${meetingObj.id}:${timestamp}`);
-    const fullUrl = `${window.location.origin}${window.location.pathname}?checkin=${meetingObj.id}&tok=${token}`;
+
+    // Embed public Supabase credentials so mobile phones scanning in Vercel connect instantly
+    const creds = getSupabaseCredentials();
+    let syncParam = '';
+    if (creds.url && creds.anonKey) {
+      const encoded = encodeSupabaseCredentials(creds.url, creds.anonKey);
+      if (encoded) {
+        syncParam = `&sc=${encodeURIComponent(encoded)}`;
+      }
+    }
+
+    const fullUrl = `${window.location.origin}${window.location.pathname}?checkin=${meetingObj.id}&tok=${token}${syncParam}`;
     setCheckinUrl(fullUrl);
 
     QRCode.toDataURL(fullUrl, {

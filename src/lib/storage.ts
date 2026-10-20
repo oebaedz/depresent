@@ -34,7 +34,74 @@ export function initLocalStorage() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// SYNCHRONOUS GETTERS (0ms Local-First State Initialization)
+// ---------------------------------------------------------------------------
+export function getCachedProfile(): SchoolProfile {
+  if (typeof window === 'undefined') return INITIAL_SCHOOL_PROFILE;
+  try {
+    const stored = localStorage.getItem(KEY_PROFILE);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return { ...INITIAL_SCHOOL_PROFILE, ...parsed };
+    }
+  } catch {
+    // fallback
+  }
+  return INITIAL_SCHOOL_PROFILE;
+}
+
+export function getCachedTeachers(): Teacher[] {
+  if (typeof window === 'undefined') return ensureValidUUIDs(INITIAL_TEACHERS);
+  try {
+    const stored = localStorage.getItem(KEY_TEACHERS);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return ensureValidUUIDs(parsed);
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return ensureValidUUIDs(INITIAL_TEACHERS);
+}
+
+export function getCachedMeetings(): Meeting[] {
+  if (typeof window === 'undefined') return ensureValidUUIDs(INITIAL_MEETINGS);
+  try {
+    const stored = localStorage.getItem(KEY_MEETINGS);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return ensureValidUUIDs(parsed);
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return ensureValidUUIDs(INITIAL_MEETINGS);
+}
+
+export function getCachedAttendances(): Attendance[] {
+  if (typeof window === 'undefined') return INITIAL_ATTENDANCES;
+  try {
+    const stored = localStorage.getItem(KEY_ATTENDANCES);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return INITIAL_ATTENDANCES;
+}
+
+// ---------------------------------------------------------------------------
 // 1. SCHOOL PROFILE
+// ---------------------------------------------------------------------------
 export async function fetchSchoolProfile(): Promise<SchoolProfile> {
   initLocalStorage();
   const supabase = getSupabase();
@@ -42,36 +109,23 @@ export async function fetchSchoolProfile(): Promise<SchoolProfile> {
   if (supabase) {
     try {
       const { data, error } = await supabase.from('smp_school_profile').select('*').limit(1);
-      if (!error) {
-        if (data && data.length > 0) {
-          const row = data[0];
-          const mapped: SchoolProfile = {
-            ...INITIAL_SCHOOL_PROFILE,
-            ...row,
-            foundation_name: row.foundation_name || INITIAL_SCHOOL_PROFILE.foundation_name,
-            headmaster_niy: row.headmaster_niy || row.headmaster_nip || INITIAL_SCHOOL_PROFILE.headmaster_niy,
-          };
-          localStorage.setItem(KEY_PROFILE, JSON.stringify(mapped));
-          return mapped;
-        } else {
-          // Table exists in Supabase but is empty -> seed initial profile directly
-          const initialPayload = {
-            ...INITIAL_SCHOOL_PROFILE,
-            id: isValidUUID(INITIAL_SCHOOL_PROFILE.id) ? INITIAL_SCHOOL_PROFILE.id : generateUUID(),
-            headmaster_nip: INITIAL_SCHOOL_PROFILE.headmaster_niy,
-          };
-          await supabase.from('smp_school_profile').insert([initialPayload]);
-          localStorage.setItem(KEY_PROFILE, JSON.stringify(initialPayload));
-          return initialPayload;
-        }
+      if (!error && data && data.length > 0) {
+        const row = data[0];
+        const mapped: SchoolProfile = {
+          ...INITIAL_SCHOOL_PROFILE,
+          ...row,
+          foundation_name: row.foundation_name || INITIAL_SCHOOL_PROFILE.foundation_name,
+          headmaster_niy: row.headmaster_niy || row.headmaster_nip || INITIAL_SCHOOL_PROFILE.headmaster_niy,
+        };
+        localStorage.setItem(KEY_PROFILE, JSON.stringify(mapped));
+        return mapped;
       }
     } catch (e) {
       console.warn('Fallback to local storage for school profile:', e);
     }
   }
 
-  const stored = localStorage.getItem(KEY_PROFILE);
-  return stored ? JSON.parse(stored) : INITIAL_SCHOOL_PROFILE;
+  return getCachedProfile();
 }
 
 export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolProfile> {
@@ -79,31 +133,30 @@ export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolP
     ...profile,
     id: isValidUUID(profile.id) ? profile.id : generateUUID(),
   };
+  // Instant local-first persist
   localStorage.setItem(KEY_PROFILE, JSON.stringify(cleanProfile));
 
   const supabase = getSupabase();
   if (supabase) {
-    try {
-      const payload = {
-        ...cleanProfile,
-        headmaster_nip: cleanProfile.headmaster_niy, // compatibility
-      };
-      const { data: existing } = await supabase.from('smp_school_profile').select('id').limit(1);
-      if (existing && existing.length > 0) {
-        const { error } = await supabase.from('smp_school_profile').update(payload).eq('id', existing[0].id);
+    const payload = {
+      ...cleanProfile,
+      headmaster_nip: cleanProfile.headmaster_niy, // compatibility
+    };
+    (async () => {
+      try {
+        const { error } = await supabase.from('smp_school_profile').upsert(payload);
         if (error) console.error('Error updating school profile in Supabase:', error.message);
-      } else {
-        const { error } = await supabase.from('smp_school_profile').insert([payload]);
-        if (error) console.error('Error inserting school profile in Supabase:', error.message);
+      } catch (e) {
+        console.warn('Could not sync school profile to Supabase:', e);
       }
-    } catch (e) {
-      console.warn('Could not sync school profile to Supabase:', e);
-    }
+    })();
   }
   return cleanProfile;
 }
 
+// ---------------------------------------------------------------------------
 // 2. TEACHERS
+// ---------------------------------------------------------------------------
 export async function fetchTeachers(): Promise<Teacher[]> {
   initLocalStorage();
   const supabase = getSupabase();
@@ -113,7 +166,6 @@ export async function fetchTeachers(): Promise<Teacher[]> {
       const { data, error } = await supabase.from('smp_teachers').select('*').order('name', { ascending: true });
       if (!error && Array.isArray(data)) {
         if (data.length > 0) {
-          // Map database columns
           const mappedTeachers: Teacher[] = data.map((row) => ({
             id: row.id,
             ptk_id: row.ptk_id,
@@ -131,13 +183,9 @@ export async function fetchTeachers(): Promise<Teacher[]> {
           localStorage.setItem(KEY_TEACHERS, JSON.stringify(mappedTeachers));
           return mappedTeachers;
         } else {
-          // Supabase table smp_teachers exists but is currently empty!
-          // Auto-seed current teachers to Supabase so the user's DB immediately has data
-          const stored = localStorage.getItem(KEY_TEACHERS);
-          const rawTeachers: Teacher[] = stored ? JSON.parse(stored) : INITIAL_TEACHERS;
-          const seedTeachers = ensureValidUUIDs(rawTeachers);
-
-          const dbPayload = seedTeachers.map((t) => ({
+          // Table exists but is empty -> auto seed from local
+          const localTeachers = getCachedTeachers();
+          const dbPayload = localTeachers.map((t) => ({
             id: t.id,
             ptk_id: t.ptk_id,
             niy: t.niy || t.nip || '-',
@@ -149,23 +197,22 @@ export async function fetchTeachers(): Promise<Teacher[]> {
             avatar_url: t.avatar_url || '',
             is_active: t.is_active,
           }));
-
-          await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
-          localStorage.setItem(KEY_TEACHERS, JSON.stringify(seedTeachers));
-          return seedTeachers;
+          (async () => {
+            try {
+              await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
+            } catch (e) {
+              console.warn(e);
+            }
+          })();
+          return localTeachers;
         }
-      }
-      if (error) {
-        console.warn('Supabase fetchTeachers error:', error.message);
       }
     } catch (e) {
       console.warn('Fallback to local storage for teachers:', e);
     }
   }
 
-  const stored = localStorage.getItem(KEY_TEACHERS);
-  const raw: Teacher[] = stored ? JSON.parse(stored) : INITIAL_TEACHERS;
-  return ensureValidUUIDs(raw);
+  return getCachedTeachers();
 }
 
 export async function saveTeacher(teacher: Teacher): Promise<Teacher> {
@@ -178,7 +225,8 @@ export async function saveTeacher(teacher: Teacher): Promise<Teacher> {
     ptk_id: teacher.ptk_id.trim(),
   };
 
-  const teachers = await fetchTeachers();
+  // Instant local-first optimistic update
+  const teachers = getCachedTeachers();
   const index = teachers.findIndex((t) => t.id === cleanTeacher.id || t.ptk_id === cleanTeacher.ptk_id);
   let updated: Teacher[];
   if (index >= 0) {
@@ -191,56 +239,57 @@ export async function saveTeacher(teacher: Teacher): Promise<Teacher> {
 
   const supabase = getSupabase();
   if (supabase) {
-    try {
-      const dbPayload = {
-        id: cleanTeacher.id,
-        ptk_id: cleanTeacher.ptk_id,
-        niy: cleanTeacher.niy,
-        nip: cleanTeacher.niy, // write both for compatibility
-        name: cleanTeacher.name,
-        phone_wa: cleanTeacher.phone_wa,
-        rank_group: cleanTeacher.rank_group,
-        role_title: cleanTeacher.role_title,
-        avatar_url: cleanTeacher.avatar_url || '',
-        is_active: cleanTeacher.is_active,
-      };
+    const dbPayload = {
+      id: cleanTeacher.id,
+      ptk_id: cleanTeacher.ptk_id,
+      niy: cleanTeacher.niy,
+      nip: cleanTeacher.niy,
+      name: cleanTeacher.name,
+      phone_wa: cleanTeacher.phone_wa,
+      rank_group: cleanTeacher.rank_group,
+      role_title: cleanTeacher.role_title,
+      avatar_url: cleanTeacher.avatar_url || '',
+      is_active: cleanTeacher.is_active,
+    };
 
-      const { error } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
-      if (error) {
-        console.error('Gagal simpan guru ke Supabase:', error.message);
+    (async () => {
+      try {
+        const { error } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
+        if (error) console.error('Gagal simpan guru ke Supabase:', error.message);
+      } catch (e) {
+        console.warn('Could not sync teacher to Supabase:', e);
       }
-    } catch (e) {
-      console.warn('Could not sync teacher to Supabase:', e);
-    }
+    })();
   }
   return cleanTeacher;
 }
 
 export async function deleteTeacher(id: string): Promise<void> {
-  const teachers = await fetchTeachers();
+  // 1. Instant local update
+  const teachers = getCachedTeachers();
   const updated = teachers.filter((t) => t.id !== id);
   localStorage.setItem(KEY_TEACHERS, JSON.stringify(updated));
 
-  // Also remove attendances for this teacher in local storage
-  const attendances = await fetchAttendances();
+  const attendances = getCachedAttendances();
   const updatedAtt = attendances.filter((a) => a.teacher_id !== id);
   localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(updatedAtt));
 
+  // 2. Background sync
   const supabase = getSupabase();
   if (supabase) {
-    try {
-      // Delete attendances first to prevent foreign key constraint violations
-      await supabase.from('smp_attendances').delete().eq('teacher_id', id);
-      const { error } = await supabase.from('smp_teachers').delete().eq('id', id);
-      if (error) console.error('Could not delete teacher in Supabase:', error.message);
-    } catch (e) {
-      console.warn('Could not delete teacher in Supabase:', e);
-    }
+    (async () => {
+      try {
+        await supabase.from('smp_attendances').delete().eq('teacher_id', id);
+        await supabase.from('smp_teachers').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Could not delete teacher in Supabase:', e);
+      }
+    })();
   }
 }
 
 export async function bulkImportTeachers(newTeachers: Omit<Teacher, 'id'>[]): Promise<number> {
-  const currentTeachers = await fetchTeachers();
+  const currentTeachers = getCachedTeachers();
   const existingPtkMap = new Map<string, Teacher>();
   currentTeachers.forEach((t) => existingPtkMap.set(t.ptk_id.trim().toLowerCase(), t));
 
@@ -275,40 +324,44 @@ export async function bulkImportTeachers(newTeachers: Omit<Teacher, 'id'>[]): Pr
 
   const supabase = getSupabase();
   if (supabase && toSave.length > 0) {
-    try {
-      const dbPayload = toSave.map((t) => ({
-        id: t.id,
-        ptk_id: t.ptk_id,
-        niy: t.niy,
-        nip: t.niy,
-        name: t.name,
-        phone_wa: t.phone_wa,
-        rank_group: t.rank_group,
-        role_title: t.role_title,
-        avatar_url: t.avatar_url || '',
-        is_active: t.is_active,
-      }));
-
-      const { error } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
-      if (error) {
-        console.error('Error bulk import to Supabase:', error.message);
+    const dbPayload = toSave.map((t) => ({
+      id: t.id,
+      ptk_id: t.ptk_id,
+      niy: t.niy,
+      nip: t.niy,
+      name: t.name,
+      phone_wa: t.phone_wa,
+      rank_group: t.rank_group,
+      role_title: t.role_title,
+      avatar_url: t.avatar_url,
+      is_active: t.is_active,
+    }));
+    (async () => {
+      try {
+        await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
+      } catch (e) {
+        console.warn('Bulk import sync warning:', e);
       }
-    } catch (e) {
-      console.warn('Could not sync bulk teachers to Supabase:', e);
-    }
+    })();
   }
 
   return count;
 }
 
+// ---------------------------------------------------------------------------
 // 3. MEETINGS
+// ---------------------------------------------------------------------------
 export async function fetchMeetings(): Promise<Meeting[]> {
   initLocalStorage();
   const supabase = getSupabase();
 
   if (supabase) {
     try {
-      const { data, error } = await supabase.from('smp_meetings').select('*').order('meeting_date', { ascending: false });
+      const { data, error } = await supabase
+        .from('smp_meetings')
+        .select('*')
+        .order('meeting_date', { ascending: false });
+
       if (!error && Array.isArray(data)) {
         if (data.length > 0) {
           const mappedMeetings: Meeting[] = data.map((row) => ({
@@ -332,14 +385,16 @@ export async function fetchMeetings(): Promise<Meeting[]> {
           localStorage.setItem(KEY_MEETINGS, JSON.stringify(mappedMeetings));
           return mappedMeetings;
         } else {
-          // Table exists in Supabase but is empty -> auto seed initial meetings
-          const stored = localStorage.getItem(KEY_MEETINGS);
-          const rawMeetings: Meeting[] = stored ? JSON.parse(stored) : INITIAL_MEETINGS;
-          const seedMeetings = ensureValidUUIDs(rawMeetings);
-
-          await supabase.from('smp_meetings').upsert(seedMeetings);
-          localStorage.setItem(KEY_MEETINGS, JSON.stringify(seedMeetings));
-          return seedMeetings;
+          // Table exists but is empty -> auto seed
+          const localMeetings = getCachedMeetings();
+          (async () => {
+            try {
+              await supabase.from('smp_meetings').upsert(localMeetings);
+            } catch (e) {
+              console.warn(e);
+            }
+          })();
+          return localMeetings;
         }
       }
     } catch (e) {
@@ -347,9 +402,45 @@ export async function fetchMeetings(): Promise<Meeting[]> {
     }
   }
 
-  const stored = localStorage.getItem(KEY_MEETINGS);
-  const raw: Meeting[] = stored ? JSON.parse(stored) : INITIAL_MEETINGS;
-  return ensureValidUUIDs(raw);
+  return getCachedMeetings();
+}
+
+// Single meeting fetch optimized for rapid mobile checkin lookup
+export async function fetchSingleMeeting(meetingId: string): Promise<Meeting | null> {
+  const cached = getCachedMeetings().find((m) => m.id === meetingId);
+  if (cached) return cached;
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('smp_meetings').select('*').eq('id', meetingId).single();
+      if (!error && data) {
+        const mapped: Meeting = {
+          id: data.id,
+          title: data.title,
+          category: data.category,
+          meeting_date: data.meeting_date,
+          start_time: data.start_time,
+          end_time: data.end_time,
+          room: data.room,
+          leader_name: data.leader_name,
+          leader_niy: data.leader_niy || '',
+          secretary_name: data.secretary_name || '',
+          secretary_niy: data.secretary_niy || '',
+          tolerance_minutes: data.tolerance_minutes || 15,
+          status: data.status || 'active',
+          notes: data.notes || '',
+          created_at: data.created_at,
+        };
+        const current = getCachedMeetings();
+        localStorage.setItem(KEY_MEETINGS, JSON.stringify([mapped, ...current.filter((m) => m.id !== mapped.id)]));
+        return mapped;
+      }
+    } catch (e) {
+      console.warn('Single meeting fetch error:', e);
+    }
+  }
+  return null;
 }
 
 export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
@@ -358,7 +449,8 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
     id: isValidUUID(meeting.id) ? meeting.id : generateUUID(),
   };
 
-  const meetings = await fetchMeetings();
+  // Instant local-first update
+  const meetings = getCachedMeetings();
   const index = meetings.findIndex((m) => m.id === cleanMeeting.id);
   let updated: Meeting[];
   if (index >= 0) {
@@ -371,42 +463,44 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
 
   const supabase = getSupabase();
   if (supabase) {
-    try {
-      const { error } = await supabase.from('smp_meetings').upsert(cleanMeeting);
-      if (error) {
-        console.error('Error saving meeting to Supabase:', error.message);
+    (async () => {
+      try {
+        const { error } = await supabase.from('smp_meetings').upsert(cleanMeeting);
+        if (error) console.error('Error saving meeting to Supabase:', error.message);
+      } catch (e) {
+        console.warn('Could not sync meeting to Supabase:', e);
       }
-    } catch (e) {
-      console.warn('Could not sync meeting to Supabase:', e);
-    }
+    })();
   }
   return cleanMeeting;
 }
 
 export async function deleteMeeting(id: string): Promise<void> {
-  const meetings = await fetchMeetings();
+  // Instant local update
+  const meetings = getCachedMeetings();
   const updated = meetings.filter((m) => m.id !== id);
   localStorage.setItem(KEY_MEETINGS, JSON.stringify(updated));
 
-  // Also remove attendances for this meeting in local storage
-  const attendances = await fetchAttendances();
+  const attendances = getCachedAttendances();
   const updatedAtt = attendances.filter((a) => a.meeting_id !== id);
   localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(updatedAtt));
 
   const supabase = getSupabase();
   if (supabase) {
-    try {
-      // Delete attendances first to prevent foreign key constraint violations
-      await supabase.from('smp_attendances').delete().eq('meeting_id', id);
-      const { error } = await supabase.from('smp_meetings').delete().eq('id', id);
-      if (error) console.error('Could not delete meeting in Supabase:', error.message);
-    } catch (e) {
-      console.warn('Could not delete meeting in Supabase:', e);
-    }
+    (async () => {
+      try {
+        await supabase.from('smp_attendances').delete().eq('meeting_id', id);
+        await supabase.from('smp_meetings').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Could not delete meeting in Supabase:', e);
+      }
+    })();
   }
 }
 
+// ---------------------------------------------------------------------------
 // 4. ATTENDANCES
+// ---------------------------------------------------------------------------
 export async function fetchAttendances(meetingId?: string): Promise<Attendance[]> {
   initLocalStorage();
   const supabase = getSupabase();
@@ -419,6 +513,9 @@ export async function fetchAttendances(meetingId?: string): Promise<Attendance[]
       }
       const { data, error } = await query.order('check_in_time', { ascending: false });
       if (!error && Array.isArray(data)) {
+        if (!meetingId) {
+          localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(data));
+        }
         return data as Attendance[];
       }
     } catch (e) {
@@ -426,8 +523,7 @@ export async function fetchAttendances(meetingId?: string): Promise<Attendance[]
     }
   }
 
-  const stored = localStorage.getItem(KEY_ATTENDANCES);
-  const all: Attendance[] = stored ? JSON.parse(stored) : INITIAL_ATTENDANCES;
+  const all = getCachedAttendances();
   if (meetingId) {
     return all.filter((a) => a.meeting_id === meetingId);
   }
@@ -442,7 +538,7 @@ export async function recordAttendance(params: {
   notes?: string;
   waNotified?: boolean;
 }): Promise<{ attendance: Attendance; isNew: boolean }> {
-  const all = await fetchAttendances();
+  const all = getCachedAttendances();
   const existingIndex = all.findIndex((a) => a.meeting_id === params.meetingId && a.teacher_id === params.teacherId);
 
   const checkInTime = new Date().toISOString();
@@ -454,7 +550,8 @@ export async function recordAttendance(params: {
       ...all[existingIndex],
       status: params.status,
       method: params.method,
-      notes: params.notes || all[existingIndex].notes,
+      check_in_time: checkInTime,
+      notes: params.notes ?? all[existingIndex].notes,
       wa_notified: params.waNotified ?? all[existingIndex].wa_notified,
     };
     all[existingIndex] = att;
@@ -473,73 +570,61 @@ export async function recordAttendance(params: {
     all.unshift(att);
   }
 
+  // Instant local persist
   localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(all));
 
+  // Background sync to Supabase
   const supabase = getSupabase();
   if (supabase) {
-    try {
-      // Validate that meetingId and teacherId are UUIDs before sending to Supabase
-      if (isValidUUID(att.meeting_id) && isValidUUID(att.teacher_id)) {
-        const { error } = await supabase.from('smp_attendances').upsert(att, { onConflict: 'meeting_id,teacher_id' });
-        if (error) {
-          console.error('Error saving attendance to Supabase:', error.message);
-        }
+    (async () => {
+      try {
+        const { error } = await supabase.from('smp_attendances').upsert(att);
+        if (error) console.error('Error saving attendance to Supabase:', error.message);
+      } catch (e) {
+        console.warn('Could not sync attendance to Supabase:', e);
       }
-    } catch (e) {
-      console.warn('Could not sync attendance to Supabase:', e);
-    }
+    })();
   }
 
   return { attendance: att, isNew };
 }
 
 export async function deleteAttendance(id: string): Promise<void> {
-  const all = await fetchAttendances();
-  const updated = all.filter((a) => a.id !== id);
+  const attendances = getCachedAttendances();
+  const updated = attendances.filter((a) => a.id !== id);
   localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(updated));
 
   const supabase = getSupabase();
   if (supabase) {
-    try {
-      await supabase.from('smp_attendances').delete().eq('id', id);
-    } catch (e) {
-      console.warn('Could not delete attendance in Supabase:', e);
-    }
+    (async () => {
+      try {
+        const { error } = await supabase.from('smp_attendances').delete().eq('id', id);
+        if (error) console.error('Error deleting attendance in Supabase:', error.message);
+      } catch (e) {
+        console.warn('Could not delete attendance in Supabase:', e);
+      }
+    })();
   }
 }
 
-// 5. SEED / INITIAL SYNC TO SUPABASE
-export async function syncInitialDataToSupabase(): Promise<{
-  success: boolean;
-  message: string;
-  countTeachers: number;
-  countMeetings: number;
-}> {
+export async function syncInitialDataToSupabase(): Promise<{ success: boolean; message: string }> {
   const supabase = getSupabase();
   if (!supabase) {
-    return {
-      success: false,
-      message: 'Supabase belum terhubung. Periksa URL dan Anon Key terlebih dahulu.',
-      countTeachers: 0,
-      countMeetings: 0,
-    };
+    return { success: false, message: 'Klien Supabase belum terhubung. Periksa URL dan Anon Key.' };
   }
 
   try {
-    // 1. Sync School Profile
-    const profile = await fetchSchoolProfile();
-    const cleanProfilePayload = {
+    // 1. Sync Profile
+    const profile = getCachedProfile();
+    const profilePayload = {
       ...profile,
-      id: isValidUUID(profile.id) ? profile.id : generateUUID(),
       headmaster_nip: profile.headmaster_niy,
     };
-    const { error: pErr } = await supabase.from('smp_school_profile').upsert(cleanProfilePayload);
-    if (pErr) throw new Error(`Gagal sync profil: ${pErr.message}`);
+    await supabase.from('smp_school_profile').upsert(profilePayload);
 
     // 2. Sync Teachers
-    const rawTeachers = await fetchTeachers();
-    const teachers = ensureValidUUIDs(rawTeachers);
-    const teacherPayload = teachers.map((t) => ({
+    const teachers = getCachedTeachers();
+    const teachersPayload = teachers.map((t) => ({
       id: t.id,
       ptk_id: t.ptk_id,
       niy: t.niy || t.nip || '-',
@@ -551,33 +636,18 @@ export async function syncInitialDataToSupabase(): Promise<{
       avatar_url: t.avatar_url || '',
       is_active: t.is_active,
     }));
-    const { error: tErr } = await supabase.from('smp_teachers').upsert(teacherPayload, { onConflict: 'ptk_id' });
-    if (tErr) throw new Error(`Gagal sync guru: ${tErr.message}`);
+    await supabase.from('smp_teachers').upsert(teachersPayload, { onConflict: 'ptk_id' });
 
     // 3. Sync Meetings
-    const rawMeetings = await fetchMeetings();
-    const meetings = ensureValidUUIDs(rawMeetings);
-    const { error: mErr } = await supabase.from('smp_meetings').upsert(meetings);
-    if (mErr) throw new Error(`Gagal sync rapat: ${mErr.message}`);
-
-    // Save cleaned UUID versions in local storage
-    localStorage.setItem(KEY_PROFILE, JSON.stringify(cleanProfilePayload));
-    localStorage.setItem(KEY_TEACHERS, JSON.stringify(teachers));
-    localStorage.setItem(KEY_MEETINGS, JSON.stringify(meetings));
+    const meetings = getCachedMeetings();
+    await supabase.from('smp_meetings').upsert(meetings);
 
     return {
       success: true,
-      message: `Berhasil menyinkronkan profil yayasan, ${teachers.length} guru, dan ${meetings.length} rapat ke database Supabase Anda!`,
-      countTeachers: teachers.length,
-      countMeetings: meetings.length,
+      message: `Berhasil menyinkronkan data profil sekolah, ${teachers.length} guru, dan ${meetings.length} agenda rapat ke database Supabase!`,
     };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    return {
-      success: false,
-      message: `Sinkronisasi gagal: ${errorMsg}`,
-      countTeachers: 0,
-      countMeetings: 0,
-    };
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, message: `Gagal menyinkronkan data ke Supabase: ${msg}` };
   }
 }
