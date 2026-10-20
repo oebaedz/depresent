@@ -1,0 +1,10 @@
+{
+  "name": "PresensiQR SMP - Presensi Rapat & Kegiatan Guru",
+  "description": "Aplikasi presensi rapat dan kegiatan sekolah berbasis QR Code ID Card terintegrasi Supabase, notifikasi WhatsApp WAHA, mode proyektor, dan laporan resmi ber-kop surat.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

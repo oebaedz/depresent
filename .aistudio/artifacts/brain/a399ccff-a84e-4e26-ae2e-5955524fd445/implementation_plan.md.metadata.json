@@ -1,0 +1,6 @@
+{
+  "summary": "Revisi rencana implementasi dePresent berdasarkan feedback pengguna: (1) Dynamic Rolling QR Code dengan rotasi cepat tiap 15 detik tanpa perlu PIN agar proses check-in kilat dan tanpa mengubah skema tabel guru; (2) Perubahan label identitas dari NIP menjadi NIY (Nomor Induk Yayasan); (3) Kop surat resmi menempatkan Nama Yayasan di atas Nama Sekolah dengan kolom input yayasan di profil; (4) Data pimpinan rapat dan notulis ditentukan spesifik per agenda rapat; (5) Diagnosa dan perbaikan menyeluruh sinkronisasi Supabase (mengatasi masalah data kosong yang fallback ke dummy, fitur 1-klik Sync Data Awal ke Supabase, dan error handling RLS yang transparan).",
+  "updatedAt": "2026-10-20T10:23:55.143506542Z",
+  "requestFeedback": true,
+  "userFacing": true
+}
