@@ -24,6 +24,7 @@ import {
   getCachedProfile,
   getCachedTeachers,
   initLocalStorage,
+  updateAdminPinInDb,
 } from './lib/storage';
 import { getSupabase } from './lib/supabase';
 import { Menu, Database, AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
@@ -82,11 +83,9 @@ export default function App() {
     setIsAdminUnlocked(false);
   };
 
-  const handleUpdateAdminPin = (newPin: string) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('smp_admin_pin', newPin);
-    }
+  const handleUpdateAdminPin = async (newPin: string) => {
     setAdminPin(newPin);
+    await updateAdminPinInDb(newPin);
   };
 
   // Selected meeting for projector or scanner
@@ -156,6 +155,11 @@ export default function App() {
       setMeetings(meetingData);
       setAttendances(attendanceData);
 
+      if (profileData.admin_pin) {
+        setAdminPin(profileData.admin_pin);
+        localStorage.setItem('smp_admin_pin', profileData.admin_pin);
+      }
+
       if (meetingData.length > 0 && !selectedMeetingId) {
         const active = meetingData.find((m) => m.status === 'active') || meetingData[0];
         setSelectedMeetingId(active.id);
@@ -168,6 +172,107 @@ export default function App() {
   useEffect(() => {
     loadAllData();
   }, [loadAllData]);
+
+  // -------------------------------------------------------------------------
+  // REAL-TIME SYNC: Otomatis sinkronisasi kehadiran tanpa perlu reload manual
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const client = getSupabase();
+    if (!client) return;
+
+    // Supabase Postgres Changes Channel
+    const channel = client
+      .channel('depresent_realtime_channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'smp_attendances' },
+        async () => {
+          const fresh = await fetchAttendances();
+          setAttendances(fresh);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'smp_meetings' },
+        async () => {
+          const fresh = await fetchMeetings();
+          setMeetings(fresh);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'smp_school_profile' },
+        async () => {
+          const fresh = await fetchSchoolProfile();
+          setSchoolProfile(fresh);
+          if (fresh.admin_pin) {
+            setAdminPin(fresh.admin_pin);
+            localStorage.setItem('smp_admin_pin', fresh.admin_pin);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'smp_teachers' },
+        async () => {
+          const fresh = await fetchTeachers();
+          setTeachers(fresh);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  }, []);
+
+  // Polling fallback ultra-ringan tiap 3 detik untuk garansi update layar proyektor / dashboard saat scan HP
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const freshAtt = await fetchAttendances();
+        setAttendances(freshAtt);
+      } catch {}
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Listener event lokal & multi-tab browser
+  useEffect(() => {
+    const handleLocalAttendance = () => {
+      setAttendances(getCachedAttendances());
+    };
+
+    const handlePinUpdated = (e: Event) => {
+      const custom = e as CustomEvent<string>;
+      if (custom.detail) {
+        setAdminPin(custom.detail);
+      }
+    };
+
+    const handleStorageEvent = (e: StorageEvent) => {
+      if (e.key === 'smp_attendances_v3') {
+        setAttendances(getCachedAttendances());
+      } else if (e.key === 'smp_meetings_v3') {
+        setMeetings(getCachedMeetings());
+      } else if (e.key === 'smp_admin_pin' && e.newValue) {
+        setAdminPin(e.newValue);
+      } else if (e.key === 'smp_school_profile_v3') {
+        setSchoolProfile(getCachedProfile());
+      }
+    };
+
+    window.addEventListener('smp_attendance_recorded', handleLocalAttendance);
+    window.addEventListener('smp_pin_updated', handlePinUpdated);
+    window.addEventListener('storage', handleStorageEvent);
+
+    return () => {
+      window.removeEventListener('smp_attendance_recorded', handleLocalAttendance);
+      window.removeEventListener('smp_pin_updated', handlePinUpdated);
+      window.removeEventListener('storage', handleStorageEvent);
+    };
+  }, []);
 
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || meetings[0];
   const targetCheckinMeeting = mobileMeeting || meetings.find((m) => m.id === mobileCheckinMeetingId);

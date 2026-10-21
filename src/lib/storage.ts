@@ -116,8 +116,12 @@ export async function fetchSchoolProfile(): Promise<SchoolProfile> {
           ...row,
           foundation_name: row.foundation_name || INITIAL_SCHOOL_PROFILE.foundation_name,
           headmaster_niy: row.headmaster_niy || row.headmaster_nip || INITIAL_SCHOOL_PROFILE.headmaster_niy,
+          admin_pin: row.admin_pin || INITIAL_SCHOOL_PROFILE.admin_pin || '1234',
         };
         localStorage.setItem(KEY_PROFILE, JSON.stringify(mapped));
+        if (mapped.admin_pin) {
+          localStorage.setItem('smp_admin_pin', mapped.admin_pin);
+        }
         return mapped;
       }
     } catch (e) {
@@ -129,12 +133,17 @@ export async function fetchSchoolProfile(): Promise<SchoolProfile> {
 }
 
 export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolProfile> {
+  const currentPin = profile.admin_pin || (typeof window !== 'undefined' ? localStorage.getItem('smp_admin_pin') : undefined) || '1234';
   const cleanProfile: SchoolProfile = {
     ...profile,
     id: isValidUUID(profile.id) ? profile.id : generateUUID(),
+    admin_pin: currentPin,
   };
   // Instant local-first persist
   localStorage.setItem(KEY_PROFILE, JSON.stringify(cleanProfile));
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('smp_admin_pin', currentPin);
+  }
 
   const supabase = getSupabase();
   if (supabase) {
@@ -152,6 +161,40 @@ export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolP
     })();
   }
   return cleanProfile;
+}
+
+export async function updateAdminPinInDb(newPin: string): Promise<boolean> {
+  const pin = newPin.trim();
+  if (!pin) return false;
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('smp_admin_pin', pin);
+    const cached = getCachedProfile();
+    const updated = { ...cached, admin_pin: pin };
+    localStorage.setItem(KEY_PROFILE, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('smp_pin_updated', { detail: pin }));
+  }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const cached = getCachedProfile();
+      const { error } = await supabase
+        .from('smp_school_profile')
+        .update({ admin_pin: pin })
+        .eq('id', cached.id);
+
+      if (error) {
+        // Fallback: update any row in smp_school_profile
+        await supabase.from('smp_school_profile').update({ admin_pin: pin }).neq('school_name', '');
+      }
+      return true;
+    } catch (e) {
+      console.warn('Could not sync admin PIN update to Supabase:', e);
+      return false;
+    }
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -499,6 +542,128 @@ export async function deleteMeeting(id: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// 3.1 MEETING CATEGORIES
+// ---------------------------------------------------------------------------
+const KEY_MEETING_CATEGORIES = 'smp_meeting_categories_v1';
+export const DEFAULT_MEETING_CATEGORIES: string[] = [
+  'Rapat Dinas',
+  'Workshop',
+  'Briefing',
+  'MGMP',
+  'Upacara',
+  'Evaluasi & Raker',
+  'Lainnya',
+];
+
+export function getMeetingCategories(): string[] {
+  if (typeof window === 'undefined') return DEFAULT_MEETING_CATEGORIES;
+  try {
+    const stored = localStorage.getItem(KEY_MEETING_CATEGORIES);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return DEFAULT_MEETING_CATEGORIES;
+}
+
+export function saveMeetingCategories(categories: string[]): string[] {
+  const clean = Array.from(new Set(categories.map((c) => c.trim()).filter(Boolean)));
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(KEY_MEETING_CATEGORIES, JSON.stringify(clean));
+    window.dispatchEvent(new CustomEvent('smp_categories_updated', { detail: clean }));
+  }
+  return clean;
+}
+
+export function addMeetingCategory(newCat: string): string[] {
+  const cat = newCat.trim();
+  if (!cat) return getMeetingCategories();
+  const current = getMeetingCategories();
+  if (!current.includes(cat)) {
+    const updated = [...current, cat];
+    return saveMeetingCategories(updated);
+  }
+  return current;
+}
+
+export function deleteMeetingCategory(catToDelete: string): string[] {
+  const current = getMeetingCategories();
+  const filtered = current.filter((c) => c !== catToDelete);
+  return saveMeetingCategories(filtered.length > 0 ? filtered : DEFAULT_MEETING_CATEGORIES);
+}
+
+// ---------------------------------------------------------------------------
+// 3.2 FINALIZE MEETING ATTENDANCE AS ABSENT (TIDAK HADIR)
+// ---------------------------------------------------------------------------
+export async function completeMeetingAndMarkAbsent(
+  meetingId: string,
+  teachers: Teacher[]
+): Promise<{ updatedCount: number; attendances: Attendance[] }> {
+  // 1. Mark meeting as completed
+  const allMeetings = getCachedMeetings();
+  const mIndex = allMeetings.findIndex((m) => m.id === meetingId);
+  if (mIndex >= 0) {
+    allMeetings[mIndex] = { ...allMeetings[mIndex], status: 'completed' };
+    localStorage.setItem(KEY_MEETINGS, JSON.stringify(allMeetings));
+  }
+
+  // 2. Find active teachers without attendance in this meeting
+  const allAttendances = getCachedAttendances();
+  const meetingAtts = allAttendances.filter((a) => a.meeting_id === meetingId);
+  const attendedTeacherIds = new Set(meetingAtts.map((a) => a.teacher_id));
+
+  const activeTeachers = teachers.filter((t) => t.is_active);
+  const nowIso = new Date().toISOString();
+  const newAbsentAttendances: Attendance[] = [];
+
+  for (const t of activeTeachers) {
+    if (!attendedTeacherIds.has(t.id)) {
+      const absentAtt: Attendance = {
+        id: generateUUID(),
+        meeting_id: meetingId,
+        teacher_id: t.id,
+        check_in_time: nowIso,
+        status: 'alpa',
+        method: 'manual',
+        notes: 'Tidak Hadir (Otomatis saat rapat selesai)',
+        wa_notified: false,
+      };
+      newAbsentAttendances.push(absentAtt);
+      allAttendances.unshift(absentAtt);
+    }
+  }
+
+  // 3. Persist attendances locally
+  localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(allAttendances));
+
+  // 4. Background sync to Supabase
+  const supabase = getSupabase();
+  if (supabase) {
+    (async () => {
+      try {
+        if (mIndex >= 0) {
+          await supabase.from('smp_meetings').update({ status: 'completed' }).eq('id', meetingId);
+        }
+        if (newAbsentAttendances.length > 0) {
+          await supabase.from('smp_attendances').upsert(newAbsentAttendances);
+        }
+      } catch (e) {
+        console.warn('Could not sync completed meeting & absents to Supabase:', e);
+      }
+    })();
+  }
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('smp_attendance_recorded'));
+  }
+
+  return { updatedCount: newAbsentAttendances.length, attendances: allAttendances };
+}
+
+// ---------------------------------------------------------------------------
 // 4. ATTENDANCES
 // ---------------------------------------------------------------------------
 export async function fetchAttendances(meetingId?: string): Promise<Attendance[]> {
@@ -572,6 +737,10 @@ export async function recordAttendance(params: {
 
   // Instant local persist
   localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(all));
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('smp_attendance_recorded', { detail: att }));
+  }
 
   // Background sync to Supabase
   const supabase = getSupabase();

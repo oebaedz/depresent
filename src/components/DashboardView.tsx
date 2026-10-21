@@ -437,10 +437,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 ? 'bg-amber-100 text-amber-800'
                                 : att.status === 'izin'
                                 ? 'bg-blue-100 text-blue-800'
-                                : 'bg-purple-100 text-purple-800'
+                                : att.status === 'sakit'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-rose-100 text-rose-800'
                             }`}
                           >
-                            {att.status.toUpperCase()}
+                            {att.status === 'alpa' ? 'TIDAK HADIR' : att.status.toUpperCase()}
+                          </span>
+                        ) : currentMeeting?.status === 'completed' ? (
+                          <span className="inline-block font-semibold text-[11px] px-2 py-0.5 rounded bg-rose-100 text-rose-800">
+                            TIDAK HADIR
                           </span>
                         ) : (
                           <span className="text-[11px] text-slate-400 font-medium">Belum Hadir</span>

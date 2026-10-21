@@ -17,6 +17,7 @@ export const INITIAL_SCHOOL_PROFILE: SchoolProfile = {
   headmaster_rank: 'Pembina Yayasan / Guru Utama',
   waha_group_id: '120363045612398@g.us',
   logo_url: '',
+  admin_pin: '1234',
 };
 
 export const INITIAL_TEACHERS: Teacher[] = [
@@ -26,7 +27,7 @@ export const INITIAL_TEACHERS: Teacher[] = [
     niy: 'YHB-2002-014',
     name: 'Ahmad Fauzi, S.Pd., M.Si.',
     phone_wa: '081234567801',
-    rank_group: 'Guru Tetap Yayasan (GTY)',
+    rank_group: 'Pegawai Tetap Yayasan',
     role_title: 'Wakasek Kurikulum / Guru IPA',
     is_active: true,
   },

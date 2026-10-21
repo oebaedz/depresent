@@ -31,7 +31,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
     niy: '',
     name: '',
     phone_wa: '',
-    rank_group: 'Guru Tetap Yayasan (GTY)',
+    rank_group: 'Pegawai Tetap Yayasan',
     role_title: 'Guru Mata Pelajaran',
     avatar_url: '',
     is_active: true,
@@ -80,7 +80,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
       niy: '',
       name: '',
       phone_wa: '',
-      rank_group: 'Guru Tetap Yayasan (GTY)',
+      rank_group: 'Pegawai Tetap Yayasan',
       role_title: 'Guru Mata Pelajaran',
       avatar_url: '',
       is_active: true,
@@ -153,7 +153,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
         let wa = parts[2]?.trim() || '';
         let ptk_id = parts[3]?.trim() || '';
         let role = parts[4]?.trim() || 'Guru Mata Pelajaran';
-        let rank = parts[5]?.trim() || 'Guru Tetap Yayasan (GTY)';
+        let rank = parts[5]?.trim() || 'Pegawai Tetap Yayasan';
 
         if (parts[0]?.length === 36 && parts[0]?.includes('-')) {
           ptk_id = parts[0].trim();
@@ -453,11 +453,19 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                   </label>
                   <input
                     type="text"
+                    list="rank_group_options"
                     value={formData.rank_group}
                     onChange={(e) => setFormData({ ...formData, rank_group: e.target.value })}
-                    placeholder="Guru Tetap Yayasan (GTY)"
+                    placeholder="Pegawai Tetap Yayasan"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-hidden"
                   />
+                  <datalist id="rank_group_options">
+                    <option value="Pegawai Tetap Yayasan" />
+                    <option value="Guru Tetap Yayasan (GTY)" />
+                    <option value="Guru Tidak Tetap (GTT)" />
+                    <option value="Pegawai Tidak Tetap (PTT)" />
+                    <option value="Tenaga Kependidikan" />
+                  </datalist>
                 </div>
               </div>
 

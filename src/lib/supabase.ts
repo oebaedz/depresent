@@ -178,12 +178,14 @@ CREATE TABLE IF NOT EXISTS smp_school_profile (
   headmaster_rank TEXT NOT NULL DEFAULT 'Pembina Yayasan / Guru Utama',
   waha_group_id TEXT DEFAULT '',
   logo_url TEXT DEFAULT '',
+  admin_pin TEXT DEFAULT '1234',
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Pastikan kolom yayasan ada jika tabel sudah terbuat sebelumnya
+-- Pastikan kolom yayasan dan PIN ada jika tabel sudah terbuat sebelumnya
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS foundation_name TEXT DEFAULT 'YAYASAN PENDIDIKAN HARAPAN BANGSA';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS headmaster_niy TEXT DEFAULT 'YHB-1994-001';
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_pin TEXT DEFAULT '1234';
 
 -- 2. TABEL DATA GURU / PTK (NIY & ptk_id UUID)
 CREATE TABLE IF NOT EXISTS smp_teachers (
@@ -193,7 +195,7 @@ CREATE TABLE IF NOT EXISTS smp_teachers (
   nip TEXT DEFAULT '-', -- Alias kompatibilitas
   name TEXT NOT NULL,
   phone_wa TEXT NOT NULL DEFAULT '',
-  rank_group TEXT NOT NULL DEFAULT 'Guru Tetap Yayasan (GTY)',
+  rank_group TEXT NOT NULL DEFAULT 'Pegawai Tetap Yayasan',
   role_title TEXT NOT NULL DEFAULT 'Guru Mata Pelajaran',
   avatar_url TEXT DEFAULT '',
   is_active BOOLEAN NOT NULL DEFAULT true,

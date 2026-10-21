@@ -15,7 +15,7 @@ export interface Teacher {
 export interface Meeting {
   id: string;
   title: string;
-  category: 'Rapat Dinas' | 'Workshop' | 'Briefing' | 'MGMP' | 'Upacara' | 'Lainnya';
+  category: string; // e.g. 'Rapat Dinas', 'Workshop', 'Briefing', 'MGMP', etc.
   meeting_date: string; // YYYY-MM-DD
   start_time: string; // HH:mm
   end_time: string; // HH:mm
@@ -63,6 +63,7 @@ export interface SchoolProfile {
   headmaster_rank: string;
   waha_group_id: string; // e.g. "120363024823924@g.us"
   logo_url?: string;
+  admin_pin?: string; // PIN akses admin tersinkronisasi di database (default: '1234')
 }
 
 export interface WahaConfig {

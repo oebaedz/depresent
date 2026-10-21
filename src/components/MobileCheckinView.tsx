@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   RotateCw,
   Lock,
-  RefreshCcw,
   User,
 } from 'lucide-react';
 import { Meeting, SchoolProfile, Teacher } from '../types';
@@ -54,9 +53,8 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
   // Validate dynamic 15s token (toleransi 60 detik untuk scan + pilih nama tanpa perlu PIN)
   const [isTokenExpired, setIsTokenExpired] = useState(false);
 
-  // Anti-Titip Absen (Device Lock 1 HP per Rapat)
+  // Anti-Titip Absen (Device Lock 1 HP per Rapat - Kunci Ketat tanpa opsi pinjam rekan)
   const [existingDeviceLock, setExistingDeviceLock] = useState<DeviceLockInfo | null>(null);
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !meeting) return;
@@ -218,14 +216,6 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
     onSuccess();
   };
 
-  const handleResetDeviceLock = () => {
-    if (meeting) {
-      localStorage.removeItem(`smp_device_lock_${meeting.id}`);
-      setExistingDeviceLock(null);
-      setIsResetModalOpen(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col justify-between p-4 sm:p-6 text-slate-800 antialiased">
       <div className="max-w-md w-full mx-auto space-y-4">
@@ -350,18 +340,6 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
               <span>
                 Smartphone Anda sudah berhasil diabsenkan. Anda tidak dapat menggunakan HP yang sama untuk mengabsenkan rekan lain (titip absen).
               </span>
-            </div>
-
-            {/* Assistance Reset Option for legitimately shared phone */}
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setIsResetModalOpen(true)}
-                className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold underline flex items-center justify-center gap-1 mx-auto"
-              >
-                <RefreshCcw className="w-3 h-3" />
-                <span>Bantuan: Pinjam HP Rekan (Buka Kunci Perangkat)</span>
-              </button>
             </div>
           </div>
         ) : checkinDone ? (
@@ -489,43 +467,6 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
           </form>
         )}
       </div>
-
-      {/* MODAL RESET PENGUNCIAN PERANGKAT (BANTUAN PANITIA) */}
-      {isResetModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-5 space-y-4 border border-slate-200">
-            <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
-              <RefreshCcw className="w-6 h-6" />
-            </div>
-
-            <div className="text-center space-y-1.5">
-              <h3 className="text-base font-bold text-slate-900">
-                Buka Kunci Perangkat Ini?
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                HP ini sebelumnya digunakan oleh <strong>{existingDeviceLock?.teacherName}</strong>. Apakah Anda ingin mereset kunci perangkat ini agar dapat digunakan oleh guru lain (misal: ponsel rekan kehabisan baterai)?
-              </p>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsResetModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleResetDeviceLock}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs"
-              >
-                Ya, Buka Kunci
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <footer className="py-4 text-center text-xs text-slate-400">
         dePresent · Sistem Presensi Kegiatan & Rapat Yayasan

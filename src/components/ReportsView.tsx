@@ -49,7 +49,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
     // 1. Sheet Rekap
     const rekapData = [
-      ['REKAPITULASI DAFTAR HADIR KEGIATAN / RAPAT DEWAN GURU'],
+      ['DAFTAR HADIR PESERTA KEGIATAN'],
       [schoolProfile.foundation_name || 'YAYASAN PENDIDIKAN HARAPAN BANGSA'],
       [schoolProfile.school_name || 'SMP HARAPAN BANGSA'],
       ['NPSN: ' + (schoolProfile.npsn || '-'), 'Alamat: ' + (schoolProfile.address || '-')],
@@ -69,7 +69,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       ['Hadir Terlambat:', terlambat],
       ['Izin Dinas:', izin],
       ['Sakit:', sakit],
-      ['Belum Presensi / Tanpa Keterangan:', belum],
+      ['Tidak Hadir (Alpa):', meetingAttendances.filter((a) => a.status === 'alpa').length + (currentMeeting.status === 'completed' ? belum : 0)],
       ['Persentase Kehadiran:', `${rate}%`],
       [],
       ['Mengetahui,', 'Pimpinan Rapat,', 'Notulis Rapat,'],
@@ -97,21 +97,30 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       'Jabatan / Mata Pelajaran',
       'Status Kehadiran',
       'Waktu Presensi',
-      'Metode Presensi',
+      'Verifikasi',
       'Catatan / Keterangan',
     ];
 
     const detailRows = activeTeachers.map((t, idx) => {
       const att = attendanceMap.get(t.id);
+      const isPresent = att && (att.status === 'hadir' || att.status === 'terlambat');
+      const statusText = att
+        ? att.status === 'alpa'
+          ? 'TIDAK HADIR'
+          : att.status.toUpperCase()
+        : currentMeeting.status === 'completed'
+        ? 'TIDAK HADIR'
+        : 'BELUM HADIR';
+
       return [
         idx + 1,
         t.niy || t.nip || '-',
         t.name,
         t.rank_group,
         t.role_title,
-        att ? att.status.toUpperCase() : 'BELUM HADIR',
+        statusText,
         att ? new Date(att.check_in_time).toLocaleTimeString('id-ID') : '-',
-        att ? (att.method === 'card_scan' ? 'Scan ID Card' : att.method === 'projector_scan' ? 'Scan Layar Proyektor' : 'Manual') : '-',
+        isPresent ? 'Verified' : '-',
         att?.notes || '-',
       ];
     });
@@ -219,7 +228,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               {schoolProfile.address || 'Jl. Ki Hajar Dewantara No. 45, Kompleks Yayasan'} · NPSN: {schoolProfile.npsn || '20104567'}
             </p>
             <p className="text-[10px] text-slate-500 font-sans">
-              Telepon: {schoolProfile.phone || '-'} · Pos-el: {schoolProfile.email || '-'} · Laman: {schoolProfile.website || '-'}
+              Telepon: {schoolProfile.phone || '-'} · Email: {schoolProfile.email || '-'} · Website: {schoolProfile.website || '-'}
             </p>
           </div>
         </div>
@@ -227,7 +236,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         {/* 2. Document Title & Metadata */}
         <div className="text-center space-y-1 mb-6 font-sans">
           <h2 className="text-sm md:text-base font-black uppercase underline tracking-wider text-slate-900">
-            DAFTAR HADIR PESERTA RAPAT / KEGIATAN KEDINASAN
+            DAFTAR HADIR PESERTA KEGIATAN
           </h2>
           <p className="text-xs font-bold text-slate-800">
             {currentMeeting?.title}
@@ -267,13 +276,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <th className="py-2 px-3 border-r border-slate-400 text-left">Jabatan</th>
                 <th className="py-2 px-2 border-r border-slate-400 w-20">Jam Hadir</th>
                 <th className="py-2 px-2 border-r border-slate-400 w-24">Status</th>
-                <th className="py-2 px-3 border-slate-400 w-32">Verifikasi / TTD</th>
+                <th className="py-2 px-3 border-slate-400 w-28 text-center">Verifikasi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-300">
               {activeTeachers.map((t, index) => {
                 const att = attendanceMap.get(t.id);
-                const isEven = (index + 1) % 2 === 0;
+                const isPresent = att && (att.status === 'hadir' || att.status === 'terlambat');
+                const isAbsent = (att && att.status === 'alpa') || (!att && currentMeeting?.status === 'completed');
 
                 return (
                   <tr key={t.id} className="hover:bg-slate-50/50 print:hover:bg-white page-break-inside-avoid">
@@ -300,25 +310,35 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
                     <td className="py-2 px-2 border-r border-slate-300 text-center text-[10px] font-bold">
                       {att ? (
-                        <span className={att.status === 'hadir' ? 'text-emerald-800' : 'text-amber-800'}>
-                          {att.status.toUpperCase()}
+                        <span
+                          className={
+                            att.status === 'hadir'
+                              ? 'text-emerald-800'
+                              : att.status === 'terlambat'
+                              ? 'text-amber-800'
+                              : att.status === 'alpa'
+                              ? 'text-red-700'
+                              : 'text-blue-800'
+                          }
+                        >
+                          {att.status === 'alpa' ? 'TIDAK HADIR' : att.status.toUpperCase()}
                         </span>
+                      ) : isAbsent ? (
+                        <span className="text-red-700 font-bold">TIDAK HADIR</span>
                       ) : (
                         <span className="text-slate-400 font-normal">BELUM HADIR</span>
                       )}
                     </td>
 
-                    {/* Signature Column */}
-                    <td className="py-1 px-3 border-slate-300 text-xs">
-                      {att ? (
-                        <div className="flex items-center gap-1.5 text-emerald-800 text-[10px]">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                          <span className="font-mono font-medium">Verified ({att.method === 'card_scan' ? 'ID Card' : 'Proyektor'})</span>
+                    {/* Verification Column: Verified if present, - if not present */}
+                    <td className="py-1 px-3 border-slate-300 text-xs text-center">
+                      {isPresent ? (
+                        <div className="flex items-center justify-center gap-1.5 text-emerald-800 text-[10px]">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="font-mono font-bold">Verified</span>
                         </div>
                       ) : (
-                        <div className={`text-[10px] text-slate-400 font-mono ${isEven ? 'text-right' : 'text-left'}`}>
-                          {index + 1}. ..................
-                        </div>
+                        <span className="font-mono text-slate-400 font-bold text-xs">-</span>
                       )}
                     </td>
                   </tr>

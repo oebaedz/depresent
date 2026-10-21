@@ -419,7 +419,7 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
                     {formData.address || 'Jl. Ki Hajar Dewantara No. 45'} · NPSN: {formData.npsn || '20104567'}
                   </p>
                   <p className="text-[9px] text-slate-500 font-sans">
-                    Telp: {formData.phone || '-'} · Pos-el: {formData.email || '-'} · Laman: {formData.website || '-'}
+                    Telp: {formData.phone || '-'} · Email: {formData.email || '-'} · Website: {formData.website || '-'}
                   </p>
                 </div>
               </div>
@@ -433,7 +433,7 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
               {/* Sample Document Title */}
               <div className="text-center pt-2 font-sans">
                 <h5 className="text-xs font-bold uppercase underline tracking-wide text-slate-900">
-                  DAFTAR HADIR RAPAT YAYASAN & DEWAN GURU
+                  DAFTAR HADIR PESERTA KEGIATAN
                 </h5>
                 <p className="text-[10px] text-slate-500 mt-0.5">
                   Nomor: 042 / YHB-SMP / RPT / 2026
