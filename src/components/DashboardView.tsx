@@ -40,8 +40,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const attendanceMap = new Map<string, Attendance>();
   meetingAttendances.forEach((a) => attendanceMap.set(a.teacher_id, a));
 
+  // Filter active teachers according to current meeting target_type & invited_teacher_ids
+  const isCustomMeeting =
+    currentMeeting &&
+    currentMeeting.target_type === 'custom' &&
+    Array.isArray(currentMeeting.invited_teacher_ids) &&
+    currentMeeting.invited_teacher_ids.length > 0;
+
+  const relevantTeachers = teachers
+    .filter((t) => t.is_active)
+    .filter((t) => !isCustomMeeting || currentMeeting.invited_teacher_ids!.includes(t.id));
+
   // Compute KPI metrics
-  const totalTeachers = teachers.filter((t) => t.is_active).length;
+  const totalTeachers = relevantTeachers.length;
   const hadirCount = meetingAttendances.filter((a) => a.status === 'hadir').length;
   const terlambatCount = meetingAttendances.filter((a) => a.status === 'terlambat').length;
   const izinCount = meetingAttendances.filter((a) => a.status === 'izin' || a.status === 'sakit').length;
@@ -50,8 +61,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const attendancePercentage = totalTeachers > 0 ? Math.round((totalPresent / totalTeachers) * 100) : 0;
 
   // Filtered rows
-  const rows = teachers
-    .filter((t) => t.is_active)
+  const rows = relevantTeachers
     .filter((t) => {
       const niyVal = (t.niy || t.nip || '').toLowerCase();
       const matchSearch =
@@ -104,7 +114,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const handleSendReminderBlast = async () => {
     if (!currentMeeting) return;
     const wahaConfig = getWahaConfig();
-    const unpresentTeachers = teachers.filter((t) => t.is_active && !attendanceMap.has(t.id) && t.phone_wa);
+    const unpresentTeachers = relevantTeachers.filter((t) => !attendanceMap.has(t.id) && t.phone_wa);
 
     if (unpresentTeachers.length === 0) {
       setWahaFeedback('Semua guru sudah hadir atau nomor WhatsApp belum terdaftar.');
@@ -165,10 +175,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Controls: Agenda Selector & Quick Actions */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Dashboard Pemantauan Presensi Real-Time</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Dashboard Pemantauan Presensi Real-Time</h2>
+            {isCustomMeeting && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-200 border border-teal-200 dark:border-teal-800">
+                Rapat Khusus ({totalTeachers} Peserta)
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 dark:text-teal-300/80 mt-0.5">
             Pantau statistik kehadiran, verifikasi guru belum hadir, dan kirim pengumuman via WAHA.
           </p>
         </div>
@@ -178,11 +195,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <select
             value={selectedMeetingId}
             onChange={(e) => setSelectedMeetingId(e.target.value)}
-            className="text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 focus:ring-2 focus:ring-blue-600 focus:outline-hidden max-w-xs truncate"
+            className="text-xs font-semibold border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-2 bg-slate-50 dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden max-w-xs truncate"
           >
             {meetings.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.title} [{m.status.toUpperCase()}]
+                {m.title} [{m.status.toUpperCase()}]{m.target_type === 'custom' ? ' (Khusus)' : ''}
               </option>
             ))}
           </select>
@@ -190,7 +207,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             onClick={onRefresh}
             title="Segarkan Data"
-            className="p-2 border border-slate-300 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+            className="p-2 border border-slate-300 dark:border-[#0f4950] rounded-lg text-slate-600 dark:text-teal-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#0b383d] transition-colors cursor-pointer"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -200,71 +217,73 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* KPI 5-Strip Card */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Total Peserta */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-xs font-semibold text-slate-500 block">Total Guru/PTK</span>
-          <span className="text-2xl font-bold font-mono text-slate-900 mt-1 block tabular-nums">
+        <div className="bg-white dark:bg-[#072b2f] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs">
+          <span className="text-xs font-semibold text-slate-500 dark:text-teal-300/80 block">Total Peserta</span>
+          <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white mt-1 block tabular-nums">
             {totalTeachers}
           </span>
-          <span className="text-[11px] text-slate-400 mt-1 block">Peserta Terdaftar</span>
+          <span className="text-[11px] text-slate-400 dark:text-teal-400/70 mt-1 block">
+            {isCustomMeeting ? 'Guru Terpilih' : 'Semua Guru'}
+          </span>
         </div>
 
         {/* Hadir Tepat Waktu */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-xs font-semibold text-emerald-700 block">Hadir Tepat Waktu</span>
-          <span className="text-2xl font-bold font-mono text-emerald-600 mt-1 block tabular-nums">
+        <div className="bg-white dark:bg-[#072b2f] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs">
+          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 block">Hadir Tepat Waktu</span>
+          <span className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400 mt-1 block tabular-nums">
             {hadirCount}
           </span>
-          <span className="text-[11px] text-emerald-600/80 mt-1 block">
+          <span className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80 mt-1 block">
             {totalTeachers > 0 ? Math.round((hadirCount / totalTeachers) * 100) : 0}% dari total
           </span>
         </div>
 
         {/* Terlambat */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-xs font-semibold text-amber-700 block">Hadir Terlambat</span>
-          <span className="text-2xl font-bold font-mono text-amber-600 mt-1 block tabular-nums">
+        <div className="bg-white dark:bg-[#072b2f] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs">
+          <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 block">Hadir Terlambat</span>
+          <span className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-1 block tabular-nums">
             {terlambatCount}
           </span>
-          <span className="text-[11px] text-amber-600/80 mt-1 block">Toleransi Lewat</span>
+          <span className="text-[11px] text-amber-600/80 dark:text-amber-400/80 mt-1 block">Toleransi Lewat</span>
         </div>
 
         {/* Izin / Sakit */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-xs font-semibold text-blue-700 block">Izin / Sakit</span>
-          <span className="text-2xl font-bold font-mono text-blue-600 mt-1 block tabular-nums">
+        <div className="bg-white dark:bg-[#072b2f] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs">
+          <span className="text-xs font-semibold text-teal-700 dark:text-teal-300 block">Izin / Sakit</span>
+          <span className="text-2xl font-bold font-mono text-teal-600 dark:text-teal-300 mt-1 block tabular-nums">
             {izinCount}
           </span>
-          <span className="text-[11px] text-blue-600/80 mt-1 block">Keterangan Resmi</span>
+          <span className="text-[11px] text-teal-600/80 dark:text-teal-300/80 mt-1 block">Keterangan Resmi</span>
         </div>
 
         {/* Belum Hadir */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <span className="text-xs font-semibold text-slate-600 block">Belum Hadir</span>
-          <span className="text-2xl font-bold font-mono text-slate-700 mt-1 block tabular-nums">
+        <div className="bg-white dark:bg-[#072b2f] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs">
+          <span className="text-xs font-semibold text-slate-600 dark:text-teal-300/80 block">Belum Hadir</span>
+          <span className="text-2xl font-bold font-mono text-slate-700 dark:text-teal-100 mt-1 block tabular-nums">
             {belumCount}
           </span>
-          <span className="text-[11px] text-slate-400 mt-1 block">Perlu Dikonfirmasi</span>
+          <span className="text-[11px] text-slate-400 dark:text-teal-400/70 mt-1 block">Perlu Dikonfirmasi</span>
         </div>
 
         {/* Persentase Kehadiran */}
-        <div className="bg-blue-900 text-white p-4 rounded-xl border border-blue-950 shadow-xs">
-          <span className="text-xs font-semibold text-blue-200 block">Tingkat Kehadiran</span>
+        <div className="bg-teal-900 dark:bg-[#042024] text-white p-4 rounded-xl border border-teal-950 dark:border-teal-700/60 shadow-xs">
+          <span className="text-xs font-semibold text-teal-200 block">Tingkat Kehadiran</span>
           <span className="text-2xl font-bold font-mono text-white mt-1 block tabular-nums">
             {attendancePercentage}%
           </span>
-          <span className="text-[11px] text-blue-200 mt-1 block">
+          <span className="text-[11px] text-teal-200 mt-1 block">
             {totalPresent} dari {totalTeachers} hadir
           </span>
         </div>
       </div>
 
       {/* WAHA Quick Broadcast Toolbar */}
-      <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-emerald-50/70 dark:bg-[#042024] border border-emerald-200 dark:border-[#0f4950] p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <MessageSquare className="w-4 h-4 text-emerald-700 shrink-0" />
+          <MessageSquare className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
           <div className="text-xs">
-            <span className="font-bold text-emerald-900">Integrasi WhatsApp (WAHA Edge Function):</span>
-            <span className="text-emerald-800 ml-1">Kirim ringkasan kehadiran langsung ke WhatsApp Group sekolah atau blast pengingat.</span>
+            <span className="font-bold text-emerald-900 dark:text-emerald-300">Integrasi WhatsApp (WAHA Edge Function):</span>
+            <span className="text-emerald-800 dark:text-emerald-200/90 ml-1">Kirim ringkasan kehadiran langsung ke WhatsApp Group sekolah atau blast pengingat.</span>
           </div>
         </div>
 
@@ -272,16 +291,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             onClick={handleSendReminderBlast}
             disabled={wahaActionLoading !== null || belumCount === 0}
-            className="px-3 py-1.5 bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            className="px-3 py-1.5 bg-white dark:bg-[#0b383d] text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700/60 hover:bg-emerald-100 dark:hover:bg-[#0f4950] rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
           >
-            <Send className="w-3 h-3 text-emerald-600" />
+            <Send className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
             <span>{wahaActionLoading === 'reminder' ? 'Mengirim...' : `Ingatkan ${belumCount} Guru Belum Hadir`}</span>
           </button>
 
           <button
             onClick={handleSendGroupRecap}
             disabled={wahaActionLoading !== null}
-            className="px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
           >
             <MessageSquare className="w-3 h-3" />
             <span>{wahaActionLoading === 'recap' ? 'Mengirim...' : 'Kirim Rekap ke Grup WA'}</span>
@@ -290,53 +309,63 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {wahaFeedback && (
-        <div className="p-3 bg-emerald-100/80 border border-emerald-300 text-emerald-950 rounded-lg text-xs font-medium">
+        <div className="p-3 bg-emerald-100/80 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200 rounded-lg text-xs font-medium">
           {wahaFeedback}
         </div>
       )}
 
       {/* Main Table: Attendance Records */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-[#072b2f] rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs overflow-hidden">
         {/* Table Filter & Search Header */}
-        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="p-4 border-b border-slate-200 dark:border-[#0f4950] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Segmented Filter Buttons */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-xs overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-[#031e21] rounded-lg text-xs overflow-x-auto">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap ${
-                statusFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                statusFilter === 'all'
+                  ? 'bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-600 dark:text-teal-300/80 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Semua ({totalTeachers})
             </button>
             <button
               onClick={() => setStatusFilter('hadir')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap ${
-                statusFilter === 'hadir' ? 'bg-white text-emerald-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                statusFilter === 'hadir'
+                  ? 'bg-white dark:bg-[#072b2f] text-emerald-800 dark:text-emerald-300 shadow-xs'
+                  : 'text-slate-600 dark:text-teal-300/80 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Hadir ({hadirCount})
             </button>
             <button
               onClick={() => setStatusFilter('terlambat')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap ${
-                statusFilter === 'terlambat' ? 'bg-white text-amber-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                statusFilter === 'terlambat'
+                  ? 'bg-white dark:bg-[#072b2f] text-amber-800 dark:text-amber-300 shadow-xs'
+                  : 'text-slate-600 dark:text-teal-300/80 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Terlambat ({terlambatCount})
             </button>
             <button
               onClick={() => setStatusFilter('izin')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap ${
-                statusFilter === 'izin' ? 'bg-white text-blue-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                statusFilter === 'izin'
+                  ? 'bg-white dark:bg-[#072b2f] text-teal-800 dark:text-teal-300 shadow-xs'
+                  : 'text-slate-600 dark:text-teal-300/80 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Izin / Sakit ({izinCount})
             </button>
             <button
               onClick={() => setStatusFilter('belum')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap ${
-                statusFilter === 'belum' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                statusFilter === 'belum'
+                  ? 'bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-600 dark:text-teal-300/80 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Belum ({belumCount})
@@ -346,26 +375,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {/* Search Input & Action Buttons */}
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <Search className="w-3.5 h-3.5 text-slate-400 dark:text-teal-400 absolute left-3 top-2.5" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari guru..."
-                className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-600"
+                className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
               />
             </div>
 
             <button
               onClick={onNavigateToScanner}
-              className="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-medium transition-colors shadow-xs whitespace-nowrap"
+              className="px-3 py-1.5 bg-teal-700 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-500 text-white rounded-lg text-xs font-medium transition-colors shadow-xs whitespace-nowrap cursor-pointer"
             >
               Buka Scanner
             </button>
 
             <button
               onClick={onNavigateToReports}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+              className="px-3 py-1.5 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] text-slate-700 dark:text-teal-100 border border-slate-300 dark:border-teal-700/60 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer"
             >
               Cetak SPJ
             </button>
@@ -376,7 +405,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase text-[10px] tracking-wider">
+              <tr className="bg-slate-50 dark:bg-[#042024] border-b border-slate-200 dark:border-[#0f4950] text-slate-600 dark:text-teal-200 font-semibold uppercase text-[10px] tracking-wider">
                 <th className="py-2.5 px-4 w-12 text-center">No</th>
                 <th className="py-2.5 px-4">Nama Guru & NIY</th>
                 <th className="py-2.5 px-4">Jabatan / Status</th>
@@ -386,10 +415,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="py-2.5 px-4 text-right">Ubah Status Cepat</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-slate-100 dark:divide-[#0f4950] text-slate-700 dark:text-teal-100">
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <td colSpan={7} className="py-12 text-center text-slate-400 dark:text-teal-300/60">
                     Tidak ada data guru yang memenuhi filter.
                   </td>
                 </tr>
@@ -406,24 +435,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     : '-';
 
                   return (
-                    <tr key={teacher.id} className="hover:bg-slate-50/80 transition-colors">
+                    <tr key={teacher.id} className="hover:bg-slate-50/80 dark:hover:bg-[#0b383d] transition-colors">
                       {/* No */}
-                      <td className="py-3 px-4 text-center font-mono text-[11px] text-slate-400 tabular-nums">
+                      <td className="py-3 px-4 text-center font-mono text-[11px] text-slate-400 dark:text-teal-400/80 tabular-nums">
                         {index + 1}
                       </td>
 
                       {/* Nama & NIY */}
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-900 leading-tight">{teacher.name}</div>
-                        <div className="text-[11px] font-mono text-slate-500 mt-0.5">
+                        <div className="font-bold text-slate-900 dark:text-white leading-tight">{teacher.name}</div>
+                        <div className="text-[11px] font-mono text-slate-500 dark:text-teal-300 mt-0.5">
                           NIY. {teacher.niy || teacher.nip || '-'}
                         </div>
                       </td>
 
                       {/* Role & Rank */}
-                      <td className="py-3 px-4 text-slate-600">
-                        <div>{teacher.role_title}</div>
-                        <div className="text-[11px] text-slate-400">{teacher.rank_group}</div>
+                      <td className="py-3 px-4 text-slate-600 dark:text-teal-100">
+                        <div className="font-medium text-slate-800 dark:text-white">{teacher.role_title}</div>
+                        <div className="text-[11px] text-slate-400 dark:text-teal-300/70">{teacher.rank_group}</div>
                       </td>
 
                       {/* Status */}
@@ -432,34 +461,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <span
                             className={`inline-block font-semibold text-[11px] px-2 py-0.5 rounded ${
                               att.status === 'hadir'
-                                ? 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                                 : att.status === 'terlambat'
-                                ? 'bg-amber-100 text-amber-800'
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                                 : att.status === 'izin'
-                                ? 'bg-blue-100 text-blue-800'
+                                ? 'bg-teal-100 text-teal-800 dark:bg-teal-950/80 dark:text-teal-300 border border-teal-200 dark:border-teal-800'
                                 : att.status === 'sakit'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-rose-100 text-rose-800'
+                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                             }`}
                           >
                             {att.status === 'alpa' ? 'TIDAK HADIR' : att.status.toUpperCase()}
                           </span>
                         ) : currentMeeting?.status === 'completed' ? (
-                          <span className="inline-block font-semibold text-[11px] px-2 py-0.5 rounded bg-rose-100 text-rose-800">
+                          <span className="inline-block font-semibold text-[11px] px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
                             TIDAK HADIR
                           </span>
                         ) : (
-                          <span className="text-[11px] text-slate-400 font-medium">Belum Hadir</span>
+                          <span className="text-[11px] text-slate-400 dark:text-teal-400/80 font-medium">Belum Hadir</span>
                         )}
                       </td>
 
                       {/* Waktu Hadir */}
-                      <td className="py-3 px-4 font-mono text-xs tabular-nums text-slate-700">
+                      <td className="py-3 px-4 font-mono text-xs tabular-nums text-slate-700 dark:text-teal-200">
                         {timeFormatted}
                       </td>
 
                       {/* Metode */}
-                      <td className="py-3 px-4 text-[11px] text-slate-500">
+                      <td className="py-3 px-4 text-[11px] text-slate-500 dark:text-teal-300/80">
                         {att ? (
                           att.method === 'card_scan' ? (
                             'Scan Kartu'
@@ -479,21 +508,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <button
                             onClick={() => handleQuickStatusChange(teacher, 'hadir')}
                             title="Tandai Hadir"
-                            className="px-2 py-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors"
+                            className="px-2 py-1 text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 rounded border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
                           >
                             Hadir
                           </button>
                           <button
                             onClick={() => handleQuickStatusChange(teacher, 'izin')}
                             title="Tandai Izin"
-                            className="px-2 py-1 text-[10px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 transition-colors"
+                            className="px-2 py-1 text-[10px] font-semibold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/60 rounded border border-teal-200 dark:border-teal-800 transition-colors cursor-pointer"
                           >
                             Izin
                           </button>
                           <button
                             onClick={() => handleQuickStatusChange(teacher, 'sakit')}
                             title="Tandai Sakit"
-                            className="px-2 py-1 text-[10px] font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 rounded border border-amber-200 transition-colors"
+                            className="px-2 py-1 text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 rounded border border-amber-200 dark:border-amber-800 transition-colors cursor-pointer"
                           >
                             Sakit
                           </button>
@@ -501,7 +530,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                             <button
                               onClick={() => handleQuickStatusChange(teacher, 'reset')}
                               title="Batalkan / Reset Presensi"
-                              className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-red-600 transition-colors"
+                              className="px-1.5 py-1 text-[10px] text-slate-400 hover:text-red-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
                             >
                               &times;
                             </button>

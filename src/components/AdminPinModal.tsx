@@ -49,33 +49,33 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 sm:p-7 border border-slate-100 space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 dark:bg-black/85 backdrop-blur-md">
+      <div className="bg-white dark:bg-[#072b2f] rounded-3xl shadow-2xl max-w-sm w-full p-6 sm:p-7 border border-slate-100 dark:border-[#0f4950] space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
         {/* App & School Branding */}
         <div className="space-y-2">
           {schoolProfile.logo_url ? (
             <img
               src={schoolProfile.logo_url}
               alt="Logo"
-              className="w-16 h-16 object-contain rounded-2xl mx-auto p-1.5 bg-slate-50 border border-slate-200 shadow-xs"
+              className="w-16 h-16 object-contain rounded-2xl mx-auto p-1.5 bg-slate-50 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950] shadow-xs"
             />
           ) : (
-            <div className="w-14 h-14 rounded-2xl bg-blue-900 text-white font-black flex items-center justify-center text-xl mx-auto shadow-md">
+            <div className="w-14 h-14 rounded-2xl bg-teal-800 text-white font-black flex items-center justify-center text-xl mx-auto shadow-md">
               dP
             </div>
           )}
 
           <div>
             {schoolProfile.foundation_name && (
-              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300">
                 {schoolProfile.foundation_name}
               </p>
             )}
-            <h2 className="text-base font-extrabold text-slate-900 leading-tight">
+            <h2 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
               {schoolProfile.school_name || 'SMP Harapan Bangsa'}
             </h2>
-            <div className="flex items-center justify-center gap-1.5 mt-1 text-slate-500 text-xs">
-              <Shield className="w-3.5 h-3.5 text-blue-900" />
+            <div className="flex items-center justify-center gap-1.5 mt-1 text-slate-500 dark:text-teal-200/80 text-xs">
+              <Shield className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
               <span className="font-medium">Akses Panel Admin & Operator</span>
             </div>
           </div>
@@ -93,8 +93,8 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                     error
                       ? 'bg-rose-500 scale-110 animate-shake'
                       : isFilled
-                      ? 'bg-blue-900 scale-110 shadow-xs'
-                      : 'bg-slate-200'
+                      ? 'bg-teal-700 dark:bg-teal-400 scale-110 shadow-xs'
+                      : 'bg-slate-200 dark:bg-[#031e21]'
                   }`}
                 />
               );
@@ -102,7 +102,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
           </div>
 
           {error && (
-            <div className="flex items-center justify-center gap-1.5 text-rose-600 text-xs font-semibold animate-in fade-in">
+            <div className="flex items-center justify-center gap-1.5 text-rose-600 dark:text-rose-400 text-xs font-semibold animate-in fade-in">
               <AlertCircle className="w-3.5 h-3.5" />
               <span>{errorMessage}</span>
             </div>
@@ -115,7 +115,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                 key={num}
                 type="button"
                 onClick={() => handleDigitClick(num)}
-                className="h-12 rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 font-bold text-base text-slate-800 transition-colors border border-slate-200/80 shadow-xs"
+                className="h-12 rounded-xl bg-slate-50 dark:bg-[#031e21] hover:bg-slate-100 dark:hover:bg-[#0b383d] active:bg-slate-200 dark:active:bg-[#0f4950] font-bold text-base text-slate-800 dark:text-white transition-colors border border-slate-200/80 dark:border-[#0f4950] shadow-xs cursor-pointer"
               >
                 {num}
               </button>
@@ -123,21 +123,21 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
             <button
               type="button"
               onClick={() => setPin('')}
-              className="h-12 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+              className="h-12 rounded-xl text-xs font-bold text-slate-400 dark:text-teal-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#031e21] transition-colors cursor-pointer"
             >
               C
             </button>
             <button
               type="button"
               onClick={() => handleDigitClick('0')}
-              className="h-12 rounded-xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 font-bold text-base text-slate-800 transition-colors border border-slate-200/80 shadow-xs"
+              className="h-12 rounded-xl bg-slate-50 dark:bg-[#031e21] hover:bg-slate-100 dark:hover:bg-[#0b383d] active:bg-slate-200 dark:active:bg-[#0f4950] font-bold text-base text-slate-800 dark:text-white transition-colors border border-slate-200/80 dark:border-[#0f4950] shadow-xs cursor-pointer"
             >
               0
             </button>
             <button
               type="button"
               onClick={handleBackspace}
-              className="h-12 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-colors"
+              className="h-12 rounded-xl text-xs font-bold text-slate-500 dark:text-teal-300 hover:text-slate-700 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#031e21] transition-colors cursor-pointer"
             >
               ⌫
             </button>
@@ -147,7 +147,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
             <button
               type="submit"
               disabled={pin.length < 4}
-              className="w-full py-2.5 px-4 bg-blue-900 hover:bg-blue-800 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 bg-teal-800 hover:bg-teal-700 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer"
             >
               <KeyRound className="w-4 h-4" />
               <span>Masuk Panel Admin</span>
@@ -155,8 +155,8 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
           </div>
         </form>
 
-        <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-100">
-          <p>PIN standar sistem: <strong className="font-mono text-slate-600">1234</strong></p>
+        <div className="text-[11px] text-slate-400 dark:text-teal-200/70 pt-1 border-t border-slate-100 dark:border-[#0f4950]">
+          <p>PIN standar sistem: <strong className="font-mono text-slate-600 dark:text-teal-200">1234</strong></p>
           <p className="mt-0.5">Dapat diganti kapan saja di menu Pengaturan Profil</p>
         </div>
       </div>

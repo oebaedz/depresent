@@ -123,7 +123,16 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
     );
   }
 
-  const activeTeachers = teachers.filter((t) => t.is_active);
+  let activeTeachers = teachers.filter((t) => t.is_active);
+  const isCustomMeeting =
+    meeting.target_type === 'custom' &&
+    Array.isArray(meeting.invited_teacher_ids) &&
+    meeting.invited_teacher_ids.length > 0;
+
+  if (isCustomMeeting) {
+    activeTeachers = activeTeachers.filter((t) => meeting.invited_teacher_ids!.includes(t.id));
+  }
+
   const filteredTeachers = activeTeachers.filter((t) => {
     const q = searchQuery.toLowerCase();
     const niyVal = (t.niy || t.nip || '').toLowerCase();
@@ -138,6 +147,7 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isTokenExpired) return;
     if (!selectedTeacher) return;
     setIsSubmitting(true);
 
@@ -217,32 +227,32 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col justify-between p-4 sm:p-6 text-slate-800 antialiased">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#031e21] flex flex-col justify-between p-4 sm:p-6 text-slate-800 dark:text-teal-100 antialiased">
       <div className="max-w-md w-full mx-auto space-y-4">
         {/* Top Header */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-white dark:bg-[#072b2f] p-5 rounded-2xl border border-slate-200 dark:border-[#0f4950] shadow-sm flex items-center justify-between">
           <div className="flex items-center gap-3">
             {schoolProfile.logo_url ? (
               <img
                 src={schoolProfile.logo_url}
                 alt="Logo"
-                className="w-10 h-10 object-contain rounded-xl bg-slate-50 p-1 border border-slate-200"
+                className="w-10 h-10 object-contain rounded-xl bg-slate-50 dark:bg-[#031e21] p-1 border border-slate-200 dark:border-[#0f4950]"
               />
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-blue-900 text-white font-bold flex items-center justify-center text-base">
+              <div className="w-10 h-10 rounded-xl bg-teal-800 text-white font-bold flex items-center justify-center text-base">
                 dP
               </div>
             )}
             <div>
               {schoolProfile.foundation_name && (
-                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 leading-tight">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300 leading-tight">
                   {schoolProfile.foundation_name}
                 </p>
               )}
-              <h2 className="text-sm font-black text-slate-900 leading-tight">
+              <h2 className="text-sm font-black text-slate-900 dark:text-white leading-tight">
                 {schoolProfile.school_name || 'SMP HARAPAN BANGSA'}
               </h2>
-              <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md inline-block mt-0.5">
+              <span className="text-[10px] font-semibold text-teal-800 dark:text-teal-200 bg-teal-50 dark:bg-[#031e21] px-2 py-0.5 rounded-md inline-block mt-0.5 border border-teal-200 dark:border-teal-800">
                 Presensi Mandiri Guru
               </span>
             </div>
@@ -250,20 +260,27 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
         </div>
 
         {/* Meeting Info Card */}
-        <div className="bg-blue-950 text-white p-5 rounded-2xl shadow-sm space-y-2.5">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-amber-300">
-            Agenda Kegiatan Rapat
-          </span>
+        <div className="bg-teal-950 dark:bg-[#02181a] text-white p-5 rounded-2xl shadow-sm space-y-2.5 border border-teal-900 dark:border-[#0f4950]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-teal-300">
+              Agenda Kegiatan Rapat
+            </span>
+            {isCustomMeeting && (
+              <span className="text-[10px] bg-amber-400 text-teal-950 font-bold px-2 py-0.5 rounded-md">
+                Rapat Khusus ({activeTeachers.length} Peserta)
+              </span>
+            )}
+          </div>
           <h3 className="text-base font-bold leading-snug">
             {meeting.title}
           </h3>
-          <div className="pt-1 flex flex-wrap items-center gap-3 text-xs text-blue-100">
+          <div className="pt-1 flex flex-wrap items-center gap-3 text-xs text-teal-100">
             <span className="flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-blue-300" />
+              <Calendar className="w-3.5 h-3.5 text-teal-400" />
               <span>{meeting.meeting_date} ({meeting.start_time} WIB)</span>
             </span>
             <span className="flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-blue-300" />
+              <MapPin className="w-3.5 h-3.5 text-teal-400" />
               <span>{meeting.room}</span>
             </span>
           </div>
@@ -271,72 +288,80 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
         {/* Expired Token Warning */}
         {isTokenExpired && !existingDeviceLock && !checkinDone && (
-          <div className="bg-amber-50 border border-amber-300 p-4 rounded-2xl text-xs text-amber-950 space-y-2 animate-in fade-in duration-200">
+          <div className="bg-amber-50 border-2 border-amber-400 p-4 rounded-2xl text-xs text-amber-950 space-y-2.5 animate-in fade-in duration-200 shadow-sm">
             <div className="flex items-center gap-2 font-bold text-amber-900">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Kode QR Layar Telah Kadaluarsa</span>
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+              <span className="text-sm">Kode QR Layar Telah Kedaluwarsa</span>
             </div>
-            <p className="text-[11px] text-amber-800 leading-relaxed">
-              Kode QR di layar proyektor berganti otomatis tiap 15 detik untuk memastikan kehadiran nyata di ruangan. Silakan arahkan kamera HP Anda kembali ke layar proyektor untuk mendapatkan kode terbaru.
+            <p className="text-[11px] text-amber-900 leading-relaxed">
+              Kode QR berganti otomatis tiap 15 detik untuk memastikan kehadiran nyata di ruangan. Pengisian presensi telah <strong>dikunci</strong>. Silakan arahkan kamera HP Anda kembali ke layar proyektor untuk mendapatkan kode terbaru.
             </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs"
+            >
+              <RotateCw className="w-3.5 h-3.5" />
+              <span>Muat Ulang Halaman</span>
+            </button>
           </div>
         )}
 
         {/* SCREEN CASE 1: HP INI SUDAH TERKUNCI / SUDAH DIAPLIKASIKAN UNTUK 1 GURU (ANTI-TITIP ABSEN) */}
         {existingDeviceLock && !checkinDone ? (
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5 text-center animate-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-[#072b2f] p-6 rounded-2xl border border-slate-200 dark:border-[#0f4950] shadow-sm space-y-5 text-center animate-in zoom-in-95 duration-200">
             <div className="relative mx-auto w-16 h-16">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center shadow-xs">
-                <Smartphone className="w-8 h-8 text-emerald-600" />
+              <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 rounded-full flex items-center justify-center shadow-xs">
+                <Smartphone className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <div className="absolute -bottom-1 -right-1 bg-emerald-600 text-white rounded-full p-1 border-2 border-white shadow-xs">
+              <div className="absolute -bottom-1 -right-1 bg-emerald-600 text-white rounded-full p-1 border-2 border-white dark:border-[#072b2f] shadow-xs">
                 <ShieldCheck className="w-4 h-4" />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full inline-block">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950 px-3 py-1 rounded-full inline-block">
                 HP Ini Telah Mengisi Presensi
               </span>
-              <h3 className="text-base font-black text-slate-900 pt-1">
+              <h3 className="text-base font-black text-slate-900 dark:text-white pt-1">
                 Presensi Terverifikasi di Perangkat Ini
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-teal-200/70">
                 Fitur Anti-Titip Absen aktif: 1 perangkat smartphone dikunci untuk 1 guru pada agenda rapat ini.
               </p>
             </div>
 
             {/* Locked Teacher Info Box */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-left space-y-2 text-xs">
+            <div className="bg-slate-50 dark:bg-[#042024] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] text-left space-y-2 text-xs">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-900 text-white font-bold flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-teal-900 dark:bg-teal-800 text-white font-bold flex items-center justify-center shrink-0">
                   {existingDeviceLock.teacherName.charAt(0)}
                 </div>
                 <div className="min-w-0">
-                  <h4 className="font-bold text-slate-900 text-sm leading-snug">
+                  <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-snug">
                     {existingDeviceLock.teacherName}
                   </h4>
-                  <p className="text-slate-500 font-mono text-[11px] mt-0.5">
+                  <p className="text-slate-500 dark:text-teal-300/80 font-mono text-[11px] mt-0.5">
                     NIY. {existingDeviceLock.teacherNiy}
                   </p>
-                  <p className="text-slate-600 text-xs">
+                  <p className="text-slate-600 dark:text-teal-200/90 text-xs">
                     {existingDeviceLock.teacherRole}
                   </p>
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-slate-200 flex justify-between text-slate-600 text-[11px]">
+              <div className="pt-2 border-t border-slate-200 dark:border-[#0f4950] flex justify-between text-slate-600 dark:text-teal-200 text-[11px]">
                 <span>Waktu Presensi:</span>
-                <span className="font-bold font-mono text-slate-900">{existingDeviceLock.checkInTime} WIB</span>
+                <span className="font-bold font-mono text-slate-900 dark:text-white">{existingDeviceLock.checkInTime} WIB</span>
               </div>
-              <div className="flex justify-between text-slate-600 text-[11px]">
+              <div className="flex justify-between text-slate-600 dark:text-teal-200 text-[11px]">
                 <span>Status:</span>
-                <span className="font-semibold text-emerald-700">{existingDeviceLock.statusText}</span>
+                <span className="font-semibold text-emerald-700 dark:text-emerald-400">{existingDeviceLock.statusText}</span>
               </div>
             </div>
 
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-[11px] text-blue-900 text-left leading-relaxed flex items-start gap-2">
-              <Lock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            <div className="p-3 bg-teal-50 dark:bg-[#031e21] border border-teal-200 dark:border-teal-800 rounded-xl text-[11px] text-teal-950 dark:text-teal-200 text-left leading-relaxed flex items-start gap-2">
+              <Lock className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
               <span>
                 Smartphone Anda sudah berhasil diabsenkan. Anda tidak dapat menggunakan HP yang sama untuk mengabsenkan rekan lain (titip absen).
               </span>
@@ -344,82 +369,85 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
           </div>
         ) : checkinDone ? (
           /* SCREEN CASE 2: SUCCESS JUST SUBMITTED */
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm text-center space-y-4 animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-xs">
+          <div className="bg-white dark:bg-[#072b2f] p-6 rounded-2xl border border-slate-200 dark:border-[#0f4950] shadow-sm text-center space-y-4 animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 rounded-full flex items-center justify-center mx-auto shadow-xs">
               <CheckCircle2 className="w-9 h-9" />
             </div>
 
             <div className="space-y-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950 px-3 py-1 rounded-full">
                 {checkinDone.status}
               </span>
-              <h4 className="text-base font-black text-slate-900 pt-2">
+              <h4 className="text-base font-black text-slate-900 dark:text-white pt-2">
                 {checkinDone.teacher.name}
               </h4>
-              <p className="text-xs font-mono text-slate-500">
+              <p className="text-xs font-mono text-slate-500 dark:text-teal-300/80">
                 NIY. {checkinDone.teacher.niy || checkinDone.teacher.nip || '-'}
               </p>
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-slate-600 dark:text-teal-200/90">
                 {checkinDone.teacher.role_title}
               </p>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
-              <div className="flex justify-between text-slate-500">
+            <div className="p-3 bg-slate-50 dark:bg-[#042024] rounded-xl border border-slate-200 dark:border-[#0f4950] text-xs space-y-1">
+              <div className="flex justify-between text-slate-500 dark:text-teal-200/80">
                 <span>Waktu Presensi:</span>
-                <span className="font-mono font-bold text-slate-900">{checkinDone.time} WIB</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white">{checkinDone.time} WIB</span>
               </div>
-              <div className="flex justify-between text-slate-500">
+              <div className="flex justify-between text-slate-500 dark:text-teal-200/80">
                 <span>Metode:</span>
-                <span className="font-semibold text-blue-900">Scan Layar Proyektor</span>
+                <span className="font-semibold text-teal-900 dark:text-teal-300">Scan Layar Proyektor</span>
               </div>
             </div>
 
-            <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-900 flex items-center justify-center gap-2">
-              <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 rounded-xl border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-900 dark:text-emerald-200 flex items-center justify-center gap-2">
+              <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>{checkinDone.waNotice}</span>
             </div>
 
-            <div className="p-3 bg-slate-100 rounded-xl text-[11px] text-slate-600 flex items-center justify-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <div className="p-3 bg-slate-100 dark:bg-[#031e21] rounded-xl text-[11px] text-slate-600 dark:text-teal-200/80 flex items-center justify-center gap-1.5 border dark:border-[#0f4950]">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Perangkat ini telah dikunci untuk presensi Anda (Anti-Titip Absen aktif).</span>
             </div>
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-teal-200/70">
               Nama Anda telah otomatis tercatat dan tampil di layar proyektor ruang rapat.
             </p>
           </div>
         ) : (
           /* SCREEN CASE 3: ACTIVE SELECTION FORM (FIRST TIME ON THIS PHONE) */
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <form onSubmit={handleSubmit} className="bg-white dark:bg-[#072b2f] p-6 rounded-2xl border border-slate-200 dark:border-[#0f4950] shadow-sm space-y-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-900 uppercase tracking-wide">
+                <label className="block text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide">
                   Cari & Pilih Nama Anda
                 </label>
-                <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" />
+                <span className="text-[10px] text-teal-800 dark:text-teal-200 bg-teal-50 dark:bg-[#031e21] border border-teal-200 dark:border-teal-800 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-teal-600 dark:text-teal-400" />
                   <span>1 HP = 1 Guru</span>
                 </span>
               </div>
 
               <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <Search className="w-4 h-4 text-slate-400 dark:text-teal-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
+                  disabled={isTokenExpired}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Ketik nama guru atau NIY..."
-                  className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-600 focus:outline-hidden"
+                  placeholder={isTokenExpired ? 'Kode QR kadaluarsa — silakan pindai ulang...' : 'Ketik nama guru atau NIY...'}
+                  className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-xl bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden disabled:bg-slate-100 dark:disabled:bg-[#02181a] disabled:text-slate-400 dark:disabled:text-teal-400/50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
             {/* Teacher Selection List */}
-            <div className="max-h-56 overflow-y-auto space-y-1.5 border border-slate-200 rounded-xl p-2 bg-slate-50">
+            <div className={`max-h-56 overflow-y-auto space-y-1.5 border border-slate-200 dark:border-[#0f4950] rounded-xl p-2 bg-slate-50 dark:bg-[#031e21] ${isTokenExpired ? 'opacity-50 pointer-events-none' : ''}`}>
               {filteredTeachers.length === 0 ? (
-                <div className="text-center py-6 text-xs text-slate-400">
-                  Tidak ada guru yang cocok dengan kata kunci.
+                <div className="text-center py-6 text-xs text-slate-400 dark:text-teal-400/60">
+                  {isCustomMeeting
+                    ? 'Tidak ada nama yang terdaftar sebagai peserta pada rapat ini.'
+                    : 'Tidak ada guru yang cocok dengan kata kunci.'}
                 </div>
               ) : (
                 filteredTeachers.map((t) => {
@@ -427,25 +455,27 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
                   return (
                     <div
                       key={t.id}
-                      onClick={() => setSelectedTeacherId(t.id)}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all flex items-center justify-between text-xs ${
-                        isSelected
-                          ? 'border-blue-600 bg-blue-50 ring-2 ring-blue-500/20'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      onClick={() => !isTokenExpired && setSelectedTeacherId(t.id)}
+                      className={`p-3 rounded-lg border transition-all flex items-center justify-between text-xs ${
+                        isTokenExpired
+                          ? 'border-slate-200 dark:border-[#0f4950] bg-white dark:bg-[#072b2f] cursor-not-allowed'
+                          : isSelected
+                          ? 'border-teal-600 dark:border-teal-400 bg-teal-50 dark:bg-[#042024] ring-2 ring-teal-500/30 cursor-pointer'
+                          : 'border-slate-200 dark:border-[#0f4950] bg-white dark:bg-[#072b2f] hover:border-teal-300 dark:hover:border-teal-700 cursor-pointer'
                       }`}
                     >
                       <div className="min-w-0 pr-2">
-                        <p className={`font-bold leading-tight ${isSelected ? 'text-blue-950' : 'text-slate-900'}`}>
+                        <p className={`font-bold leading-tight ${isSelected ? 'text-teal-950 dark:text-teal-200' : 'text-slate-900 dark:text-white'}`}>
                           {t.name}
                         </p>
-                        <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+                        <p className="text-[11px] font-mono text-slate-500 dark:text-teal-300/80 mt-0.5">
                           NIY. {t.niy || t.nip || '-'} · {t.role_title}
                         </p>
                       </div>
 
                       <div
                         className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                          isSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'
+                          isSelected ? 'border-teal-600 bg-teal-600 text-white' : 'border-slate-300 dark:border-[#0f4950] bg-white dark:bg-[#031e21]'
                         }`}
                       >
                         {isSelected && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -458,17 +488,23 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
             <button
               type="submit"
-              disabled={!selectedTeacherId || isSubmitting}
-              className="w-full py-3 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2"
+              disabled={isTokenExpired || !selectedTeacherId || isSubmitting}
+              className="w-full py-3 bg-teal-800 hover:bg-teal-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               <UserCheck className="w-4 h-4" />
-              <span>{isSubmitting ? 'Mencatat Kehadiran...' : 'Konfirmasi Kehadiran Saya'}</span>
+              <span>
+                {isTokenExpired
+                  ? 'Kode QR Kadaluarsa — Pindai Ulang di Layar'
+                  : isSubmitting
+                  ? 'Mencatat Kehadiran...'
+                  : 'Konfirmasi Kehadiran Saya'}
+              </span>
             </button>
           </form>
         )}
       </div>
 
-      <footer className="py-4 text-center text-xs text-slate-400">
+      <footer className="py-4 text-center text-xs text-slate-400 dark:text-teal-300/70">
         dePresent · Sistem Presensi Kegiatan & Rapat Yayasan
       </footer>
     </div>

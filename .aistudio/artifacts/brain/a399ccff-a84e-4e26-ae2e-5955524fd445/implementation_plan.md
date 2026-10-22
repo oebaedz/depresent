@@ -1,158 +1,130 @@
-# Rencana Akselerasi Performa & Pengamanan dePresent (Revisi)
+# Peningkatan Presensi dePresent: QR Expiry Guard, Pemilihan Peserta Rapat, Tema Dark Teal & Dark Mode, serta Perbaikan Cetak ID Card
 
-Mengatasi kendala kelambatan penarikan data Supabase (*loading latency*), mengeliminasi *flash* data sekolah lama dengan strategi **Local-First (Stale-While-Revalidate)** berkecepatan 0ms, menuntaskan masalah "Rapat Tidak Ditemukan" pada Vercel, serta menerapkan proteksi PIN admin dan isolasi antarmuka presensi guru.
+Rencana implementasi untuk menyempurnakan alur presensi mobile (validasi kedaluwarsa QR dinamis), fleksibilitas pemilihan guru peserta rapat kedinasan, pembaruan estetika modern dengan palet Dark Teal dan Dark Mode toggle, serta perbaikan cetak ID Card portrait guru.
 
 ---
 
-### User Review & Critical Decisions
+## User Review & Critical Decisions
 
 > [!IMPORTANT]
-> **Penyebab Utama Kelambatan yang Ditemukan**:
-> 1. **Redundansi 8x HTTP Request per Aksi**: Setiap kali aplikasi dibuka atau data disimpan/diperbarui, aplikasi memanggil `testSupabaseConnection()` (4 query HTTP beruntun) lalu memanggil `fetch*()` (4 query HTTP lagi). Di jaringan cloud Supabase, ini memakan waktu 3–7 detik.
-> 2. **State React Menggunakan Data Dummy Awal**: `App.tsx` menginisialisasi state dengan objek dummy (`INITIAL_SCHOOL_PROFILE`), alih-alih membaca memori `localStorage` yang sudah tersimpan di browser secara sinkron.
-> 3. **Non-Optimistic Writes**: Fungsi `saveTeacher` dan `saveMeeting` melakukan `await fetchTeachers()` (HTTP query ke server) sebelum menyimpan, sehingga tombol simpan/hapus terasa lambat.
->
-> **Solusi Revisi Arsitektur**:
-> - **Local-First Stale-While-Revalidate**: State awal langsung dimuat dari `localStorage` dalam **0 milidetik** saat pertama kali dibuka. Tidak ada jeda atau kedip nama sekolah lama.
-> - **Eliminasi Network Overhead**: `testSupabaseConnection()` hanya dijalankan di dalam modal pengaturan Supabase, bukan di jalur render utama aplikasi.
-> - **Optimistic UI Updates**: Tambah, ubah, dan hapus data langsung memperbarui tampilan dalam hitungan milidetik tanpa menunggu respon round-trip jaringan cloud.
-> - **Sinkronisasi Instan Vercel**: Tautan QR proyektor membawa token kredensial publik Supabase sehingga HP guru langsung mengenali database sekolah seketika tanpa error "Rapat Tidak Ditemukan".
-> - **Proteksi PIN Admin & Isolasi Presensi**: Dashboard admin terkunci PIN; halaman presensi di HP guru tidak memiliki tombol akses ke admin.
-
-- **Keputusan 1**: Gunakan arsitektur *Local-First* agar nama yayasan, sekolah, agenda rapat, dan guru tampil instan (0ms).
-- **Keputusan 2**: Terapkan *Optimistic Updates* pada simpan/edit/hapus data agar interaksi UI responsif seketika.
-- **Keputusan 3**: Kunci menu admin dengan PIN (default: `1234`) dan isolasi total halaman presensi HP guru.
+> Ringkasan keputusan berdasarkan konfirmasi pengguna:
+> - **Perilaku QR Expired di HP**: Menampilkan peringatan kadaluarsa yang jelas, menonaktifkan pemilihan nama dan tombol simpan presensi, serta menginstruksikan guru untuk mengarahkan kamera ke layar proyektor rapat yang menampilkan QR bergulir terbaru (toleransi 60 detik).
+> - **Pemilihan Peserta Rapat**: Agenda rapat mendukung opsi **Semua Guru** (default) atau **Pilih Guru Tertentu** dengan fitur *quick-filter* berdasarkan kelompok jabatan/mapel serta centang daftar guru manual. Perhitungan kehadiran (dashboard, laporan resmi SPJ, dan auto-alpa) hanya menghitung guru yang diundang.
+> - **Tema Dark Teal & Dark Mode**: Menerapkan palet warna *Deep Teal* (`teal-950`, `teal-900`, `teal-800`, `teal-600`, aksen `emerald-500` & `amber-500`) dengan toggle *Light / Dark Mode* yang tersimpan di `localStorage` dan tersinkronisasi di seluruh komponen.
+> - **Perbaikan Cetak ID Card**: Mengatasi masalah pemotongan overflow pada modal cetak, menambahkan kelas CSS cetak khusus (`print-color-adjust: exact`, `break-inside-avoid`, grid A4 3 kolom), dan memastikan QR ptk_id ter-render tajam tanpa terpotong.
 
 ---
 
-### 1. Overview & Core Concept
+## 1. Overview & Core Concept
 
-- **Apa yang Dilakukan**:
-  - Mengubah paradigma pemuatan data menjadi **Local-First & Optimistic**: aplikasi membaca dan menampilkan data lokal seketika, lalu menyinkronkan pembaruan ke cloud Supabase di latar belakang (*background sync*).
-  - Menyematkan konfigurasi publik Supabase pada link QR dinamis sehingga saat guru memindai proyektor di Vercel, HP langsung terhubung ke database dan menampilkan rapat tanpa *delay*.
-  - Menghilangkan jeda *loading* yang sebelumnya menyebabkan HP guru sempat menampilkan "Rapat Tidak Ditemukan".
-  - Memasang gerbang autentikasi PIN pada konsol admin dePresent dan menghapus semua tombol kembali/Home di layar presensi guru.
-- **Target Pengguna**:
-  - **Operator / Panitia**: Merasakan aplikasi dePresent yang sangat cepat, responsif saat input/edit/hapus rapat & guru, dan aman dari akses guru.
-  - **Guru**: Memindai QR di layar panggung, halaman presensi terbuka cepat dalam hitungan detik, mengisi presensi dengan lancar, dan perangkat HP terkunci dari titip absen.
+- **Apa yang Dibangun**:
+  1. **QR Expiry Guard**: Di halaman presensi mobile (`MobileCheckinView`), jika token QR proyektor telah kedaluwarsa (>60 detik), sistem secara tegas menonaktifkan formulir presensi dan tombol kirim, menampilkan banner instruksi pindai ulang.
+  2. **Selective Meeting Attendees**: Di `MeetingsView`, admin rapat dapat menentukan apakah suatu agenda berlaku untuk seluruh dewan guru atau kelompok peserta spesifik (misalnya rapat MGMP guru mapel, rapat wali kelas, atau rapat pimpinan).
+  3. **Dark Teal Palette & Dark Mode**: Transformasi gaya visual aplikasi ke *Deep Oceanic Teal*, menggantikan nuansa biru standar dengan palet teal yang teduh dan elegan, dilengkapi tombol pengalih tema terang/gelap pada bilah navigasi atas.
+  4. **ID Card Printing Engine Fix**: Perbaikan tata letak cetak ID Card Portrait (54 x 85.6 mm) agar dapat dicetak ke kertas A4 (9 kartu per lembar) atau disimpan ke PDF dengan warna latar utuh dan tanpa terpotong batas modal.
 
----
-
-### 2. User Experience & Visual Design
-
-#### A. Startup Instan Aplikasi (Admin & Proyektor)
-- Saat membuka aplikasi dePresent di laptop sekolah:
-  - Nama yayasan dan sekolah Anda langsung muncul dalam **0 milidetik** tanpa jeda (*zero layout shift*).
-  - Agenda rapat aktif langsung terpilih dari cache lokal.
-  - Penarikan data terbaru dari Supabase berjalan tenang di latar belakang (*silent revalidation*).
-
-#### B. Akselerasi Simpan, Edit, dan Hapus (0ms Latency)
-- Saat operator menambah agenda rapat, mengedit data guru ber-NIY, atau menghapus item:
-  - Antarmuka tabel/kartu langsung terupdate seketika (*optimistic update*).
-  - Data di-push ke Supabase secara asinkron tanpa memblokir interaksi pengguna.
-  - Modal dialog konfirmasi hapus in-app yang aman dan cepat.
-
-#### C. Alur Presensi Guru via Scan QR (Cepat & Terisolasi)
-1. Guru memindai QR dinamis di layar proyektor.
-2. HP guru langsung membaca token data & kredensial Supabase dari parameter URL.
-3. Rapat langsung terdeteksi tanpa pesan "Rapat Tidak Ditemukan".
-4. Guru mencari nama/NIY dan menekan tombol presensi.
-5. Muncul tanda sukses resmi berlogo yayasan; HP terkunci untuk 1 guru (mencegah titip absen).
-6. **Keamanan**: Tidak ada tombol Home atau menu navigasi admin di layar HP guru.
-
-#### D. Gerbang PIN Admin
-- Tampilan dialog kunci PIN yang elegan bergaya institusional.
-- Keypad angka cepat dan dukungan input keyboard.
-- Fitur ganti PIN di menu Profil Yayasan & Sekolah.
+- **Target Pengguna**: Pimpinan yayasan, kepala sekolah, notulis/panitia rapat, dan guru peserta kegiatan.
 
 ---
 
-### 3. Key Product Decisions & Trade-Offs
+## 2. User Experience & Visual Design
 
-- **Keputusan 1: Local-First Stale-While-Revalidate (SWR)**
-  - *Pendekatan*: Inisialisasi state React langsung dari `localStorage`:
-    ```ts
-    const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(() => getCachedProfile());
-    const [meetings, setMeetings] = useState<Meeting[]>(() => getCachedMeetings());
-    const [teachers, setTeachers] = useState<Teacher[]>(() => getCachedTeachers());
-    ```
-  - *Alasan*: Menghilangkan keluhan "proses tarik data sangat lama sehingga app menampilkan nama sekolah mode lama". Aplikasi langsung menampilkan identitas sekolah asli pengguna sejak frame pertama.
-- **Keputusan 2: Pemisahan Jalur Diagnostic vs. Data Fetching**
-  - *Pendekatan*: Mencabut pemanggilan `testSupabaseConnection()` dari siklus `loadAllData()`. Pengecekan tabel hanya dilakukan ketika operator membuka modal Supabase.
-  - *Alasan*: Mengurangi 50% beban kueri HTTP dan memangkas waktu muat hingga beberapa detik.
-- **Keputusan 3: Penulisan Optimistik (Optimistic Writes)**
-  - *Pendekatan*: Pada `saveTeacher`, `saveMeeting`, `deleteTeacher`, dan `deleteMeeting`, simpan ke `localStorage` dan perbarui state seketika, lalu jalankan `upsert`/`delete` ke Supabase tanpa melakukan query `fetch` ganda.
-  - *Alasan*: Pengguna tidak merasakan *freeze* atau *loading spinner* yang mengganggu saat mengelola data rapat dan guru.
+### A. Alur Pengguna (User Flows)
+1. **Guru Memindai QR Proyektor (Mobile Check-in)**:
+   - Guru memindai QR dinamis di layar proyektor.
+   - Jika QR masih aktif: nama guru yang diundang ke rapat tersebut muncul, guru memilih namanya dan menekan "Konfirmasi Kehadiran Saya". HP terkunci untuk 1 guru (Anti-Titip Absen).
+   - Jika QR kedaluwarsa: muncul banner peringatan kuning-oranye tegas, tombol konfirmasi dinonaktifkan dengan label *"Kode QR Kedaluwarsa — Pindai Ulang di Layar"*, dan guru tidak dapat memilih atau mengirimkan presensi.
+2. **Pembuatan / Pengeditan Agenda Rapat**:
+   - Panitia memilih kategori, tanggal, waktu, pimpinan rapat, dan notulis.
+   - Di bagian **Target Peserta Rapat**, terdapat pilihan:
+     - `Semua Guru & Pegawai` (default)
+     - `Pilih Guru Tertentu` (menampilkan ringkasan jumlah guru terpilih, tombol *Pilih Semua*, *Hapus Pilihan*, filter cepat per Jabatan, dan daftar checklist pencarian guru).
+3. **Penyelarasan Presensi & Laporan**:
+   - Dashboard KPI, layar proyektor, pengingat WhatsApp WAHA, dan Laporan Resmi SPJ secara otomatis menyesuaikan total peserta hanya dengan menghitung guru yang terdaftar dalam agenda tersebut.
+4. **Cetak ID Card Portrait**:
+   - Di menu Data Guru, panitia menekan "Cetak ID Card Portrait" (semua atau perorangan).
+   - Jendela pratinjau cetak terbuka dengan opsi ukuran cetak A4 teroptimasi. Ketika tombol "Cetak / Simpan PDF" ditekan, browser membuka dialog cetak yang bersih: tanpa sidebar, tanpa latar overlay abu-abu, warna latar dan logo tetap tercetak tajam (`print-color-adjust: exact`).
+5. **Dark Mode Toggle**:
+   - Ikon Sun / Moon yang elegan di header atas memungkinkan pengalihan tema instan antara mode terang beraksen deep teal dan mode gelap teal pekat.
+
+### B. Palet Warna & Tipografi
+- **Mode Terang (Light Mode)**:
+  - Background Canvas: Slate 50 (`#F8FAFC`)
+  - Primary Brand: Deep Teal (`#0F766E` / `teal-700` & `#115E59` / `teal-800`)
+  - Headers / Sidebar: Dark Teal Slate (`#042F2E` / `teal-950`)
+  - Accent / Status: Emerald (`#10B981`), Amber (`#D97706`), Rose (`#E11D48`)
+- **Mode Gelap (Dark Mode)**:
+  - Background Canvas: Dark Neutral / Deep Teal (`#021B1A` / `#0F172A`)
+  - Surface Containers: Dark Teal Slate (`#082F2D` / `#134E4A`) dengan garis batas halus (`border-teal-800/40`)
+  - Typography: Crisp white (`#F8FAFC`) untuk judul, soft teal/slate (`#94A3B8` / `#5EEAD4`) untuk teks sekunder
+  - Focus Ring: Teal 500 (`#14B8A6`)
+- **Tipografi**: Display font `Plus Jakarta Sans`, tabular numerals `JetBrains Mono` / `tabular-nums` pada seluruh tabel dan jam.
 
 ---
 
-### 4. Technical Architecture & Data Strategy
+## 3. Key Product Decisions & Trade-Offs
+
+- **Penguncian Formulir saat QR Kedaluwarsa**:
+  - *Keputusan*: Menampilkan peringatan jelas dan menonaktifkan interaksi tombol submit jika token QR >60 detik.
+  - *Alasan*: Menjamin integritas kehadiran fisik di dalam ruangan rapat tanpa merusak pengalaman guru yang sudah berada di halaman.
+- **Struktur Data Peserta Rapat (Selective Attendees)**:
+  - *Keputusan*: Menambahkan `target_type: 'all' | 'custom'` dan `invited_teacher_ids: string[]` pada antarmuka `Meeting`.
+  - *Alasan*: Menjaga kompatibilitas mundur dengan rapat-rapat yang sudah dibuat sebelumnya (jika `target_type` tidak ada atau `'all'`, sistem otomatis menganggap seluruh dewan guru sebagai peserta).
+- **Perbaikan Cetak Berbasis CSS Media Print Murni**:
+  - *Keputusan*: Menambahkan aturan cetak `@media print` terisolasi di mana elemen modal cetak menjadi satu-satunya kontainer yang ditampilkan, menonaktifkan overflow scrolling dan memicu tata letak grid A4 3x3 yang rapi.
+  - *Alasan*: Menghindari ketergantungan pada library pihak ketiga yang berat dan memastikan hasil cetak PDF vektor tajam langsung dari browser.
+
+---
+
+## 4. Technical Architecture & Data Strategy
+
+### Diagram Arsitektur & Alur Data
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      LOCAL STORAGE CACHE                        │
-│  - Profil Sekolah & Yayasan (Kop Surat)                         │
-│  - Daftar Guru & NIY                                            │
-│  - Agenda Rapat & Kegiatan                                      │
-│  - Riwayat Presensi                                             │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │ Baca Sinkron (0 ms) pada Startup
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    REACT STATE INITIALIZATION                   │
-│  - UI langsung render identitas sekolah asli                    │
-│  - Tanpa kedip / tanpa data dummy lama                          │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │ Revalidasi Asinkron di Background
-                                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       SUPABASE POSTGRESQL                       │
-│  - Tarik data pembaruan (Promise.all paralel)                   │
-│  - Update cache lokal jika ada data baru                        │
-│  - Tulis langsung (Optimistic Upsert tanpa query ganda)         │
-└─────────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────────┐
-│              ALUR QR PROYEKTOR -> HP GURU DI VERCEL             │
-│  1. Proyektor buat link: ?checkin={id}&tok={hash}&sc={cred}     │
-│  2. HP Guru buka link -> parse {cred} -> konek Supabase instan  │
-│  3. Cari rapat di database -> Rapat Ditemukan seketika          │
-│  4. Layar sandboxed: Tanpa tombol kembali ke Home/Admin         │
-└─────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        dePresent Architecture                          │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  [ Theme Store ] ───> LocalStorage ('smp_theme') ───> document.root   │
+│                             │                                          │
+│                             ▼                                          │
+│                     [ Dark Teal Theme ]                                │
+│                                                                        │
+│  [ Meeting Model ]                                                     │
+│     ├── target_type ('all' | 'custom')                                 │
+│     └── invited_teacher_ids (string[])                                 │
+│               │                                                        │
+│               ▼                                                        │
+│  ┌─────────────────────────┬─────────────────────────┐                 │
+│  │ Dashboard / Reports     │ Mobile Checkin View     │                 │
+│  │ - Filter expected PTK   │ - Filter selectable PTK │                 │
+│  │ - Accurate % & Absent   │ - QR Expiry Guard       │                 │
+│  └─────────────────────────┴─────────────────────────┘                 │
+│                                                                        │
+│  [ ID Card Generator ] ───> @media print CSS Engine ───> PDF / Printer │
+│     ├── Standard Portrait (54 x 85.6 mm)                               │
+│     ├── 3-column A4 grid layout                                        │
+│     └── Forced background color preservation                           │
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### File & Komponen yang Dioptimalkan:
-1. `src/lib/storage.ts`:
-   - Implementasi getter sinkron: `getCachedProfile()`, `getCachedTeachers()`, `getCachedMeetings()`, `getCachedAttendances()`.
-   - Refactoring `save*` dan `delete*` menjadi *optimistic*: simpan ke cache lokal langsung, kirim satu kueri tunggal ke Supabase tanpa re-fetch internal yang lambat.
-2. `src/lib/supabase.ts`:
-   - Penambahan `encodeSupabaseCredentials` dan `decodeSupabaseCredentials` untuk parameter `sc`.
-   - Otomatis inisialisasi kredensial jika parameter `sc` terdeteksi di URL HP guru.
-3. `src/App.tsx`:
-   - Gunakan lazy initial state dari cache lokal (0ms rendering).
-   - Jalankan `loadAllData()` sebagai proses *background revalidation* tanpa blocking.
-   - Pemasangan `AdminPinGate` (PIN default `1234` atau PIN tersimpan).
-   - Penanganan khusus rute `checkin`: tidak menampilkan tombol navigasi admin.
-4. `src/components/ProjectorView.tsx`:
-   - Menyertakan token kredensial publik Supabase pada string QR dinamis.
-5. `src/components/MobileCheckinView.tsx`:
-   - Menghapus total tombol Home / "Buka Aplikasi Utama".
-   - Tampilan loading skeleton dan error yang rapi dan tertutup.
-6. `src/components/SchoolProfileView.tsx`:
-   - Menambahkan pengaturan ubah PIN Admin dengan verifikasi.
-
----
-
-### 5. Verification Plan
-
-1. **Uji Coba Kecepatan Render Awal**:
-   - Refresh aplikasi di browser dan pastikan nama yayasan/sekolah yang sudah diinput langsung tampil tanpa menampilkan teks dummy default sama sekali.
-2. **Uji Coba Respon Input/Edit/Hapus**:
-   - Tambah/edit/hapus agenda rapat dan guru; verifikasi aksi berlangsung instan tanpa jeda tunggu.
-3. **Uji Coba Presensi HP Guru di Vercel**:
-   - Buka tautan presensi hasil scan QR di perangkat lain; verifikasi bahwa informasi rapat langsung tampil dengan cepat tanpa tulisan "Rapat Tidak Ditemukan".
-4. **Uji Coba Keamanan PIN**:
-   - Buka konsol admin pada tab baru atau sesi baru dan pastikan PIN diminta.
-   - Cek halaman presensi guru dan pastikan tidak ada jalan keluar menuju dashboard admin.
-5. **Kompilasi & Lint**:
-   - Menjalankan `compile_applet` dan `lint_applet` untuk memastikan kode bebas galat.
+### Rincian Komponen yang Dimodifikasi:
+1. `src/types/index.ts`: Menambahkan properti `target_type` dan `invited_teacher_ids` pada antarmuka `Meeting`.
+2. `src/components/MobileCheckinView.tsx`:
+   - Penegakan `isTokenExpired`: blokir interaksi pemilihan guru dan formulir submit saat kedaluwarsa.
+   - Filter `filteredTeachers` hanya menampilkan guru yang diundang ke rapat tersebut jika rapat bersangkutan memiliki `invited_teacher_ids`.
+   - Penerapan warna dark teal.
+3. `src/components/MeetingsView.tsx`:
+   - Antarmuka pemilihan peserta rapat: tombol alih "Semua Guru" vs "Pilih Guru Tertentu".
+   - Panel *quick-filter* per jabatan/kelompok guru + checklist nama guru dengan pencarian.
+   - Tampilan badge jumlah peserta pada kartu agenda rapat.
+4. `src/components/DashboardView.tsx` & `src/components/ReportsView.tsx`:
+   - Perhitungan total peserta, persentase kehadiran, dan daftar guru belum hadir disaring berdasarkan `meeting.invited_teacher_ids`.
+   - Laporan resmi SPJ dan ekspor Excel hanya memuat guru yang terdaftar dalam agenda.
+5. `src/components/TeachersView.tsx` & `src/index.css`:
+   - Perbaikan aturan `@media print` untuk ID Card portrait: menyembunyikan background overlay modal, menampilkan container cetak secara penuh, mengaktifkan `print-color-adjust: exact`, dan menata grid 3 kartu per baris.
+6. `src/App.tsx`, `src/components/Sidebar.tsx`, dan navigasi:
+   - State `theme` (`'light'` / `'dark'`) dengan inisialisasi dari `localStorage`.
+   - Tombol toggle Sun / Moon di bilah navigasi atas.
+   - Penyesuaian kelas tema dari biru standar ke Dark Teal (`bg-teal-950`, `bg-teal-900`, `text-teal-400`, dll.).

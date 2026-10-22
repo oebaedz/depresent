@@ -84,22 +84,22 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs">
+      <div className="bg-white dark:bg-[#072b2f] rounded-xl shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 dark:border-[#0f4950]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-[#0f4950] flex items-center justify-between bg-slate-50 dark:bg-[#031e21]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 flex items-center justify-center">
               <Database className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Koneksi Database Supabase</h3>
-              <p className="text-xs text-slate-500">Integrasi tabel smp_school_profile, smp_teachers, smp_meetings, smp_attendances</p>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">Koneksi Database Supabase</h3>
+              <p className="text-xs text-slate-500 dark:text-teal-200/80">Integrasi tabel smp_school_profile, smp_teachers, smp_meetings, smp_attendances</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+            className="p-1 rounded-lg text-slate-400 dark:text-teal-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#0b383d] transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -108,11 +108,11 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-5 text-sm">
           {/* Quick Guidance Box */}
-          <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-3">
-            <Globe className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+          <div className="p-3.5 bg-teal-50 dark:bg-[#042024] border border-teal-200 dark:border-[#0f4950] rounded-lg text-xs text-teal-950 dark:text-teal-100 flex items-start gap-3">
+            <Globe className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <p className="font-semibold">Langkah Menghubungkan & Menyinkronkan Database Supabase:</p>
-              <ol className="list-decimal list-inside space-y-0.5 text-blue-800">
+              <p className="font-semibold text-teal-950 dark:text-white">Langkah Menghubungkan & Menyinkronkan Database Supabase:</p>
+              <ol className="list-decimal list-inside space-y-0.5 text-teal-900 dark:text-teal-200/90">
                 <li>Buka dashboard project Supabase Anda di <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-medium inline-flex items-center gap-0.5">supabase.com <ExternalLink className="w-2.5 h-2.5" /></a>.</li>
                 <li>Masuk ke menu <strong>Project Settings &rarr; API</strong>, salin <em>Project URL</em> dan <em>anon public key</em> ke formulir di bawah.</li>
                 <li>Buka menu <strong>SQL Editor</strong> di Supabase, klik tombol <strong>"Salin Skrip SQL"</strong> di bawah lalu jalankan (Run) agar tabel <code>smp_*</code> dan izin RLS dibuat otomatis.</li>
@@ -123,7 +123,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
           {/* Form Inputs */}
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-teal-100 mb-1">
                 Supabase Project URL *
               </label>
               <div className="relative">
@@ -132,13 +132,13 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="https://xyzabcdefg.supabase.co"
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-600 font-mono text-xs"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-600 font-mono text-xs"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-teal-100 mb-1">
                 Supabase Anon (Public) Key *
               </label>
               <div className="relative">
@@ -147,7 +147,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
                   value={anonKey}
                   onChange={(e) => setAnonKey(e.target.value)}
                   placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-600 font-mono text-xs"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-600 font-mono text-xs"
                 />
               </div>
             </div>
@@ -158,7 +158,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
             <button
               onClick={handleTest}
               disabled={isTesting || !url || !anonKey}
-              className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-[#0f4950] rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isTesting ? 'animate-spin' : ''}`} />
               <span>{isTesting ? 'Menguji...' : 'Uji Koneksi & Cek Tabel'}</span>
@@ -166,7 +166,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
 
             <button
               onClick={handleSave}
-              className="px-4 py-2 text-xs font-medium text-white bg-blue-900 hover:bg-blue-800 rounded-lg transition-colors shadow-sm flex items-center gap-1.5"
+              className="px-4 py-2 text-xs font-medium text-white bg-teal-800 hover:bg-teal-700 rounded-lg transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
               <Check className="w-3.5 h-3.5" />
               <span>Simpan Kredensial</span>
@@ -177,15 +177,15 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
               onClick={handleSyncInitialData}
               disabled={isSyncing || !url || !anonKey}
               title="Unggah data sekolah dan guru yang ada saat ini ke database Supabase Anda"
-              className="px-3.5 py-2 text-xs font-semibold text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3.5 py-2 text-xs font-semibold text-emerald-900 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-800 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
-              <UploadCloud className={`w-3.5 h-3.5 text-emerald-700 ${isSyncing ? 'animate-bounce' : ''}`} />
+              <UploadCloud className={`w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 ${isSyncing ? 'animate-bounce' : ''}`} />
               <span>{isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Data Awal ke Supabase'}</span>
             </button>
 
             <button
               onClick={handleResetToDemo}
-              className="px-3 py-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors ml-auto"
+              className="px-3 py-2 text-xs font-medium text-slate-500 dark:text-teal-300/70 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#0b383d] rounded-lg transition-colors ml-auto cursor-pointer"
             >
               Reset ke Demo Lokal
             </button>
@@ -260,22 +260,22 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
           )}
 
           {/* SQL Generator Section */}
-          <div className="pt-2 border-t border-slate-200">
+          <div className="pt-2 border-t border-slate-200 dark:border-[#0f4950]">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide">
                   1-Click SQL Schema Generator (Tabel smp_*)
                 </h4>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-slate-500 dark:text-teal-200/70">
                   Salin dan jalankan skrip ini di SQL Editor Supabase untuk membuat/memperbarui tabel.
                 </p>
               </div>
               <button
                 onClick={handleCopySql}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
                   copiedSql
                     ? 'bg-emerald-600 text-white border-emerald-600'
-                    : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+                    : 'bg-white dark:bg-[#031e21] text-slate-700 dark:text-teal-200 border-slate-300 dark:border-[#0f4950] hover:bg-slate-50 dark:hover:bg-[#0b383d]'
                 }`}
               >
                 {copiedSql ? (
@@ -292,18 +292,18 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
               </button>
             </div>
 
-            <div className="relative max-h-48 overflow-y-auto rounded-lg border border-slate-300 bg-slate-900 p-3 text-slate-200 font-mono text-[11px] leading-relaxed">
+            <div className="relative max-h-48 overflow-y-auto rounded-lg border border-slate-300 dark:border-[#0f4950] bg-slate-900 dark:bg-[#02181a] p-3 text-slate-200 dark:text-teal-100 font-mono text-[11px] leading-relaxed">
               <pre>{SUPABASE_SQL_SCHEMA}</pre>
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-6 py-3 border-t border-slate-200 dark:border-[#0f4950] bg-slate-50 dark:bg-[#031e21] flex items-center justify-between text-xs text-slate-500 dark:text-teal-300/70">
           <span>Tabel: smp_school_profile, smp_teachers, smp_meetings, smp_attendances</span>
           <button
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition-colors"
+            className="px-4 py-1.5 bg-slate-200 dark:bg-[#0b383d] hover:bg-slate-300 dark:hover:bg-[#0f4950] text-slate-700 dark:text-teal-100 font-medium rounded-lg transition-colors cursor-pointer"
           >
             Tutup
           </button>

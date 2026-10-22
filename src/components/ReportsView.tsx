@@ -28,8 +28,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const attendanceMap = new Map<string, Attendance>();
   meetingAttendances.forEach((a) => attendanceMap.set(a.teacher_id, a));
 
-  // Metrics
-  const activeTeachers = teachers.filter((t) => t.is_active);
+  // Filter active teachers according to current meeting's target_type & invited_teacher_ids
+  const isCustomMeeting =
+    currentMeeting &&
+    currentMeeting.target_type === 'custom' &&
+    Array.isArray(currentMeeting.invited_teacher_ids) &&
+    currentMeeting.invited_teacher_ids.length > 0;
+
+  const activeTeachers = teachers
+    .filter((t) => t.is_active)
+    .filter((t) => !isCustomMeeting || currentMeeting.invited_teacher_ids!.includes(t.id));
+
   const total = activeTeachers.length;
   const hadir = meetingAttendances.filter((a) => a.status === 'hadir').length;
   const terlambat = meetingAttendances.filter((a) => a.status === 'terlambat').length;
@@ -147,10 +156,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Header & Actions */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
+      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Laporan Resmi & Berkas Presensi Kedinasan</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Laporan Resmi & Berkas Presensi Kedinasan</h2>
+            {isCustomMeeting && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-100 dark:bg-[#031e21] text-teal-900 dark:text-teal-200 border border-teal-200 dark:border-teal-800">
+                Rapat Khusus ({total} Peserta)
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 dark:text-teal-200/80 mt-0.5">
             Format resmi ber-Kop Surat Yayasan, daftar hadir ber-NIY, tanda tangan pimpinan rapat & notulis.
           </p>
         </div>
@@ -160,11 +176,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <select
             value={selectedMeetingId}
             onChange={(e) => setSelectedMeetingId(e.target.value)}
-            className="text-xs font-semibold border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 focus:ring-2 focus:ring-blue-600 focus:outline-hidden max-w-xs truncate"
+            className="text-xs font-semibold border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-2 bg-slate-50 dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden max-w-xs truncate"
           >
             {meetings.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.title} ({m.meeting_date})
+              <option key={m.id} value={m.id} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
+                {m.title} ({m.meeting_date}){m.target_type === 'custom' ? ' [Khusus]' : ''}
               </option>
             ))}
           </select>
@@ -172,7 +188,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           {/* Export XLSX Button */}
           <button
             onClick={handleExportXLSX}
-            className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Ekspor File Excel (.xlsx)</span>
@@ -181,7 +197,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           {/* Print PDF Button */}
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-4 py-2 bg-teal-800 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Cetak Dokumen Resmi (PDF)</span>
@@ -190,8 +206,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       </div>
 
       {exportSuccess && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg text-xs font-medium flex items-center gap-2 no-print">
-          <Check className="w-4 h-4 text-emerald-600" />
+        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-lg text-xs font-medium flex items-center gap-2 no-print">
+          <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           <span>{exportSuccess}</span>
         </div>
       )}

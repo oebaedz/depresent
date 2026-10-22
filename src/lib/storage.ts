@@ -421,6 +421,8 @@ export async function fetchMeetings(): Promise<Meeting[]> {
             secretary_niy: row.secretary_niy || '',
             tolerance_minutes: row.tolerance_minutes || 15,
             status: row.status || 'active',
+            target_type: row.target_type || 'all',
+            invited_teacher_ids: Array.isArray(row.invited_teacher_ids) ? row.invited_teacher_ids : undefined,
             notes: row.notes || '',
             created_at: row.created_at,
           }));
@@ -472,6 +474,8 @@ export async function fetchSingleMeeting(meetingId: string): Promise<Meeting | n
           secretary_niy: data.secretary_niy || '',
           tolerance_minutes: data.tolerance_minutes || 15,
           status: data.status || 'active',
+          target_type: data.target_type || 'all',
+          invited_teacher_ids: Array.isArray(data.invited_teacher_ids) ? data.invited_teacher_ids : undefined,
           notes: data.notes || '',
           created_at: data.created_at,
         };
@@ -611,15 +615,25 @@ export async function completeMeetingAndMarkAbsent(
   }
 
   // 2. Find active teachers without attendance in this meeting
+  const targetMeeting = mIndex >= 0 ? allMeetings[mIndex] : undefined;
+  let targetTeachers = teachers.filter((t) => t.is_active);
+  if (
+    targetMeeting &&
+    targetMeeting.target_type === 'custom' &&
+    Array.isArray(targetMeeting.invited_teacher_ids) &&
+    targetMeeting.invited_teacher_ids.length > 0
+  ) {
+    targetTeachers = targetTeachers.filter((t) => targetMeeting.invited_teacher_ids!.includes(t.id));
+  }
+
   const allAttendances = getCachedAttendances();
   const meetingAtts = allAttendances.filter((a) => a.meeting_id === meetingId);
   const attendedTeacherIds = new Set(meetingAtts.map((a) => a.teacher_id));
 
-  const activeTeachers = teachers.filter((t) => t.is_active);
   const nowIso = new Date().toISOString();
   const newAbsentAttendances: Attendance[] = [];
 
-  for (const t of activeTeachers) {
+  for (const t of targetTeachers) {
     if (!attendedTeacherIds.has(t.id)) {
       const absentAtt: Attendance = {
         id: generateUUID(),

@@ -212,10 +212,10 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
   return (
     <div className="space-y-6">
       {/* Top Header & Action Controls */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">Data Guru & ID Card Portrait (Tabel smp_teachers)</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Data Guru & ID Card Portrait (Tabel smp_teachers)</h2>
+          <p className="text-xs text-slate-500 dark:text-teal-300/80 mt-0.5">
             Daftar PTK ber-NIY (Nomor Induk Yayasan), impor token ptk_id kartu fisik, dan cetak ID Card format portrait tegak (54 x 85.6 mm).
           </p>
         </div>
@@ -224,9 +224,9 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
           {/* Bulk Import Button */}
           <button
             onClick={() => setIsBulkModalOpen(true)}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-teal-700/60 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <Upload className="w-3.5 h-3.5 text-blue-600" />
+            <Upload className="w-3.5 h-3.5 text-teal-600 dark:text-teal-300" />
             <span>Unggah / Impor Massal</span>
           </button>
 
@@ -236,16 +236,16 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
               setSelectedTeacherForPrint(null);
               setIsPrintModalOpen(true);
             }}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-teal-700/60 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <Printer className="w-3.5 h-3.5 text-slate-600" />
+            <Printer className="w-3.5 h-3.5 text-teal-600 dark:text-teal-300" />
             <span>Cetak ID Card Portrait</span>
           </button>
 
           {/* Add Teacher Button */}
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 text-xs font-semibold text-white bg-blue-900 hover:bg-blue-800 rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-4 py-2 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-500 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Tambah Guru</span>
@@ -254,29 +254,29 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
       </div>
 
       {/* Search Input Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#072b2f] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-slate-400 dark:text-teal-400 absolute left-3 top-2.5" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Cari berdasarkan nama, NIY, mapel, atau ptk_id UUID..."
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-hidden"
+            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
           />
         </div>
 
-        <div className="text-xs text-slate-500 font-mono">
-          Total: <span className="font-bold text-slate-800">{filteredTeachers.length}</span> Guru
+        <div className="text-xs text-slate-500 dark:text-teal-300 font-mono">
+          Total: <span className="font-bold text-slate-900 dark:text-white">{filteredTeachers.length}</span> Guru
         </div>
       </div>
 
       {/* Teachers Data Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-[#072b2f] rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase text-[10px] tracking-wider">
+              <tr className="bg-slate-50 dark:bg-[#042024] border-b border-slate-200 dark:border-[#0f4950] text-slate-600 dark:text-teal-200 font-semibold uppercase text-[10px] tracking-wider">
                 <th className="py-2.5 px-4 w-12 text-center">No</th>
                 <th className="py-2.5 px-4">Nama Lengkap & NIY</th>
                 <th className="py-2.5 px-4">Kode QR (ptk_id)</th>
@@ -285,37 +285,39 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                 <th className="py-2.5 px-4 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-slate-100 dark:divide-[#0f4950] text-slate-700 dark:text-teal-100">
               {filteredTeachers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <td colSpan={6} className="py-12 text-center text-slate-400 dark:text-teal-300/60">
                     Tidak ada guru yang ditemukan.
                   </td>
                 </tr>
               ) : (
                 filteredTeachers.map((t, idx) => (
-                  <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-3 px-4 text-center font-mono text-[11px] text-slate-400 tabular-nums">
+                  <tr key={t.id} className="hover:bg-slate-50/80 dark:hover:bg-[#0b383d] transition-colors">
+                    <td className="py-3 px-4 text-center font-mono text-[11px] text-slate-400 dark:text-teal-400/80 tabular-nums">
                       {idx + 1}
                     </td>
 
                     <td className="py-3 px-4">
-                      <div className="font-bold text-slate-900 leading-tight">{t.name}</div>
-                      <div className="text-[11px] font-mono text-slate-500 mt-0.5">
+                      <div className="font-bold text-slate-900 dark:text-white leading-tight">{t.name}</div>
+                      <div className="text-[11px] font-mono text-slate-500 dark:text-teal-300 mt-0.5">
                         NIY. {t.niy || t.nip || '-'}
                       </div>
                     </td>
 
-                    <td className="py-3 px-4 font-mono text-[11px] text-blue-900 bg-blue-50/50 rounded max-w-[200px] truncate" title={t.ptk_id}>
-                      {t.ptk_id}
+                    <td className="py-3 px-4">
+                      <span className="font-mono text-[11px] text-teal-800 dark:text-teal-200 bg-teal-50 dark:bg-[#031e21] border border-teal-200 dark:border-teal-800/80 rounded px-1.5 py-0.5 block max-w-[200px] truncate" title={t.ptk_id}>
+                        {t.ptk_id}
+                      </span>
                     </td>
 
-                    <td className="py-3 px-4 text-slate-600">
-                      <div>{t.role_title}</div>
-                      <div className="text-[11px] text-slate-400">{t.rank_group}</div>
+                    <td className="py-3 px-4 text-slate-600 dark:text-teal-100">
+                      <div className="font-medium text-slate-800 dark:text-white">{t.role_title}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-teal-300/70">{t.rank_group}</div>
                     </td>
 
-                    <td className="py-3 px-4 font-mono text-[11px] text-slate-700">
+                    <td className="py-3 px-4 font-mono text-[11px] text-slate-700 dark:text-teal-200">
                       {t.phone_wa || '-'}
                     </td>
 
@@ -327,21 +329,21 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                             setIsPrintModalOpen(true);
                           }}
                           title="Cetak ID Card Portrait"
-                          className="p-1.5 text-slate-600 hover:text-blue-900 hover:bg-slate-100 rounded transition-colors"
+                          className="p-1.5 text-teal-700 dark:text-teal-300 hover:text-teal-900 dark:hover:text-white hover:bg-teal-50 dark:hover:bg-[#0b383d] rounded transition-colors cursor-pointer"
                         >
                           <Printer className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleOpenEdit(t)}
                           title="Edit Data Guru"
-                          className="p-1.5 text-slate-600 hover:text-blue-900 hover:bg-slate-100 rounded transition-colors"
+                          className="p-1.5 text-teal-700 dark:text-teal-300 hover:text-teal-900 dark:hover:text-white hover:bg-teal-50 dark:hover:bg-[#0b383d] rounded transition-colors cursor-pointer"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setDeleteTargetTeacher(t)}
                           title="Hapus Data Guru"
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="p-1.5 text-slate-400 dark:text-rose-400 hover:text-red-600 dark:hover:text-rose-300 hover:bg-red-50 dark:hover:bg-rose-950/50 rounded transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -358,24 +360,24 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
       {/* MODAL 1: Tambah / Edit Guru */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <h3 className="text-sm font-bold text-slate-900">
+          <div className="bg-white dark:bg-[#072b2f] rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 dark:border-[#0f4950]">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-[#0f4950] flex items-center justify-between bg-slate-50 dark:bg-[#042024]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                 {editingTeacher ? 'Edit Data Guru' : 'Tambah Guru Baru'}
               </h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setIsAddModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveTeacher} className="p-6 space-y-4 text-xs">
               {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs font-medium">
+                <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-900 text-red-800 dark:text-red-300 rounded-lg text-xs font-medium">
                   {formError}
                 </div>
               )}
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
                   Nama Lengkap & Gelar *
                 </label>
                 <input
@@ -384,13 +386,13 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Contoh: Drs. Ahmad Fauzi, M.Pd."
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-hidden"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
                     NIY (Nomor Induk Yayasan)
                   </label>
                   <input
@@ -398,12 +400,12 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                     value={formData.niy}
                     onChange={(e) => setFormData({ ...formData, niy: e.target.value })}
                     placeholder="Contoh: YHB-2002-014"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-hidden font-mono"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
                     No. WhatsApp (WAHA)
                   </label>
                   <input
@@ -411,13 +413,13 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                     value={formData.phone_wa}
                     onChange={(e) => setFormData({ ...formData, phone_wa: e.target.value })}
                     placeholder="08123456789"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-hidden font-mono"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
                   Kode QR ID Card (ptk_id UUID) *
                 </label>
                 <input
@@ -426,16 +428,16 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                   value={formData.ptk_id}
                   onChange={(e) => setFormData({ ...formData, ptk_id: e.target.value })}
                   placeholder="225b36db-f768-461f-b6d2-b3c399e06113"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-hidden font-mono text-blue-900 bg-blue-50/30"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-teal-50/50 dark:bg-[#031e21] text-teal-900 dark:text-teal-200 placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden font-mono"
                 />
-                <p className="text-[10px] text-slate-500 mt-1">
+                <p className="text-[10px] text-slate-500 dark:text-teal-300/70 mt-1">
                   Isi persis token UUID dari fisik kartu guru. Scanner mencocokkan kode UUID ini langsung.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
                     Jabatan / Guru Mapel
                   </label>
                   <input
@@ -443,12 +445,12 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                     value={formData.role_title}
                     onChange={(e) => setFormData({ ...formData, role_title: e.target.value })}
                     placeholder="Guru Bahasa Indonesia"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-hidden"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
+                  <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
                     Pangkat / Status Kepegawaian
                   </label>
                   <input
@@ -457,7 +459,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                     value={formData.rank_group}
                     onChange={(e) => setFormData({ ...formData, rank_group: e.target.value })}
                     placeholder="Pegawai Tetap Yayasan"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-600 focus:outline-hidden"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                   <datalist id="rank_group_options">
                     <option value="Pegawai Tetap Yayasan" />
@@ -469,17 +471,17 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-200 dark:border-[#0f4950] flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-slate-700 font-medium"
+                  className="px-4 py-2 bg-slate-200 dark:bg-[#0b383d] hover:bg-slate-300 dark:hover:bg-[#0f4950] rounded-lg text-slate-700 dark:text-teal-100 font-medium cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg font-semibold shadow-xs"
+                  className="px-4 py-2 bg-teal-700 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-500 text-white rounded-lg font-semibold shadow-xs cursor-pointer"
                 >
                   Simpan Data
                 </button>
@@ -492,19 +494,19 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
       {/* MODAL KONFIRMASI HAPUS GURU */}
       {deleteTargetTeacher && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 p-6 space-y-4">
-            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+          <div className="bg-white dark:bg-[#072b2f] rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 dark:border-[#0f4950] p-6 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-rose-950/60 text-red-600 dark:text-rose-400 flex items-center justify-center mx-auto">
               <Trash2 className="w-6 h-6" />
             </div>
 
             <div className="text-center space-y-2">
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 Konfirmasi Hapus Data Guru
               </h3>
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Apakah Anda yakin ingin menghapus data guru <strong className="text-slate-900">{deleteTargetTeacher.name}</strong> (NIY: {deleteTargetTeacher.niy || deleteTargetTeacher.nip || '-'})?
+              <p className="text-xs text-slate-600 dark:text-teal-200/90 leading-relaxed">
+                Apakah Anda yakin ingin menghapus data guru <strong className="text-slate-900 dark:text-white">{deleteTargetTeacher.name}</strong> (NIY: {deleteTargetTeacher.niy || deleteTargetTeacher.nip || '-'})?
               </p>
-              <p className="text-[11px] text-red-600 bg-red-50 p-2 rounded-lg font-medium">
+              <p className="text-[11px] text-red-600 dark:text-rose-300 bg-red-50 dark:bg-rose-950/50 border border-red-200 dark:border-rose-900 p-2.5 rounded-lg font-medium">
                 Peringatan: Seluruh data riwayat kehadiran terkait guru ini juga akan terhapus secara permanen.
               </p>
             </div>
@@ -514,7 +516,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                 type="button"
                 disabled={isDeleting}
                 onClick={() => setDeleteTargetTeacher(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                className="px-4 py-2 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] text-slate-700 dark:text-teal-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -522,7 +524,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                 type="button"
                 disabled={isDeleting}
                 onClick={handleConfirmDelete}
-                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Data Guru'}</span>
@@ -535,27 +537,27 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
       {/* MODAL 2: Impor Massal CSV */}
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 max-h-[90vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Upload className="w-4 h-4 text-blue-900" />
+          <div className="bg-white dark:bg-[#072b2f] rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-200 dark:border-[#0f4950] max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-[#0f4950] flex items-center justify-between bg-slate-50 dark:bg-[#042024]">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <Upload className="w-4 h-4 text-teal-600 dark:text-teal-300" />
                 <span>Unggah & Impor Massal Data Guru</span>
               </h3>
-              <button onClick={() => setIsBulkModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setIsBulkModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 space-y-1">
+              <div className="p-3 bg-teal-50 dark:bg-[#042024] border border-teal-200 dark:border-[#0f4950] rounded-lg text-teal-900 dark:text-teal-200 space-y-1">
                 <p className="font-semibold">Format Kolom (Bisa Copy-Paste langsung dari Excel / Spreadsheet):</p>
-                <p className="font-mono text-[11px] text-blue-800">
+                <p className="font-mono text-[11px] text-teal-800 dark:text-teal-300">
                   Nama Guru [TAB/KOMA] NIY [TAB/KOMA] No_WhatsApp [TAB/KOMA] ptk_id [TAB/KOMA] Jabatan
                 </p>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
                   Tempelkan Teks dari Excel / CSV di sini:
                 </label>
                 <textarea
@@ -563,24 +565,24 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                   value={bulkText}
                   onChange={(e) => handleParseBulk(e.target.value)}
                   placeholder={`Drs. Bambang Sudarsono\tYHB-1994-001\t081234567890\t225b36db-f768-461f-b6d2-b3c399e06113\tKepala Sekolah\nSiti Rahmawati, S.Pd.\tYHB-2008-028\t081234567891\t7b8c2e41-61a0-4359-994c-88e5d321041a\tGuru Matematika`}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-[11px] focus:ring-2 focus:ring-blue-600 focus:outline-hidden"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 font-mono text-[11px] focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
               {bulkParsed.length > 0 && (
                 <div className="space-y-2">
-                  <span className="font-bold text-slate-800 block">
+                  <span className="font-bold text-slate-800 dark:text-white block">
                     Pratinjau Data Terdeteksi ({bulkParsed.length} Guru):
                   </span>
-                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                  <div className="max-h-48 overflow-y-auto border border-slate-200 dark:border-[#0f4950] rounded-lg divide-y divide-slate-100 dark:divide-[#0f4950] bg-white dark:bg-[#031e21]">
                     {bulkParsed.map((item, idx) => (
-                      <div key={idx} className="p-2 flex items-center justify-between text-[11px] hover:bg-slate-50">
+                      <div key={idx} className="p-2 flex items-center justify-between text-[11px] hover:bg-slate-50 dark:hover:bg-[#0b383d]">
                         <div>
-                          <span className="font-bold text-slate-900">{item.name}</span>
-                          <span className="text-slate-400 ml-2 font-mono">NIY: {item.niy}</span>
-                          <span className="text-blue-700 ml-2 font-mono">ptk_id: {item.ptk_id.substring(0, 8)}...</span>
+                          <span className="font-bold text-slate-900 dark:text-white">{item.name}</span>
+                          <span className="text-slate-400 dark:text-teal-300/70 ml-2 font-mono">NIY: {item.niy}</span>
+                          <span className="text-teal-700 dark:text-teal-300 ml-2 font-mono">ptk_id: {item.ptk_id.substring(0, 8)}...</span>
                         </div>
-                        <span className="text-slate-500">{item.role_title}</span>
+                        <span className="text-slate-500 dark:text-teal-200/80">{item.role_title}</span>
                       </div>
                     ))}
                   </div>
@@ -588,24 +590,24 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
               )}
 
               {importStatus && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-lg font-semibold flex items-center gap-2">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300 rounded-lg font-semibold flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-600" />
                   <span>{importStatus}</span>
                 </div>
               )}
             </div>
 
-            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className="px-6 py-3 border-t border-slate-200 dark:border-[#0f4950] bg-slate-50 dark:bg-[#042024] flex items-center justify-between">
               <button
                 onClick={() => setIsBulkModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-medium"
+                className="px-4 py-2 bg-slate-200 dark:bg-[#0b383d] hover:bg-slate-300 dark:hover:bg-[#0f4950] text-slate-700 dark:text-teal-100 rounded-lg text-xs font-medium cursor-pointer"
               >
                 Tutup
               </button>
               <button
                 onClick={handleExecuteImport}
                 disabled={bulkParsed.length === 0}
-                className="px-5 py-2 bg-blue-900 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                className="px-5 py-2 bg-teal-700 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-500 text-white rounded-lg text-xs font-semibold shadow-xs disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>Impor {bulkParsed.length} Guru</span>
@@ -617,18 +619,18 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
 
       {/* MODAL 3: ID Card Generator & Cetak PORTRAIT */}
       {isPrintModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full overflow-hidden border border-slate-200 max-h-[92vh] flex flex-col">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-900 text-white no-print">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs id-card-modal-backdrop">
+          <div className="bg-white dark:bg-[#072b2f] rounded-xl shadow-2xl max-w-5xl w-full overflow-hidden border border-slate-200 dark:border-[#0f4950] max-h-[92vh] flex flex-col id-card-modal-content">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-[#0f4950] flex items-center justify-between bg-teal-950 text-white no-print">
               <div className="flex items-center gap-2">
-                <Printer className="w-5 h-5 text-blue-400" />
+                <Printer className="w-5 h-5 text-teal-400" />
                 <div>
                   <h3 className="text-sm font-bold">
                     {selectedTeacherForPrint
                       ? `Cetak ID Card Portrait: ${selectedTeacherForPrint.name}`
                       : `Cetak ID Card Portrait Guru (${teachers.length} Guru)`}
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[11px] text-teal-200">
                     Standar Kartu Tegak (Portrait) 54 mm x 85.6 mm ber-Kop Yayasan & QR Code ptk_id
                   </p>
                 </div>
@@ -637,14 +639,14 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => window.print()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5"
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Cetak / Simpan PDF</span>
                 </button>
                 <button
                   onClick={() => setIsPrintModalOpen(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white"
+                  className="p-1 rounded-lg text-slate-400 hover:text-white cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -652,22 +654,22 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
             </div>
 
             {/* Printable Portrait Area */}
-            <div className="p-8 overflow-y-auto flex-1 bg-slate-100 print:bg-white print:p-0">
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6 print:grid-cols-3 print:gap-4 justify-items-center">
+            <div className="p-8 overflow-y-auto flex-1 bg-slate-100 dark:bg-[#031e21] print:bg-white print:p-0 id-card-print-container">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6 print:grid-cols-3 print:gap-4 justify-items-center id-card-grid">
                 {(selectedTeacherForPrint ? [selectedTeacherForPrint] : teachers).map((t) => (
-                  /* Standard Portrait ID-1 Card (54mm width x 85.6mm height, approx 280px x 444px) */
+                  /* Standard Portrait ID-1 Card (54mm width x 85.6mm height, approx 250px x 395px) */
                   <div
                     key={t.id}
-                    className="w-[270px] bg-white rounded-2xl shadow-md border-2 border-slate-300 overflow-hidden flex flex-col justify-between text-center page-break-inside-avoid print:shadow-none relative"
-                    style={{ minHeight: '430px' }}
+                    className="w-[260px] bg-white rounded-2xl shadow-md border-2 border-slate-300 overflow-hidden flex flex-col justify-between text-center page-break-inside-avoid print:shadow-none relative id-card-portrait-unit"
+                    style={{ minHeight: '415px' }}
                   >
                     {/* Top Lanyard Punch Slot Indicator */}
-                    <div className="pt-2 pb-1 bg-slate-900 flex justify-center">
-                      <div className="w-10 h-1.5 rounded-full bg-slate-700 border border-slate-600" />
+                    <div className="pt-2 pb-1 bg-teal-950 flex justify-center">
+                      <div className="w-10 h-1.5 rounded-full bg-teal-800 border border-teal-700" />
                     </div>
 
                     {/* Card Header (Yayasan & School Identity & Logo) */}
-                    <div className="bg-slate-900 text-white px-3 py-2.5 border-b-2 border-amber-400 flex flex-col items-center space-y-1">
+                    <div className="bg-teal-950 text-white px-3 py-2.5 border-b-2 border-amber-400 flex flex-col items-center space-y-1">
                       {schoolProfile.logo_url ? (
                         <img
                           src={schoolProfile.logo_url}
@@ -675,7 +677,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                           className="w-10 h-10 object-contain bg-white rounded-full p-1 shadow-xs"
                         />
                       ) : (
-                        <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        <div className="w-9 h-9 rounded-full bg-teal-700 text-white font-black text-xs flex items-center justify-center shadow-xs">
                           dP
                         </div>
                       )}
@@ -688,16 +690,16 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                         <p className="text-[10px] font-black uppercase tracking-tight text-white leading-tight">
                           {schoolProfile.school_name || 'SMP HARAPAN BANGSA'}
                         </p>
-                        <p className="text-[8px] font-bold uppercase tracking-widest text-slate-300 mt-0.5">
+                        <p className="text-[8px] font-bold uppercase tracking-widest text-teal-200 mt-0.5">
                           KARTU TANDA PENGENAL GURU
                         </p>
                       </div>
                     </div>
 
                     {/* Card Body (Teacher Photo/Avatar & Info) */}
-                    <div className="px-4 py-2.5 flex-1 flex flex-col items-center justify-between space-y-1.5 bg-gradient-to-b from-white to-slate-50">
+                    <div className="px-4 py-2 flex-1 flex flex-col items-center justify-between space-y-1.5 bg-gradient-to-b from-white to-slate-50">
                       {/* Avatar */}
-                      <div className="w-14 h-14 rounded-full bg-blue-950 text-white font-bold text-lg flex items-center justify-center border-2 border-blue-600 shadow-xs mt-0.5">
+                      <div className="w-13 h-13 rounded-full bg-teal-950 text-white font-bold text-base flex items-center justify-center border-2 border-teal-600 shadow-xs mt-0.5">
                         {t.name.charAt(0)}
                       </div>
 
@@ -709,7 +711,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                         <p className="text-[10px] font-mono text-slate-800 font-bold">
                           NIY. {t.niy || t.nip || '-'}
                         </p>
-                        <p className="text-[10px] font-semibold text-blue-900">
+                        <p className="text-[10px] font-semibold text-teal-900">
                           {t.role_title}
                         </p>
                         <p className="text-[9px] text-slate-500">
@@ -723,10 +725,10 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                           <img
                             src={qrCache[t.ptk_id]}
                             alt={`QR ${t.name}`}
-                            className="w-28 h-28 object-contain mx-auto"
+                            className="w-26 h-26 object-contain mx-auto"
                           />
                         ) : (
-                          <div className="w-28 h-28 flex items-center justify-center text-[10px] text-slate-400">
+                          <div className="w-26 h-26 flex items-center justify-center text-[10px] text-slate-400">
                             QR
                           </div>
                         )}
@@ -741,7 +743,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                     </div>
 
                     {/* Card Bottom Strip */}
-                    <div className="bg-slate-900 text-slate-300 px-3 py-1.5 border-t border-slate-800 text-[8px] font-medium flex items-center justify-between">
+                    <div className="bg-teal-950 text-teal-200 px-3 py-1.5 border-t border-teal-900 text-[8px] font-medium flex items-center justify-between">
                       <span>NPSN: {schoolProfile.npsn || '20104567'}</span>
                       <span className="font-bold text-amber-300">dePresent</span>
                     </div>
@@ -750,13 +752,13 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
               </div>
             </div>
 
-            <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between no-print">
-              <span className="text-xs text-slate-500">
+            <div className="px-6 py-3 border-t border-slate-200 dark:border-[#0f4950] bg-slate-50 dark:bg-[#042024] flex items-center justify-between no-print">
+              <span className="text-xs text-slate-500 dark:text-teal-300/80">
                 Format ID Card Portrait: Siap dicetak pada kertas foto/PVC atau disimpan sebagai PDF.
               </span>
               <button
                 onClick={() => setIsPrintModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-medium rounded-lg"
+                className="px-4 py-2 bg-slate-200 dark:bg-[#0b383d] hover:bg-slate-300 dark:hover:bg-[#0f4950] text-slate-700 dark:text-teal-100 text-xs font-medium rounded-lg cursor-pointer"
               >
                 Tutup
               </button>

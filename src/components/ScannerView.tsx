@@ -76,6 +76,17 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
     if (!selectedMeeting) return;
     setIsRecording(true);
 
+    // Verify attendee invitation if target_type is custom
+    if (selectedMeeting.target_type === 'custom' && selectedMeeting.invited_teacher_ids && selectedMeeting.invited_teacher_ids.length > 0) {
+      if (!selectedMeeting.invited_teacher_ids.includes(teacher.id)) {
+        sound.playWarning();
+        setCameraError(`${teacher.name} bukan peserta yang diundang pada agenda "${selectedMeeting.title}".`);
+        setTimeout(() => setCameraError(null), 4000);
+        setIsRecording(false);
+        return;
+      }
+    }
+
     // Calculate status (Hadir vs Terlambat)
     // Meeting start_time is "HH:mm" (e.g. "08:00")
     let status: AttendanceStatus = 'hadir';
@@ -208,9 +219,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
     }
   };
 
-  // Filter teachers for manual search
+  // Filter teachers for manual search based on meeting participants
+  const eligibleTeachers =
+    selectedMeeting?.target_type === 'custom' && selectedMeeting.invited_teacher_ids?.length
+      ? teachers.filter((t) => selectedMeeting.invited_teacher_ids!.includes(t.id))
+      : teachers;
+
   const filteredTeachers = searchQuery.trim()
-    ? teachers.filter((t) => {
+    ? eligibleTeachers.filter((t) => {
         const q = searchQuery.toLowerCase();
         const niyVal = (t.niy || t.nip || '').toLowerCase();
         return (
@@ -224,28 +240,28 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
   return (
     <div className="space-y-6">
       {/* Top Banner & Meeting Selector */}
-      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
-            <h2 className="text-lg font-bold text-slate-900">Pemindai QR Panitia (Scan Kartu Guru)</h2>
+            <span className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-ping" />
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Pemindai QR Panitia (Scan Kartu Guru)</h2>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-teal-200/80 mt-0.5">
             Arahkan kamera ke QR Code pada ID Card guru untuk mencatat kehadiran seketika.
           </p>
         </div>
 
         {/* Selected Meeting */}
         <div className="flex items-center gap-2 self-start md:self-auto">
-          <label className="text-xs font-semibold text-slate-600 whitespace-nowrap">Agenda Rapat:</label>
+          <label className="text-xs font-semibold text-slate-600 dark:text-teal-100 whitespace-nowrap">Agenda Rapat:</label>
           <select
             value={selectedMeetingId}
             onChange={(e) => setSelectedMeetingId(e.target.value)}
-            className="text-xs font-medium border border-slate-300 rounded-lg px-3 py-1.5 bg-slate-50 focus:ring-2 focus:ring-blue-600 focus:outline-hidden max-w-xs truncate"
+            className="text-xs font-medium border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-1.5 bg-slate-50 dark:bg-[#031e21] text-slate-800 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden max-w-xs truncate"
           >
             {meetings.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.title} ({m.meeting_date}) [{m.status === 'active' ? 'AKTIF' : m.status}]
+              <option key={m.id} value={m.id} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
+                {m.title} ({m.meeting_date}) [{m.status === 'active' ? 'AKTIF' : m.status}] {m.target_type === 'custom' ? `(${m.invited_teacher_ids?.length || 0} Undangan)` : ''}
               </option>
             ))}
           </select>
@@ -255,11 +271,11 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
       {/* Main Grid: Camera Scanner (Left) & Live Confirmation Card / Manual Search (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Camera Viewport */}
-        <div className="lg:col-span-7 bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
+        <div className="lg:col-span-7 bg-white dark:bg-[#072b2f] p-6 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Camera className="w-5 h-5 text-blue-900" />
-              <h3 className="text-sm font-bold text-slate-900">Jendela Pemindai Kamera</h3>
+              <Camera className="w-5 h-5 text-teal-800 dark:text-teal-300" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Jendela Pemindai Kamera</h3>
             </div>
 
             {/* Camera Selector */}
@@ -272,7 +288,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
                     stopScanner().then(() => startScanner());
                   }
                 }}
-                className="text-xs border border-slate-300 rounded px-2 py-1 bg-slate-50 max-w-[180px] truncate"
+                className="text-xs border border-slate-300 dark:border-slate-700 rounded px-2 py-1 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-200 max-w-[180px] truncate"
               >
                 {cameras.map((cam) => (
                   <option key={cam.id} value={cam.id}>
@@ -289,7 +305,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
 
             {!isScanning && (
               <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-slate-900/90 text-white space-y-3 z-10">
-                <div className="w-14 h-14 rounded-full bg-blue-900/40 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                <div className="w-14 h-14 rounded-full bg-teal-900/40 border border-teal-500/40 flex items-center justify-center text-teal-400">
                   <Camera className="w-7 h-7" />
                 </div>
                 <div>
@@ -300,7 +316,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
                 </div>
                 <button
                   onClick={startScanner}
-                  className="px-5 py-2.5 bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
+                  className="px-5 py-2.5 bg-teal-700 hover:bg-teal-600 text-white text-xs font-semibold rounded-lg transition-colors shadow-md flex items-center gap-2"
                 >
                   <Zap className="w-4 h-4 text-amber-300" />
                   <span>Aktifkan Kamera Pemindai</span>
@@ -325,13 +341,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
           </div>
 
           {cameraError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-900 flex items-start gap-2">
+            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-900 dark:text-red-300 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <span>{cameraError}</span>
             </div>
           )}
 
-          <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-1">
             <span className="flex items-center gap-1">
               <Volume2 className="w-3.5 h-3.5 text-slate-400" />
               <span>Bunyi audio bip chime aktif saat kartu terdeteksi</span>
@@ -343,14 +359,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
         {/* Right Column: Scanned Teacher Confirmation Card & Quick Fallback */}
         <div className="lg:col-span-5 space-y-6">
           {/* Last Scanned Confirmation Card */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-                <UserCheck className="w-4 h-4 text-emerald-600" />
+          <div className="bg-white dark:bg-[#072b2f] p-6 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#0f4950] pb-3">
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                 <span>Konfirmasi Presensi Terakhir</span>
               </h3>
               {lastScanned && (
-                <span className="text-[11px] font-mono text-slate-500">
+                <span className="text-[11px] font-mono text-slate-500 dark:text-teal-300/80">
                   {lastScanned.time} WIB
                 </span>
               )}
@@ -362,14 +378,14 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
                 <div
                   className={`p-3 rounded-lg border flex items-center justify-between ${
                     lastScanned.status === 'hadir'
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                      : 'bg-amber-50 border-amber-200 text-amber-900'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
+                      : 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200'
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <CheckCircle2
                       className={`w-5 h-5 ${
-                        lastScanned.status === 'hadir' ? 'text-emerald-600' : 'text-amber-600'
+                        lastScanned.status === 'hadir' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
                       }`}
                     />
                     <span className="font-bold text-xs uppercase tracking-wide">
@@ -380,41 +396,41 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
                 </div>
 
                 {/* Teacher Profile Summary */}
-                <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 space-y-2.5">
+                <div className="p-4 bg-slate-50 dark:bg-[#042024] rounded-lg border border-slate-200 dark:border-[#0f4950] space-y-2.5">
                   <div className="flex items-start gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-blue-900 text-white flex items-center justify-center font-bold text-lg shrink-0">
+                    <div className="w-12 h-12 rounded-lg bg-teal-900 dark:bg-teal-800 text-white flex items-center justify-center font-bold text-lg shrink-0">
                       {lastScanned.teacher.name.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      <h4 className="font-bold text-slate-900 text-sm leading-snug">
+                      <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-snug">
                         {lastScanned.teacher.name}
                       </h4>
-                      <p className="text-xs font-mono text-slate-600 mt-0.5">
+                      <p className="text-xs font-mono text-slate-600 dark:text-teal-300/80 mt-0.5">
                         NIY. {lastScanned.teacher.niy || lastScanned.teacher.nip || '-'}
                       </p>
-                      <p className="text-xs text-slate-700 mt-0.5">
+                      <p className="text-xs text-slate-700 dark:text-teal-100/90 mt-0.5">
                         {lastScanned.teacher.role_title} · {lastScanned.teacher.rank_group}
                       </p>
                     </div>
                   </div>
 
                   {/* WAHA Status */}
-                  <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
-                    <span className="flex items-center gap-1 text-emerald-700 font-medium">
-                      <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                  <div className="pt-2 border-t border-slate-200 dark:border-[#0f4950] flex items-center justify-between text-[11px] text-slate-600 dark:text-teal-200/80">
+                    <span className="flex items-center gap-1 text-teal-700 dark:text-teal-300 font-medium">
+                      <Smartphone className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                       <span>{lastScanned.waStatus || 'WhatsApp Notif'}</span>
                     </span>
-                    <span className="font-mono text-[10px] text-slate-400 truncate max-w-[140px]">
+                    <span className="font-mono text-[10px] text-slate-400 dark:text-teal-400/60 truncate max-w-[140px]">
                       ptk_id: {lastScanned.teacher.ptk_id.substring(0, 8)}...
                     </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-10 text-slate-400 space-y-2">
-                <Clock className="w-8 h-8 mx-auto text-slate-300 stroke-1" />
-                <p className="text-xs text-slate-500">Belum ada kartu guru yang dipindai.</p>
-                <p className="text-[11px] text-slate-400">
+              <div className="text-center py-10 text-slate-400 dark:text-teal-400/60 space-y-2">
+                <Clock className="w-8 h-8 mx-auto text-slate-300 dark:text-teal-600/50 stroke-1" />
+                <p className="text-xs text-slate-500 dark:text-teal-200/80">Belum ada kartu guru yang dipindai.</p>
+                <p className="text-[11px] text-slate-400 dark:text-teal-400/60">
                   Scan QR ID Card atau gunakan formulir pencarian manual di bawah jika kartu tertinggal.
                 </p>
               </div>
@@ -422,9 +438,9 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
           </div>
 
           {/* Fallback Manual Check-in */}
-          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-3">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5 text-slate-500" />
+          <div className="bg-white dark:bg-[#072b2f] p-6 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs space-y-3">
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
               <span>Input Manual (Bila Kartu Tertinggal)</span>
             </h3>
 
@@ -434,28 +450,28 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari Nama Guru atau NIY..."
-                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-blue-600"
+                className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] bg-white dark:bg-[#031e21] text-slate-800 dark:text-white rounded-lg focus:outline-hidden focus:ring-2 focus:ring-teal-600"
               />
             </div>
 
             {searchQuery && (
-              <div className="max-h-48 overflow-y-auto space-y-1.5 border border-slate-200 rounded-lg p-2 bg-slate-50">
+              <div className="max-h-48 overflow-y-auto space-y-1.5 border border-slate-200 dark:border-[#0f4950] rounded-lg p-2 bg-slate-50 dark:bg-[#031e21]">
                 {filteredTeachers.length === 0 ? (
-                  <p className="text-center py-2 text-xs text-slate-400">Tidak ada guru yang cocok.</p>
+                  <p className="text-center py-2 text-xs text-slate-400 dark:text-teal-400/60">Tidak ada guru yang cocok.</p>
                 ) : (
                   filteredTeachers.map((t) => (
                     <div
                       key={t.id}
-                      className="flex items-center justify-between p-2 bg-white rounded border border-slate-200 hover:border-blue-400 text-xs transition-colors"
+                      className="flex items-center justify-between p-2 bg-white dark:bg-[#072b2f] rounded border border-slate-200 dark:border-[#0f4950] hover:border-teal-400 dark:hover:border-teal-500 text-xs transition-colors"
                     >
                       <div className="min-w-0 pr-2">
-                        <p className="font-semibold text-slate-900 truncate">{t.name}</p>
-                        <p className="font-mono text-[10px] text-slate-500">NIY. {t.niy || t.nip || '-'}</p>
+                        <p className="font-semibold text-slate-900 dark:text-white truncate">{t.name}</p>
+                        <p className="font-mono text-[10px] text-slate-500 dark:text-teal-300/80">NIY. {t.niy || t.nip || '-'}</p>
                       </div>
                       <button
                         onClick={() => processAttendance(t, 'manual')}
                         disabled={isRecording}
-                        className="px-2.5 py-1 bg-blue-900 hover:bg-blue-800 text-white rounded text-[11px] font-medium shrink-0 transition-colors shadow-xs"
+                        className="px-2.5 py-1 bg-teal-800 hover:bg-teal-700 text-white rounded text-[11px] font-medium shrink-0 transition-colors shadow-xs cursor-pointer"
                       >
                         Presensi Hadir
                       </button>

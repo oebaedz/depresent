@@ -27,11 +27,40 @@ import {
   updateAdminPinInDb,
 } from './lib/storage';
 import { getSupabase } from './lib/supabase';
-import { Menu, Database, AlertTriangle, CheckCircle2, Lock } from 'lucide-react';
+import { Menu, Database, AlertTriangle, CheckCircle2, Lock, Sun, Moon } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Theme Management (Dark Mode & Dark Teal theme toggle)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smp_theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.body.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.body.classList.remove('dark');
+      }
+      localStorage.setItem('smp_theme', theme);
+    }
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
 
   // Check if current URL is a teacher mobile checkin link (e.g. ?checkin=<meetingId>)
   const [mobileCheckinMeetingId] = useState<string | null>(() => {
@@ -331,12 +360,16 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex text-slate-800 antialiased selection:bg-blue-900 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#031e21] flex text-slate-800 dark:text-teal-50 antialiased selection:bg-teal-700 selection:text-white transition-colors duration-150">
       {/* 1. Left Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isSupabaseConnected={supabaseStatus === 'connected'}
+        supabaseStatus={supabaseStatus}
+        isAdminUnlocked={isAdminUnlocked}
+        onAdminLock={handleAdminLock}
+        onAdminUnlockRequest={() => setIsAdminUnlocked(false)}
         schoolProfile={schoolProfile}
         isOpenMobile={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
@@ -348,12 +381,12 @@ export default function App() {
       {/* 2. Right Main Viewport Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
         {/* Top Contextual Header Bar */}
-        <header className="sticky top-0 z-30 bg-white border-b border-slate-200 h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between no-print">
+        <header className="sticky top-0 z-30 bg-white dark:bg-[#072b2f] border-b border-slate-200 dark:border-[#0f4950] h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between no-print transition-colors duration-150 shadow-xs">
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile Hamburger Button */}
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-teal-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#0b383d] cursor-pointer"
               title="Buka Menu"
             >
               <Menu className="w-5 h-5" />
@@ -361,48 +394,41 @@ export default function App() {
 
             {/* Breadcrumb / Current View Title */}
             <div className="min-w-0">
-              <h1 className="text-base font-bold text-slate-900 truncate leading-none">
+              <h1 className="text-base font-bold text-slate-900 dark:text-white truncate leading-none">
                 {pageTitles[activeTab].title}
               </h1>
-              <p className="text-[11px] text-slate-500 mt-1 truncate">
+              <p className="text-[11px] text-slate-500 dark:text-teal-300/80 mt-1 truncate">
                 {pageTitles[activeTab].subtitle}
               </p>
             </div>
           </div>
 
           {/* Quick Header Badges / Status */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             {schoolProfile.school_name && (
-              <span className="hidden sm:inline-block text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md truncate max-w-[200px]">
+              <span className="hidden sm:inline-block text-xs font-semibold text-teal-800 dark:text-teal-200 bg-teal-50 dark:bg-[#0b383d] border border-teal-200 dark:border-teal-700/60 px-2.5 py-1 rounded-md truncate max-w-[200px]">
                 {schoolProfile.school_name}
               </span>
             )}
 
-            {supabaseStatus === 'connected' && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="hidden sm:inline">Supabase Aktif</span>
-              </span>
-            )}
-
-            {supabaseStatus === 'demo' && (
-              <button
-                onClick={() => setIsSupabaseModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors cursor-pointer"
-              >
-                <Database className="w-3.5 h-3.5 text-slate-500" />
-                <span>Mode Demo</span>
-              </button>
-            )}
-
-            {/* Lock Admin Screen Button */}
+            {/* Dark Mode Toggle Button */}
             <button
-              onClick={handleAdminLock}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors cursor-pointer"
-              title="Kunci Panel Admin"
+              onClick={toggleTheme}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-teal-700/60 rounded-lg transition-all shadow-xs cursor-pointer"
+              title={theme === 'dark' ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap (Dark Teal)'}
+              aria-label="Toggle Mode Gelap dan Terang"
             >
-              <Lock className="w-3.5 h-3.5 text-slate-600" />
-              <span className="hidden sm:inline">Kunci Admin</span>
+              {theme === 'dark' ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-300" />
+                  <span className="font-medium">Mode Terang</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-teal-700" />
+                  <span className="font-medium">Mode Gelap</span>
+                </>
+              )}
             </button>
           </div>
         </header>

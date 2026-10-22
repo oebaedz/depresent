@@ -115,15 +115,21 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
     .filter((a) => a.meeting_id === meeting?.id)
     .sort((a, b) => new Date(b.check_in_time).getTime() - new Date(a.check_in_time).getTime());
 
+  // Filter relevant teachers if custom attendees are selected
+  const relevantTeachers =
+    meeting?.target_type === 'custom' && meeting.invited_teacher_ids && meeting.invited_teacher_ids.length > 0
+      ? teachers.filter((t) => meeting.invited_teacher_ids!.includes(t.id))
+      : teachers;
+
   const presentTeacherIds = new Set(meetingAttendances.map((a) => a.teacher_id));
-  const totalTeachers = teachers.length;
+  const totalTeachers = relevantTeachers.length;
   const presentCount = meetingAttendances.length;
   const attendanceRate = totalTeachers > 0 ? Math.round((presentCount / totalTeachers) * 100) : 0;
 
   // Direct checkin fallback from projector view
   const handleDirectSelfCheckin = async (teacherId: string) => {
     if (!meeting || !teacherId) return;
-    const teacher = teachers.find((t) => t.id === teacherId);
+    const teacher = relevantTeachers.find((t) => t.id === teacherId);
     if (!teacher) return;
 
     sound.playSuccess();
@@ -141,14 +147,14 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
     setTimeout(() => setSelfCheckinSuccess(null), 3000);
   };
 
-  const unpresentTeachers = teachers.filter((t) => !presentTeacherIds.has(t.id));
+  const unpresentTeachers = relevantTeachers.filter((t) => !presentTeacherIds.has(t.id));
 
   if (!meeting) {
     return (
-      <div className="bg-white p-12 rounded-xl border border-slate-200 text-center text-slate-500 space-y-3">
-        <Tv className="w-12 h-12 mx-auto text-slate-300 stroke-1" />
-        <h3 className="text-base font-bold text-slate-800">Tidak Ada Rapat Aktif</h3>
-        <p className="text-xs text-slate-400">Silakan pilih atau aktifkan agenda rapat di menu Agenda Rapat.</p>
+      <div className="bg-white dark:bg-[#072b2f] p-12 rounded-xl border border-slate-200 dark:border-[#0f4950] text-center text-slate-500 dark:text-teal-200/70 space-y-3">
+        <Tv className="w-12 h-12 mx-auto text-slate-300 dark:text-teal-600/50 stroke-1" />
+        <h3 className="text-base font-bold text-slate-800 dark:text-white">Tidak Ada Rapat Aktif</h3>
+        <p className="text-xs text-slate-400 dark:text-teal-300/60">Silakan pilih atau aktifkan agenda rapat di menu Agenda Rapat.</p>
       </div>
     );
   }
@@ -157,32 +163,32 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
   const progressPercent = Math.round((secondsRemaining / ROTATION_INTERVAL_SECONDS) * 100);
 
   return (
-    <div className={`space-y-6 ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-950 p-8 overflow-y-auto' : ''}`}>
+    <div className={`space-y-6 ${isFullscreen ? 'fixed inset-0 z-50 bg-[#031e21] p-8 overflow-y-auto text-white' : ''}`}>
       {/* Top Meeting Header Bar */}
       <div className={`p-6 rounded-2xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 ${
-        isFullscreen ? 'bg-slate-900 border-slate-800 text-white' : 'bg-blue-950 border-blue-900 text-white'
+        isFullscreen ? 'bg-[#072b2f] border-[#0f4950] text-white' : 'bg-teal-950 dark:bg-[#072b2f] border-teal-900 dark:border-[#0f4950] text-white'
       }`}>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs uppercase font-bold tracking-wider text-blue-200">
+            <span className="text-xs uppercase font-bold tracking-wider text-teal-200">
               {schoolProfile.foundation_name || schoolProfile.school_name || 'YAYASAN'} · dePresent MODE PROYEKTOR
             </span>
           </div>
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white line-clamp-2">
             {meeting.title}
           </h1>
-          <div className="flex flex-wrap items-center gap-4 text-xs text-blue-100">
+          <div className="flex flex-wrap items-center gap-4 text-xs text-teal-100">
             <span className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-blue-300" />
+              <Calendar className="w-3.5 h-3.5 text-teal-300" />
               <span>{meeting.meeting_date} ({meeting.start_time} - {meeting.end_time} WIB)</span>
             </span>
             <span className="flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-blue-300" />
+              <MapPin className="w-3.5 h-3.5 text-teal-300" />
               <span>{meeting.room}</span>
             </span>
             <span className="flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-blue-300" />
+              <User className="w-3.5 h-3.5 text-teal-300" />
               <span>Pimpinan: {meeting.leader_name}</span>
             </span>
           </div>
@@ -191,17 +197,17 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
         {/* Big Live Digital Clock & Fullscreen Toggle */}
         <div className="flex items-center gap-5 shrink-0 self-start md:self-center">
           <div className="text-right">
-            <div className="text-2xl md:text-3xl font-black font-mono tracking-tight text-emerald-400 tabular-nums">
+            <div className="text-2xl md:text-3xl font-black font-mono tracking-tight text-teal-300 tabular-nums">
               {currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
-            <p className="text-[11px] text-blue-200">
+            <p className="text-[11px] text-teal-200">
               {currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           </div>
 
           <button
             onClick={toggleFullscreen}
-            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10"
+            className="p-2.5 rounded-xl bg-teal-800/50 hover:bg-teal-700 text-white transition-colors border border-teal-700/60"
             title={isFullscreen ? 'Keluar Fullscreen' : 'Mode Layar Penuh (Fullscreen)'}
           >
             {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
@@ -213,23 +219,23 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Big Rolling QR Stage */}
         <div className={`lg:col-span-5 p-6 rounded-2xl border shadow-xs flex flex-col items-center justify-center text-center space-y-4 ${
-          isFullscreen ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          isFullscreen ? 'bg-[#072b2f] border-[#0f4950] text-white' : 'bg-white dark:bg-[#072b2f] border-slate-200 dark:border-[#0f4950] text-slate-900 dark:text-teal-50'
         }`}>
           {/* Header with Anti-Proxy Rotating Badge */}
           <div className="space-y-1.5 w-full">
             <div className="flex items-center justify-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+              <span className="text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-[#042024] px-2.5 py-1 rounded-md flex items-center gap-1.5 border border-teal-200/60 dark:border-[#0f4950]">
+                <ShieldCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                 <span>QR Dinamis (Berganti Tiap 15s)</span>
               </span>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-teal-200/70">
               Arahkan kamera HP Anda langsung ke proyektor di ruangan ini.
             </p>
           </div>
 
           {/* QR Code Container with 15-Second Countdown Ring */}
-          <div className="relative p-4 bg-white rounded-2xl shadow-md border-2 border-slate-200 flex items-center justify-center">
+          <div className="relative p-4 bg-white rounded-2xl shadow-md border-2 border-teal-800/20 dark:border-teal-500/30 flex items-center justify-center">
             {qrDataUrl ? (
               <img
                 src={qrDataUrl}
@@ -245,22 +251,22 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
 
           {/* 15-Second Progress Bar & Countdown Indicator */}
           <div className="w-full max-w-[280px] space-y-1">
-            <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
-              <span className="flex items-center gap-1 text-blue-600 font-semibold">
+            <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 dark:text-teal-300">
+              <span className="flex items-center gap-1 text-teal-600 dark:text-teal-300 font-semibold">
                 <RotateCw className="w-3 h-3 animate-spin" />
                 <span>Rotasi Kode</span>
               </span>
-              <span className="font-bold text-slate-800 tabular-nums">
+              <span className="font-bold text-slate-800 dark:text-white tabular-nums">
                 {secondsRemaining} detik
               </span>
             </div>
-            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+            <div className="w-full bg-slate-200 dark:bg-[#042024] h-2 rounded-full overflow-hidden">
               <div
-                className="bg-blue-600 h-full rounded-full transition-all duration-1000 ease-linear"
+                className="bg-teal-600 dark:bg-teal-400 h-full rounded-full transition-all duration-1000 ease-linear"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <p className="text-[10px] text-slate-400 pt-0.5">
+            <p className="text-[10px] text-slate-400 dark:text-teal-300/60 pt-0.5">
               Kode QR kadaluarsa otomatis untuk mencegah link dibagikan ke luar ruangan rapat.
             </p>
           </div>
@@ -270,18 +276,18 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
             {onOpenMobileCheckin ? (
               <button
                 onClick={() => onOpenMobileCheckin(meeting.id)}
-                className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg font-medium transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-teal-50 dark:bg-[#042024] hover:bg-teal-100 dark:hover:bg-[#0b383d] text-teal-800 dark:text-teal-200 border border-teal-200/60 dark:border-[#0f4950] rounded-lg font-medium transition-colors flex items-center gap-1.5"
               >
-                <Smartphone className="w-3.5 h-3.5 text-blue-700" />
+                <Smartphone className="w-3.5 h-3.5 text-teal-600 dark:text-teal-300" />
                 <span>Buka Form HP</span>
               </button>
             ) : null}
 
             <button
               onClick={handleCopyLink}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-slate-100 dark:bg-[#042024] hover:bg-slate-200 dark:hover:bg-[#0b383d] text-slate-700 dark:text-teal-200 border border-slate-200 dark:border-[#0f4950] rounded-lg font-medium transition-colors flex items-center gap-1.5"
             >
-              {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedUrl ? 'Tersalin!' : 'Salin Tautan'}</span>
             </button>
           </div>
@@ -289,19 +295,19 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
           {/* KPI Mini-Bar */}
           <div className="w-full grid grid-cols-2 gap-3 pt-2">
             <div className={`p-3 rounded-xl border text-center ${
-              isFullscreen ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+              isFullscreen ? 'bg-[#042024] border-[#0f4950]' : 'bg-slate-50 dark:bg-[#042024] border-slate-200 dark:border-[#0f4950]'
             }`}>
-              <span className="text-[11px] text-slate-400 block font-medium">Kehadiran</span>
-              <span className="text-xl font-bold font-mono text-emerald-600 tabular-nums">
+              <span className="text-[11px] text-slate-400 dark:text-teal-300/70 block font-medium">Kehadiran</span>
+              <span className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
                 {presentCount} / {totalTeachers}
               </span>
             </div>
 
             <div className={`p-3 rounded-xl border text-center ${
-              isFullscreen ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+              isFullscreen ? 'bg-[#042024] border-[#0f4950]' : 'bg-slate-50 dark:bg-[#042024] border-slate-200 dark:border-[#0f4950]'
             }`}>
-              <span className="text-[11px] text-slate-400 block font-medium">Persentase</span>
-              <span className="text-xl font-bold font-mono text-blue-600 tabular-nums">
+              <span className="text-[11px] text-slate-400 dark:text-teal-300/70 block font-medium">Persentase</span>
+              <span className="text-xl font-bold font-mono text-teal-700 dark:text-teal-300 tabular-nums">
                 {attendanceRate}%
               </span>
             </div>
@@ -309,20 +315,20 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
 
           {/* Interactive Check-in Helper */}
           <div className={`w-full p-3 rounded-xl border text-left space-y-2 ${
-            isFullscreen ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+            isFullscreen ? 'bg-[#042024] border-[#0f4950]' : 'bg-slate-50 dark:bg-[#042024] border-slate-200 dark:border-[#0f4950]'
           }`}>
-            <span className="text-[11px] font-semibold text-slate-600 block">
+            <span className="text-[11px] font-semibold text-slate-600 dark:text-teal-200 block">
               Bantuan Presensi di Layar (Jika Kamera HP Terkendala):
             </span>
             <div className="flex items-center gap-2">
               <select
                 value={selectedTeacherForSelfCheckin}
                 onChange={(e) => setSelectedTeacherForSelfCheckin(e.target.value)}
-                className="text-xs border border-slate-300 rounded px-2 py-1.5 flex-1 bg-white text-slate-800 truncate"
+                className="text-xs border border-slate-300 dark:border-[#0f4950] rounded px-2 py-1.5 flex-1 bg-white dark:bg-[#072b2f] text-slate-800 dark:text-white truncate"
               >
-                <option value="">-- Pilih Nama Guru --</option>
+                <option value="" className="text-slate-500 dark:text-teal-300/60">-- Pilih Nama Guru --</option>
                 {unpresentTeachers.map((t) => (
-                  <option key={t.id} value={t.id}>
+                  <option key={t.id} value={t.id} className="dark:bg-[#072b2f]">
                     {t.name} ({t.niy || t.nip || '-'})
                   </option>
                 ))}
@@ -330,29 +336,29 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
               <button
                 onClick={() => handleDirectSelfCheckin(selectedTeacherForSelfCheckin)}
                 disabled={!selectedTeacherForSelfCheckin}
-                className="px-3 py-1.5 bg-blue-900 hover:bg-blue-800 text-white rounded text-xs font-medium disabled:opacity-50 transition-colors shrink-0"
+                className="px-3 py-1.5 bg-teal-800 hover:bg-teal-700 text-white rounded text-xs font-medium disabled:opacity-50 transition-colors shrink-0"
               >
                 Catat Hadir
               </button>
             </div>
             {selfCheckinSuccess && (
-              <p className="text-[11px] text-emerald-600 font-medium">{selfCheckinSuccess}</p>
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">{selfCheckinSuccess}</p>
             )}
           </div>
         </div>
 
         {/* Right Column: Live Attendance Ticker / Feed */}
         <div className={`lg:col-span-7 p-6 rounded-2xl border shadow-xs space-y-4 flex flex-col ${
-          isFullscreen ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+          isFullscreen ? 'bg-[#072b2f] border-[#0f4950] text-white' : 'bg-white dark:bg-[#072b2f] border-slate-200 dark:border-[#0f4950] text-slate-900 dark:text-white'
         }`}>
-          <div className="flex items-center justify-between border-b pb-3 border-slate-200">
+          <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-[#0f4950]">
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-600" />
+              <Users className="w-5 h-5 text-teal-600 dark:text-teal-300" />
               <h3 className="text-sm font-bold tracking-wide uppercase">
                 Daftar Hadir Real-Time (Live Feed)
               </h3>
             </div>
-            <span className="text-xs font-mono text-slate-400">
+            <span className="text-xs font-mono text-slate-400 dark:text-teal-300">
               {presentCount} Guru Telah Hadir
             </span>
           </div>
@@ -360,10 +366,10 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
           {/* Attendee Feed Stream */}
           <div className="space-y-2.5 overflow-y-auto max-h-[440px] flex-1 pr-1">
             {meetingAttendances.length === 0 ? (
-              <div className="text-center py-16 text-slate-400 space-y-2">
-                <Clock className="w-8 h-8 mx-auto text-slate-300 stroke-1 animate-pulse" />
+              <div className="text-center py-16 text-slate-400 dark:text-teal-300/60 space-y-2">
+                <Clock className="w-8 h-8 mx-auto text-slate-300 dark:text-teal-600/50 stroke-1 animate-pulse" />
                 <p className="text-xs">Menunggu presensi guru pertama...</p>
-                <p className="text-[11px] text-slate-400">Nama guru akan langsung muncul di sini begitu QR dipindai.</p>
+                <p className="text-[11px] text-slate-400 dark:text-teal-300/50">Nama guru akan langsung muncul di sini begitu QR dipindai.</p>
               </div>
             ) : (
               meetingAttendances.map((att, idx) => {
@@ -380,19 +386,19 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                     key={att.id}
                     className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                       idx === 0
-                        ? 'border-emerald-400 bg-emerald-50/70 shadow-xs'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 shadow-xs'
                         : isFullscreen
-                        ? 'border-slate-800 bg-slate-800/60'
-                        : 'border-slate-100 bg-slate-50'
+                        ? 'border-[#0f4950] bg-[#042024]/80'
+                        : 'border-slate-100 dark:border-[#0f4950]/60 bg-slate-50 dark:bg-[#042024]/60'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-3">
-                      <div className="w-8 h-8 rounded-lg bg-blue-900 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-teal-800 text-white font-bold text-xs flex items-center justify-center shrink-0">
                         {idx + 1}
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          <p className={`font-bold text-xs truncate ${isFullscreen ? 'text-white' : 'text-slate-900'}`}>
+                          <p className={`font-bold text-xs truncate ${isFullscreen ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
                             {teacher.name}
                           </p>
                           {idx === 0 && (
@@ -401,7 +407,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-500 font-mono">
+                        <p className="text-[11px] text-slate-500 dark:text-teal-200/70 font-mono">
                           NIY. {teacher.niy || teacher.nip || '-'} · {teacher.role_title}
                         </p>
                       </div>
@@ -409,12 +415,12 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
 
                     <div className="text-right shrink-0">
                       <div className="flex items-center gap-1 justify-end">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="font-mono text-xs font-semibold text-slate-700">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span className="font-mono text-xs font-semibold text-slate-700 dark:text-teal-200">
                           {timeStr}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-slate-400 dark:text-teal-300/60">
                         {att.method === 'card_scan' ? 'Scan Kartu' : 'Scan Proyektor'}
                       </span>
                     </div>

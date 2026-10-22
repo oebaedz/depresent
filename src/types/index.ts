@@ -26,6 +26,8 @@ export interface Meeting {
   secretary_niy?: string;
   tolerance_minutes: number; // e.g. 15 mins late tolerance
   status: 'upcoming' | 'active' | 'completed';
+  target_type?: 'all' | 'custom'; // 'all' = semua dewan guru, 'custom' = guru tertentu
+  invited_teacher_ids?: string[]; // array ID guru yang diundang
   notes?: string;
   created_at?: string;
 }
