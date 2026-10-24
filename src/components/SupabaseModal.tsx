@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Database, Check, Copy, AlertTriangle, ExternalLink, RefreshCw, Globe, UploadCloud, CheckCircle2 } from 'lucide-react';
-import { getSupabaseCredentials, saveSupabaseCredentials, SUPABASE_SQL_SCHEMA, testSupabaseConnection } from '../lib/supabase';
+import { X, Database, Check, Copy, AlertTriangle, ExternalLink, RefreshCw, Globe, UploadCloud, CheckCircle2, Sparkles } from 'lucide-react';
+import { getSupabaseCredentials, saveSupabaseCredentials, SUPABASE_SQL_SCHEMA, SUPABASE_SQL_MIGRATION_V4, testSupabaseConnection } from '../lib/supabase';
 import { syncInitialDataToSupabase } from '../lib/storage';
 
 interface SupabaseModalProps {
@@ -19,9 +19,11 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
     message: string;
     tablesExist?: boolean;
     missingTables?: string[];
+    missingColumns?: string[];
     teacherCount?: number;
   } | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedMigration, setCopiedMigration] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
@@ -81,6 +83,12 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
     await navigator.clipboard.writeText(SUPABASE_SQL_SCHEMA);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2500);
+  };
+
+  const handleCopyMigration = async () => {
+    await navigator.clipboard.writeText(SUPABASE_SQL_MIGRATION_V4);
+    setCopiedMigration(true);
+    setTimeout(() => setCopiedMigration(false), 2500);
   };
 
   return (
@@ -259,12 +267,51 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
             </div>
           )}
 
+          {/* Quick Migration Tool for Selective Attendees */}
+          <div className="p-3.5 bg-amber-50 dark:bg-[#042024] border border-amber-300 dark:border-amber-700/60 rounded-xl space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0" />
+                <h4 className="text-xs font-bold text-amber-950 dark:text-amber-200">
+                  Update Skema Kolom Peserta Rapat (Selective Attendees)
+                </h4>
+              </div>
+              <button
+                onClick={handleCopyMigration}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                  copiedMigration
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 hover:bg-amber-200 dark:hover:bg-amber-900'
+                }`}
+              >
+                {copiedMigration ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin SQL Update Kolom</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] text-amber-900 dark:text-amber-200/90 leading-relaxed">
+              Jika tabel <code>smp_meetings</code> Anda sudah ada di Supabase, jalankan 2 baris perintah ini di SQL Editor untuk menambahkan kolom <code>target_type</code> dan <code>invited_teacher_ids</code>:
+            </p>
+            <div className="rounded-lg bg-amber-950/90 p-2 text-amber-100 font-mono text-[11px] select-all">
+              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';<br />
+              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
+            </div>
+          </div>
+
           {/* SQL Generator Section */}
           <div className="pt-2 border-t border-slate-200 dark:border-[#0f4950]">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide">
-                  1-Click SQL Schema Generator (Tabel smp_*)
+                  1-Click SQL Schema Lengkap (Tabel smp_*)
                 </h4>
                 <p className="text-[11px] text-slate-500 dark:text-teal-200/70">
                   Salin dan jalankan skrip ini di SQL Editor Supabase untuk membuat/memperbarui tabel.

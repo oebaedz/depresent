@@ -87,6 +87,7 @@ export async function testSupabaseConnection(url?: string, anonKey?: string): Pr
   message: string;
   tablesExist?: boolean;
   missingTables?: string[];
+  missingColumns?: string[];
   teacherCount?: number;
 }> {
   const creds = url && anonKey ? { url: url.trim(), anonKey: anonKey.trim() } : getSupabaseCredentials();
@@ -130,6 +131,13 @@ export async function testSupabaseConnection(url?: string, anonKey?: string): Pr
       };
     }
 
+    // Check if new columns exist in smp_meetings
+    const missingCols: string[] = [];
+    const { error: selectiveColErr } = await testClient.from('smp_meetings').select('invited_teacher_ids, target_type').limit(1);
+    if (selectiveColErr && (selectiveColErr.message?.includes('invited_teacher_ids') || selectiveColErr.message?.includes('target_type') || selectiveColErr.code === 'PGRST204')) {
+      missingCols.push('invited_teacher_ids');
+    }
+
     if (profileErr || teacherErr || meetingErr || attendanceErr) {
       const err = profileErr || teacherErr || meetingErr || attendanceErr;
       return {
@@ -139,11 +147,21 @@ export async function testSupabaseConnection(url?: string, anonKey?: string): Pr
     }
 
     const count = typeof teacherCount === 'number' ? teacherCount : 0;
+    if (missingCols.length > 0) {
+      return {
+        success: true,
+        tablesExist: true,
+        missingColumns: missingCols,
+        teacherCount: count,
+        message: `Koneksi Supabase terhubung! Namun tabel smp_meetings belum memiliki kolom "invited_teacher_ids". Aplikasi tetap berjalan normal dengan mode kompatibilitas, dan Anda dapat menyalin perintah "SQL Update Kolom" untuk meng-upgrade database.`,
+      };
+    }
+
     return {
       success: true,
       tablesExist: true,
       teacherCount: count,
-      message: `Koneksi berhasil! Terhubung ke Supabase, tabel smp_* aktif dengan ${count} data guru.`,
+      message: `Koneksi berhasil! Terhubung ke Supabase, seluruh tabel smp_* dan kolom selective attendees aktif (${count} data guru).`,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
@@ -221,13 +239,18 @@ CREATE TABLE IF NOT EXISTS smp_meetings (
   secretary_niy TEXT DEFAULT '',
   tolerance_minutes INT NOT NULL DEFAULT 15,
   status TEXT NOT NULL DEFAULT 'active', -- 'upcoming', 'active', 'completed'
+  target_type TEXT NOT NULL DEFAULT 'all', -- 'all' atau 'custom'
+  invited_teacher_ids JSONB DEFAULT '[]'::jsonb, -- daftar ID guru peserta terpilih
   notes TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- Pastikan kolom pimpinan, notulis, dan selective attendees ada jika tabel sudah terbuat sebelumnya
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS leader_niy TEXT DEFAULT '';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS secretary_name TEXT DEFAULT '';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS secretary_niy TEXT DEFAULT '';
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
 
 -- 4. TABEL REKAM KEHADIRAN (ATTENDANCES)
 CREATE TABLE IF NOT EXISTS smp_attendances (
@@ -270,4 +293,12 @@ CREATE POLICY "Public All smp_meetings" ON smp_meetings FOR ALL USING (true) WIT
 
 DROP POLICY IF EXISTS "Public All smp_attendances" ON smp_attendances;
 CREATE POLICY "Public All smp_attendances" ON smp_attendances FOR ALL USING (true) WITH CHECK (true);
+`;
+
+export const SUPABASE_SQL_MIGRATION_V4 = `-- ============================================================
+-- SKRIP UPDATE CEPAT KOLOM PESERTA RAPAT (SELECTIVE ATTENDEES)
+-- Jalankan skrip ini jika tabel smp_meetings sudah ada di Supabase Anda:
+-- ============================================================
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
 `;

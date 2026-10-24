@@ -164,19 +164,31 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
       ...formData,
     };
 
-    await saveMeeting(meetingToSave);
+    try {
+      await saveMeeting(meetingToSave);
 
-    // Ketika status rapat diset completed (selesai), otomatis ubah kehadiran yang belum hadir jadi Tidak Hadir
-    if (meetingToSave.status === 'completed') {
-      const res = await completeMeetingAndMarkAbsent(meetingToSave.id, teachers);
-      setActionSuccessMsg(
-        `Rapat selesai disimpan. ${res.updatedCount} guru yang belum presensi otomatis ditandai "Tidak Hadir".`
-      );
-      setTimeout(() => setActionSuccessMsg(null), 4000);
+      // Ketika status rapat diset completed (selesai), otomatis ubah kehadiran yang belum hadir jadi Tidak Hadir
+      if (meetingToSave.status === 'completed') {
+        const res = await completeMeetingAndMarkAbsent(meetingToSave.id, teachers);
+        setActionSuccessMsg(
+          `Rapat selesai disimpan. ${res.updatedCount} guru yang belum presensi otomatis ditandai "Tidak Hadir".`
+        );
+        setTimeout(() => setActionSuccessMsg(null), 4000);
+      } else {
+        setActionSuccessMsg(
+          editingMeeting
+            ? `Agenda rapat "${meetingToSave.title}" berhasil diperbarui!`
+            : `Agenda rapat baru "${meetingToSave.title}" berhasil dibuat dan disimpan!`
+        );
+        setTimeout(() => setActionSuccessMsg(null), 4000);
+      }
+
+      setIsModalOpen(false);
+      onRefresh();
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setFormError(`Gagal menyimpan rapat: ${errMsg}`);
     }
-
-    setIsModalOpen(false);
-    onRefresh();
   };
 
   const handleExecuteCompleteMeeting = async () => {

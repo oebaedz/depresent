@@ -213,7 +213,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       )}
 
       {/* Official Printable Report Document */}
-      <div className="bg-white p-8 md:p-12 rounded-xl border border-slate-300 shadow-sm max-w-4xl mx-auto print:border-none print:shadow-none print:p-0">
+      <div className="bg-white text-slate-900 p-8 md:p-12 rounded-xl border border-slate-300 shadow-sm max-w-4xl mx-auto report-printable-area print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none">
         {/* 1. Official Foundation & School Letterhead (Kop Surat) */}
         <div className="border-b-4 border-double border-slate-900 pb-3 mb-6 text-center relative font-serif">
           {/* Logo */}
@@ -240,10 +240,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               {schoolProfile.school_name || 'SMP HARAPAN BANGSA'}
             </h1>
 
-            <p className="text-[11px] text-slate-600 font-sans mt-1">
+            <p className="text-[11px] text-slate-700 font-sans mt-1">
               {schoolProfile.address || 'Jl. Ki Hajar Dewantara No. 45, Kompleks Yayasan'} · NPSN: {schoolProfile.npsn || '20104567'}
             </p>
-            <p className="text-[10px] text-slate-500 font-sans">
+            <p className="text-[10px] text-slate-600 font-sans">
               Telepon: {schoolProfile.phone || '-'} · Email: {schoolProfile.email || '-'} · Website: {schoolProfile.website || '-'}
             </p>
           </div>
@@ -263,26 +263,26 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 font-sans text-xs space-y-2 print:bg-white print:border-slate-400">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <span className="text-slate-500 block text-[10px]">Hari / Tanggal</span>
+              <span className="text-slate-600 block text-[10px] font-medium">Hari / Tanggal</span>
               <span className="font-bold text-slate-900">{currentMeeting?.meeting_date}</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px]">Waktu</span>
+              <span className="text-slate-600 block text-[10px] font-medium">Waktu</span>
               <span className="font-bold text-slate-900 font-mono">{currentMeeting?.start_time} - {currentMeeting?.end_time} WIB</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px]">Tempat</span>
+              <span className="text-slate-600 block text-[10px] font-medium">Tempat</span>
               <span className="font-bold text-slate-900">{currentMeeting?.room}</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px]">Pimpinan Rapat</span>
+              <span className="text-slate-600 block text-[10px] font-medium">Pimpinan Rapat</span>
               <span className="font-bold text-slate-900">{currentMeeting?.leader_name}</span>
             </div>
           </div>
         </div>
 
         {/* 4. Tabular Attendance Grid with NIY & Signature Columns */}
-        <div className="mb-6 overflow-x-auto">
+        <div className="mb-6 overflow-x-auto print:overflow-visible report-table-wrapper">
           <table className="w-full text-left border-collapse border border-slate-400 text-xs font-sans">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-400 text-slate-900 font-bold uppercase text-[10px] tracking-wider text-center">
@@ -290,7 +290,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 <th className="py-2 px-3 border-r border-slate-400 text-left">Nama Guru & Pegawai</th>
                 <th className="py-2 px-3 border-r border-slate-400 text-left">NIY / Status</th>
                 <th className="py-2 px-3 border-r border-slate-400 text-left">Jabatan</th>
-                <th className="py-2 px-2 border-r border-slate-400 w-20">Jam Hadir</th>
+                <th className="py-2 px-2 border-r border-slate-400 w-24">Jam Hadir</th>
                 <th className="py-2 px-2 border-r border-slate-400 w-24">Status</th>
                 <th className="py-2 px-3 border-slate-400 w-28 text-center">Verifikasi</th>
               </tr>
@@ -303,25 +303,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
                 return (
                   <tr key={t.id} className="hover:bg-slate-50/50 print:hover:bg-white page-break-inside-avoid">
-                    <td className="py-2 px-2 text-center border-r border-slate-300 font-mono tabular-nums">
+                    {/* Explicit high-contrast text-slate-900 so number is clearly visible in both light & dark mode */}
+                    <td className="py-2 px-2 text-center border-r border-slate-300 font-mono font-bold text-slate-900 tabular-nums">
                       {index + 1}
                     </td>
 
-                    <td className="py-2 px-3 border-r border-slate-300 font-semibold text-slate-900">
+                    <td className="py-2 px-3 border-r border-slate-300 font-bold text-slate-900">
                       {t.name}
                     </td>
 
-                    <td className="py-2 px-3 border-r border-slate-300 text-slate-700">
-                      <div className="font-mono text-[11px]">{t.niy || t.nip || '-'}</div>
-                      <div className="text-[10px] text-slate-500">{t.rank_group}</div>
+                    <td className="py-2 px-3 border-r border-slate-300 text-slate-800">
+                      <div className="font-mono text-[11px] font-bold text-slate-900">{t.niy || t.nip || '-'}</div>
+                      <div className="text-[10px] text-slate-600">{t.rank_group}</div>
                     </td>
 
-                    <td className="py-2 px-3 border-r border-slate-300 text-slate-700 text-[11px]">
+                    <td className="py-2 px-3 border-r border-slate-300 text-slate-800 text-[11px] font-medium">
                       {t.role_title}
                     </td>
 
-                    <td className="py-2 px-2 border-r border-slate-300 text-center font-mono text-[11px] tabular-nums">
-                      {att ? new Date(att.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                    {/* Explicit high-contrast text-slate-900 so check-in time is clearly visible in both light & dark mode */}
+                    <td className="py-2 px-2 border-r border-slate-300 text-center font-mono font-bold text-slate-900 text-[11px] tabular-nums">
+                      {att ? (
+                        <span>{new Date(att.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                      ) : (
+                        <span className="text-slate-400 font-normal">-</span>
+                      )}
                     </td>
 
                     <td className="py-2 px-2 border-r border-slate-300 text-center text-[10px] font-bold">
@@ -365,60 +371,60 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 5. Attendance Recapitulation Box */}
-        <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 mb-8 font-sans text-xs print:bg-white print:border-slate-400 page-break-inside-avoid">
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 mb-8 font-sans text-xs print:bg-white print:border-slate-400 recap-box page-break-inside-avoid">
           <h4 className="font-bold text-slate-900 mb-2 uppercase text-[11px] tracking-wide">
             Rekapitulasi Kehadiran Peserta:
           </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-700">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-800 font-medium">
             <div>
-              Total Guru: <strong className="font-mono">{total}</strong> orang
+              Total Guru: <strong className="font-mono text-slate-900">{total}</strong> orang
             </div>
             <div>
-              Hadir Tepat: <strong className="font-mono text-emerald-700">{hadir}</strong> orang
+              Hadir Tepat: <strong className="font-mono text-emerald-800 font-bold">{hadir}</strong> orang
             </div>
             <div>
-              Terlambat: <strong className="font-mono text-amber-700">{terlambat}</strong> orang
+              Terlambat: <strong className="font-mono text-amber-800 font-bold">{terlambat}</strong> orang
             </div>
             <div>
-              Izin / Sakit: <strong className="font-mono text-blue-700">{izin + sakit}</strong> orang
+              Izin / Sakit: <strong className="font-mono text-blue-800 font-bold">{izin + sakit}</strong> orang
             </div>
             <div>
-              Persentase: <strong className="font-mono text-slate-900">{rate}%</strong>
+              Persentase: <strong className="font-mono text-slate-900 font-bold">{rate}%</strong>
             </div>
           </div>
         </div>
 
         {/* 6. Formal Closing Signatures (Headmaster, Meeting Leader, and Meeting Secretary) */}
-        <div className="pt-4 grid grid-cols-3 text-center text-xs font-sans page-break-inside-avoid gap-4">
+        <div className="pt-4 grid grid-cols-3 text-center text-xs font-sans signature-block page-break-inside-avoid gap-4">
           {/* Kepala Sekolah */}
           <div>
-            <p className="text-slate-600">Mengetahui,</p>
+            <p className="text-slate-700">Mengetahui,</p>
             <p className="font-bold text-slate-900">Kepala Sekolah</p>
-            <div className="h-16" />
+            <div className="h-14" />
             <p className="font-bold underline text-slate-900">{schoolProfile.headmaster_name}</p>
-            <p className="text-slate-600 font-mono text-[11px]">NIY. {schoolProfile.headmaster_niy}</p>
+            <p className="text-slate-700 font-mono text-[11px]">NIY. {schoolProfile.headmaster_niy}</p>
           </div>
 
           {/* Pimpinan Rapat Tertentu */}
           <div>
-            <p className="text-slate-600">&nbsp;</p>
+            <p className="text-slate-700">&nbsp;</p>
             <p className="font-bold text-slate-900">Pimpinan Rapat</p>
-            <div className="h-16" />
+            <div className="h-14" />
             <p className="font-bold underline text-slate-900">{currentMeeting?.leader_name}</p>
-            <p className="text-slate-600 font-mono text-[11px]">
+            <p className="text-slate-700 font-mono text-[11px]">
               {currentMeeting?.leader_niy ? `NIY. ${currentMeeting.leader_niy}` : 'Pimpinan Agenda'}
             </p>
           </div>
 
           {/* Notulis Rapat Tertentu */}
           <div>
-            <p className="text-slate-600">
+            <p className="text-slate-700">
               {schoolProfile.city || 'Kota'}, {currentMeeting?.meeting_date ? new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('id-ID')}
             </p>
             <p className="font-bold text-slate-900">Notulis Rapat</p>
-            <div className="h-16" />
+            <div className="h-14" />
             <p className="font-bold underline text-slate-900">{currentMeeting?.secretary_name || '-'}</p>
-            <p className="text-slate-600 font-mono text-[11px]">
+            <p className="text-slate-700 font-mono text-[11px]">
               {currentMeeting?.secretary_niy ? `NIY. ${currentMeeting.secretary_niy}` : 'Notulis'}
             </p>
           </div>

@@ -32,18 +32,44 @@
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
   }
 
-  body {
-    background: white !important;
-    color: black !important;
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  /* Force pure white background and remove all dark-mode margins and page borders */
+  html,
+  html.dark,
+  body,
+  html.dark body,
+  #root,
+  #root > div,
+  main,
+  header {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    border: none !important;
+    box-shadow: none !important;
   }
   
   .no-print,
   aside,
-  nav {
+  nav,
+  header {
     display: none !important;
   }
   
@@ -59,6 +85,58 @@
   .page-break-inside-avoid {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  /* Official report document container */
+  .report-printable-area {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  .report-table-wrapper {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .recap-box {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    background-color: #ffffff !important;
+    border: 1px solid #94a3b8 !important;
+  }
+
+  .signature-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    width: 100% !important;
+    margin-top: 24px !important;
+    padding-top: 16px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   /* Modal unroll for printing ID cards */
@@ -114,6 +192,6 @@
 
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 12mm 10mm 15mm 10mm;
   }
 }

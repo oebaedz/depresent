@@ -407,25 +407,46 @@ export async function fetchMeetings(): Promise<Meeting[]> {
 
       if (!error && Array.isArray(data)) {
         if (data.length > 0) {
-          const mappedMeetings: Meeting[] = data.map((row) => ({
-            id: row.id,
-            title: row.title,
-            category: row.category,
-            meeting_date: row.meeting_date,
-            start_time: row.start_time,
-            end_time: row.end_time,
-            room: row.room,
-            leader_name: row.leader_name,
-            leader_niy: row.leader_niy || '',
-            secretary_name: row.secretary_name || '',
-            secretary_niy: row.secretary_niy || '',
-            tolerance_minutes: row.tolerance_minutes || 15,
-            status: row.status || 'active',
-            target_type: row.target_type || 'all',
-            invited_teacher_ids: Array.isArray(row.invited_teacher_ids) ? row.invited_teacher_ids : undefined,
-            notes: row.notes || '',
-            created_at: row.created_at,
-          }));
+          const mappedMeetings: Meeting[] = data.map((row) => {
+            let invitedIds: string[] | undefined = Array.isArray(row.invited_teacher_ids)
+              ? row.invited_teacher_ids
+              : (typeof row.invited_teacher_ids === 'string' && row.invited_teacher_ids.startsWith('[')
+                  ? JSON.parse(row.invited_teacher_ids)
+                  : undefined);
+
+            let cleanNotes = row.notes || '';
+            // Backward compatibility fallback: if column invited_teacher_ids wasn't added to Supabase table,
+            // recover attendee IDs from the fallback tag in notes
+            if ((!invitedIds || invitedIds.length === 0) && cleanNotes.includes('[ATTENDEES_SYNC:')) {
+              const match = cleanNotes.match(/\[ATTENDEES_SYNC:(.*?)\]/);
+              if (match && match[1]) {
+                try {
+                  invitedIds = JSON.parse(match[1]);
+                  cleanNotes = cleanNotes.replace(/\[ATTENDEES_SYNC:.*?\]/g, '').trim();
+                } catch {}
+              }
+            }
+
+            return {
+              id: row.id,
+              title: row.title,
+              category: row.category,
+              meeting_date: row.meeting_date,
+              start_time: row.start_time,
+              end_time: row.end_time,
+              room: row.room,
+              leader_name: row.leader_name,
+              leader_niy: row.leader_niy || '',
+              secretary_name: row.secretary_name || '',
+              secretary_niy: row.secretary_niy || '',
+              tolerance_minutes: row.tolerance_minutes || 15,
+              status: row.status || 'active',
+              target_type: row.target_type || (invitedIds && invitedIds.length > 0 ? 'custom' : 'all'),
+              invited_teacher_ids: invitedIds,
+              notes: cleanNotes,
+              created_at: row.created_at,
+            };
+          });
 
           localStorage.setItem(KEY_MEETINGS, JSON.stringify(mappedMeetings));
           return mappedMeetings;
@@ -434,7 +455,19 @@ export async function fetchMeetings(): Promise<Meeting[]> {
           const localMeetings = getCachedMeetings();
           (async () => {
             try {
-              await supabase.from('smp_meetings').upsert(localMeetings);
+              const { error: seedErr } = await supabase.from('smp_meetings').upsert(localMeetings);
+              if (seedErr && (seedErr.message?.includes('invited_teacher_ids') || seedErr.message?.includes('target_type') || seedErr.code === 'PGRST204')) {
+                const sanitized = localMeetings.map((m) => {
+                  const copy: Record<string, any> = { ...m };
+                  if (m.invited_teacher_ids && m.invited_teacher_ids.length > 0) {
+                    copy.notes = `${m.notes || ''}\n[ATTENDEES_SYNC:${JSON.stringify(m.invited_teacher_ids)}]`.trim();
+                  }
+                  delete copy.invited_teacher_ids;
+                  delete copy.target_type;
+                  return copy;
+                });
+                await supabase.from('smp_meetings').upsert(sanitized);
+              }
             } catch (e) {
               console.warn(e);
             }
@@ -460,6 +493,23 @@ export async function fetchSingleMeeting(meetingId: string): Promise<Meeting | n
     try {
       const { data, error } = await supabase.from('smp_meetings').select('*').eq('id', meetingId).single();
       if (!error && data) {
+        let invitedIds: string[] | undefined = Array.isArray(data.invited_teacher_ids)
+          ? data.invited_teacher_ids
+          : (typeof data.invited_teacher_ids === 'string' && data.invited_teacher_ids.startsWith('[')
+              ? JSON.parse(data.invited_teacher_ids)
+              : undefined);
+
+        let cleanNotes = data.notes || '';
+        if ((!invitedIds || invitedIds.length === 0) && cleanNotes.includes('[ATTENDEES_SYNC:')) {
+          const match = cleanNotes.match(/\[ATTENDEES_SYNC:(.*?)\]/);
+          if (match && match[1]) {
+            try {
+              invitedIds = JSON.parse(match[1]);
+              cleanNotes = cleanNotes.replace(/\[ATTENDEES_SYNC:.*?\]/g, '').trim();
+            } catch {}
+          }
+        }
+
         const mapped: Meeting = {
           id: data.id,
           title: data.title,
@@ -474,9 +524,9 @@ export async function fetchSingleMeeting(meetingId: string): Promise<Meeting | n
           secretary_niy: data.secretary_niy || '',
           tolerance_minutes: data.tolerance_minutes || 15,
           status: data.status || 'active',
-          target_type: data.target_type || 'all',
-          invited_teacher_ids: Array.isArray(data.invited_teacher_ids) ? data.invited_teacher_ids : undefined,
-          notes: data.notes || '',
+          target_type: data.target_type || (invitedIds && invitedIds.length > 0 ? 'custom' : 'all'),
+          invited_teacher_ids: invitedIds,
+          notes: cleanNotes,
           created_at: data.created_at,
         };
         const current = getCachedMeetings();
@@ -510,14 +560,38 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
 
   const supabase = getSupabase();
   if (supabase) {
-    (async () => {
-      try {
-        const { error } = await supabase.from('smp_meetings').upsert(cleanMeeting);
-        if (error) console.error('Error saving meeting to Supabase:', error.message);
-      } catch (e) {
-        console.warn('Could not sync meeting to Supabase:', e);
+    try {
+      const { error } = await supabase.from('smp_meetings').upsert(cleanMeeting);
+      if (error) {
+        // If error indicates column invited_teacher_ids or target_type is missing in schema cache
+        if (
+          error.message?.includes('invited_teacher_ids') ||
+          error.message?.includes('target_type') ||
+          error.code === 'PGRST204'
+        ) {
+          console.warn('Supabase smp_meetings table lacks invited_teacher_ids column. Saving with compatibility fallback notes...');
+          const fallbackPayload: Record<string, any> = { ...cleanMeeting };
+          if (cleanMeeting.invited_teacher_ids && cleanMeeting.invited_teacher_ids.length > 0) {
+            fallbackPayload.notes = `${cleanMeeting.notes || ''}\n[ATTENDEES_SYNC:${JSON.stringify(cleanMeeting.invited_teacher_ids)}]`.trim();
+          }
+          delete fallbackPayload.invited_teacher_ids;
+          if (error.message?.includes('target_type')) {
+            delete fallbackPayload.target_type;
+          }
+
+          const { error: retryErr } = await supabase.from('smp_meetings').upsert(fallbackPayload);
+          if (retryErr) {
+            console.error('Retry upsert meeting failed:', retryErr.message);
+          } else {
+            console.log('Successfully saved meeting to Supabase using backward compatibility mode!');
+          }
+        } else {
+          console.error('Error saving meeting to Supabase:', error.message);
+        }
       }
-    })();
+    } catch (e) {
+      console.warn('Could not sync meeting to Supabase:', e);
+    }
   }
   return cleanMeeting;
 }
@@ -823,7 +897,19 @@ export async function syncInitialDataToSupabase(): Promise<{ success: boolean; m
 
     // 3. Sync Meetings
     const meetings = getCachedMeetings();
-    await supabase.from('smp_meetings').upsert(meetings);
+    const { error: meetErr } = await supabase.from('smp_meetings').upsert(meetings);
+    if (meetErr && (meetErr.message?.includes('invited_teacher_ids') || meetErr.message?.includes('target_type') || meetErr.code === 'PGRST204')) {
+      const sanitized = meetings.map((m) => {
+        const copy: Record<string, any> = { ...m };
+        if (m.invited_teacher_ids && m.invited_teacher_ids.length > 0) {
+          copy.notes = `${m.notes || ''}\n[ATTENDEES_SYNC:${JSON.stringify(m.invited_teacher_ids)}]`.trim();
+        }
+        delete copy.invited_teacher_ids;
+        delete copy.target_type;
+        return copy;
+      });
+      await supabase.from('smp_meetings').upsert(sanitized);
+    }
 
     return {
       success: true,
