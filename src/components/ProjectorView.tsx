@@ -122,9 +122,13 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
       ? teachers.filter((t) => meeting.invited_teacher_ids!.includes(t.id))
       : teachers;
 
-  const presentTeacherIds = new Set(meetingAttendances.map((a) => a.teacher_id));
+  // Separate actual present (hadir / terlambat) from permission/sick (izin / sakit)
+  const presentAttendances = meetingAttendances.filter((a) => a.status === 'hadir' || a.status === 'terlambat');
+  const izinSakitAttendances = meetingAttendances.filter((a) => a.status === 'izin' || a.status === 'sakit');
+  const presentTeacherIds = new Set(presentAttendances.map((a) => a.teacher_id));
   const totalTeachers = relevantTeachers.length;
-  const presentCount = meetingAttendances.length;
+  const presentCount = presentAttendances.length;
+  const izinSakitCount = izinSakitAttendances.length;
   const attendanceRate = totalTeachers > 0 ? Math.round((presentCount / totalTeachers) * 100) : 0;
 
   // Direct checkin fallback from projector view
@@ -172,8 +176,8 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs uppercase font-bold tracking-wider text-teal-200">
-              {schoolProfile.foundation_name || schoolProfile.school_name || 'YAYASAN'} · dePresent MODE PROYEKTOR
+            <span className="text-xs font-bold tracking-wider text-teal-200">
+              <span className="uppercase">{schoolProfile.school_name || 'SMP MUHAMMADIYAH 1 KUDUS'}</span> · <span className="font-extrabold normal-case text-white">dePresent</span> MODE PROYEKTOR
             </span>
           </div>
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white line-clamp-2">
@@ -298,16 +302,21 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
             <div className={`p-3 rounded-xl border text-center ${
               isFullscreen ? 'bg-[#042024] border-[#0f4950]' : 'bg-slate-50 dark:bg-[#042024] border-slate-200 dark:border-[#0f4950]'
             }`}>
-              <span className="text-[11px] text-slate-400 dark:text-teal-300/70 block font-medium">Kehadiran</span>
+              <span className="text-[11px] text-slate-500 dark:text-teal-200 block font-semibold">Guru Hadir</span>
               <span className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400 tabular-nums">
                 {presentCount} / {totalTeachers}
               </span>
+              {izinSakitCount > 0 && (
+                <span className="text-[10px] text-amber-700 dark:text-amber-300 block font-semibold mt-0.5">
+                  ({izinSakitCount} Izin / Sakit)
+                </span>
+              )}
             </div>
 
             <div className={`p-3 rounded-xl border text-center ${
               isFullscreen ? 'bg-[#042024] border-[#0f4950]' : 'bg-slate-50 dark:bg-[#042024] border-slate-200 dark:border-[#0f4950]'
             }`}>
-              <span className="text-[11px] text-slate-400 dark:text-teal-300/70 block font-medium">Persentase</span>
+              <span className="text-[11px] text-slate-500 dark:text-teal-200 block font-semibold">Persentase Hadir</span>
               <span className="text-xl font-bold font-mono text-teal-700 dark:text-teal-300 tabular-nums">
                 {attendanceRate}%
               </span>
@@ -318,16 +327,16 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
           <div className={`w-full p-3 rounded-xl border text-left space-y-2 ${
             isFullscreen ? 'bg-[#042024] border-[#0f4950]' : 'bg-slate-50 dark:bg-[#042024] border-slate-200 dark:border-[#0f4950]'
           }`}>
-            <span className="text-[11px] font-semibold text-slate-600 dark:text-teal-200 block">
+            <span className="text-[11px] font-semibold text-slate-700 dark:text-teal-100 block">
               Bantuan Presensi di Layar (Jika Kamera HP Terkendala):
             </span>
             <div className="flex items-center gap-2">
               <select
                 value={selectedTeacherForSelfCheckin}
                 onChange={(e) => setSelectedTeacherForSelfCheckin(e.target.value)}
-                className="text-xs border border-slate-300 dark:border-[#0f4950] rounded px-2 py-1.5 flex-1 bg-white dark:bg-[#072b2f] text-slate-800 dark:text-white truncate"
+                className="text-xs border border-slate-300 dark:border-[#0f4950] rounded px-2 py-1.5 flex-1 bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white truncate"
               >
-                <option value="" className="text-slate-500 dark:text-teal-300/60">-- Pilih Nama Guru --</option>
+                <option value="" className="text-slate-500 dark:text-teal-300/80">-- Pilih Nama Guru --</option>
                 {unpresentTeachers.map((t) => (
                   <option key={t.id} value={t.id} className="dark:bg-[#072b2f]">
                     {t.name} ({t.niy || t.nip || '-'})
@@ -337,7 +346,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
               <button
                 onClick={() => handleDirectSelfCheckin(selectedTeacherForSelfCheckin)}
                 disabled={!selectedTeacherForSelfCheckin}
-                className="px-3 py-1.5 bg-teal-800 hover:bg-teal-700 text-white rounded text-xs font-medium disabled:opacity-50 transition-colors shrink-0"
+                className="px-3 py-1.5 bg-teal-800 hover:bg-teal-700 text-white rounded text-xs font-semibold disabled:opacity-50 transition-colors shrink-0 cursor-pointer"
               >
                 Catat Hadir
               </button>
@@ -352,16 +361,23 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
         <div className={`lg:col-span-7 p-6 rounded-2xl border shadow-xs space-y-4 flex flex-col ${
           isFullscreen ? 'bg-[#072b2f] border-[#0f4950] text-white' : 'bg-white dark:bg-[#072b2f] border-slate-200 dark:border-[#0f4950] text-slate-900 dark:text-white'
         }`}>
-          <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-[#0f4950]">
+          <div className="flex items-center justify-between border-b pb-3 border-slate-200 dark:border-[#0f4950] flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-teal-600 dark:text-teal-300" />
               <h3 className="text-sm font-bold tracking-wide uppercase">
                 Daftar Hadir Real-Time (Live Feed)
               </h3>
             </div>
-            <span className="text-xs font-mono text-slate-400 dark:text-teal-300">
-              {presentCount} Guru Telah Hadir
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-bold text-teal-900 dark:text-teal-100 bg-teal-100/90 dark:bg-[#042024] px-2.5 py-1 rounded-md border border-teal-300/80 dark:border-[#0f4950]">
+                {presentCount} Guru Telah Hadir
+              </span>
+              {izinSakitCount > 0 && (
+                <span className="text-xs font-mono font-semibold text-amber-900 dark:text-amber-200 bg-amber-100/90 dark:bg-amber-950/70 px-2 py-1 rounded-md border border-amber-300/80 dark:border-amber-800">
+                  {izinSakitCount} Izin / Sakit
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Attendee Feed Stream */}

@@ -78,17 +78,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-        {/* Sidebar Container */}
+        {/* Sidebar Container - Fixed viewport screen height (h-screen sticky top-0) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-teal-950 dark:bg-slate-950 text-slate-200 flex flex-col border-r border-teal-900/60 dark:border-slate-800 transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 h-screen max-h-screen bg-teal-950 dark:bg-slate-950 text-slate-100 flex flex-col border-r border-teal-900/70 dark:border-slate-800 transition-transform duration-200 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:max-h-screen lg:shrink-0 lg:translate-x-0 ${
           isOpenMobile ? 'translate-x-0' : '-translate-x-full'
         } no-print`}
       >
         {/* Brand Lockup */}
-        <div className="h-18 px-5 border-b border-teal-900/60 dark:border-slate-800 flex items-center justify-between shrink-0">
+        <div className="h-18 px-5 border-b border-teal-900/70 dark:border-slate-800 flex items-center justify-between shrink-0">
           <button
             onClick={() => handleNavClick('dashboard')}
-            className="flex items-center gap-3 text-left hover:opacity-90 transition-opacity"
+            className="flex items-center gap-3 text-left hover:opacity-95 transition-opacity cursor-pointer"
           >
             {schoolProfile.logo_url ? (
               <img
@@ -97,7 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className="w-10 h-10 rounded-xl object-contain bg-white p-1 shadow-sm shrink-0"
               />
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center font-bold text-lg shadow-sm shrink-0 tracking-tight">
+              <div className="w-10 h-10 rounded-xl bg-teal-700 text-white flex items-center justify-center font-black text-lg shadow-sm shrink-0 tracking-tight">
                 dP
               </div>
             )}
@@ -105,7 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="text-lg font-black tracking-tight text-white block leading-none">
                 dePresent
               </span>
-              <span className="text-[11px] font-medium text-teal-300/80 block leading-tight mt-1 truncate">
+              <span className="text-[11px] font-semibold text-teal-200 block leading-tight mt-1 truncate">
                 Sistem Presensi Kegiatan
               </span>
             </div>
@@ -114,15 +114,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Mobile Close Button */}
           <button
             onClick={onCloseMobile}
-            className="lg:hidden p-1.5 rounded-lg text-teal-300/70 hover:text-white hover:bg-teal-900"
+            className="lg:hidden p-1.5 rounded-lg text-teal-200 hover:text-white hover:bg-teal-900/80 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-teal-400/70">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto min-h-0">
+          <div className="px-3 pb-2 text-[10px] font-extrabold uppercase tracking-wider text-teal-300">
             Menu Utama
           </div>
 
@@ -132,10 +132,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-teal-800 text-white font-semibold shadow-xs'
-                    : 'text-teal-100/80 hover:text-white hover:bg-teal-900/60'
+                    ? 'bg-teal-700 text-white shadow-xs'
+                    : 'text-slate-200 hover:text-white hover:bg-teal-900/70'
                 }`}
               >
                 <span className={isActive ? 'text-teal-200' : 'text-teal-400/80'}>

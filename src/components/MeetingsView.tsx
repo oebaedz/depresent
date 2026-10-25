@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Calendar,
   Plus,
@@ -30,7 +30,7 @@ import {
   getTeacherGroup,
   getGroupBadgeColor,
   sortTeachersStructuralFirst,
-  TEACHER_GROUPS,
+  getTeacherGroups,
   TeacherGroupType,
 } from '../lib/teacherGroups';
 
@@ -56,6 +56,19 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
   const [categoryMsg, setCategoryMsg] = useState<string | null>(null);
+
+  // Dynamic teacher groups state
+  const [teacherGroups, setTeacherGroups] = useState<string[]>(() => getTeacherGroups());
+
+  useEffect(() => {
+    const handleGroupsUpdated = (e: CustomEvent<string[]>) => {
+      setTeacherGroups(e.detail || getTeacherGroups());
+    };
+    window.addEventListener('smp_teacher_groups_updated', handleGroupsUpdated as EventListener);
+    return () => {
+      window.removeEventListener('smp_teacher_groups_updated', handleGroupsUpdated as EventListener);
+    };
+  }, []);
 
   // Status notification
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
@@ -744,7 +757,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                       </div>
 
                       <div className="flex flex-wrap gap-1.5">
-                        {TEACHER_GROUPS.map((grp) => {
+                        {teacherGroups.map((grp) => {
                           const groupTeachers = sortedTeachers.filter((t) => t.is_active && getTeacherGroup(t) === grp);
                           if (groupTeachers.length === 0) return null;
 
@@ -807,7 +820,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                         >
                           Semua Kelompok
                         </button>
-                        {TEACHER_GROUPS.map((grp) => (
+                        {teacherGroups.map((grp: string) => (
                           <button
                             key={grp}
                             type="button"

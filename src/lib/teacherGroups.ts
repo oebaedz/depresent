@@ -1,6 +1,6 @@
 import { Teacher } from '../types';
 
-export const TEACHER_GROUPS = [
+export const DEFAULT_TEACHER_GROUPS = [
   'Struktural',
   'Wali Kelas',
   'Guru Mapel',
@@ -9,14 +9,82 @@ export const TEACHER_GROUPS = [
   'Tenaga Kependidikan',
 ] as const;
 
-export type TeacherGroupType = typeof TEACHER_GROUPS[number];
+export const TEACHER_GROUPS = DEFAULT_TEACHER_GROUPS;
+
+export type TeacherGroupType = string;
+
+const KEY_CUSTOM_TEACHER_GROUPS = 'smp_teacher_groups_v1';
+
+/**
+ * Mendapatkan daftar kelompok guru aktif (bisa dikustomisasi pengguna)
+ */
+export function getTeacherGroups(): string[] {
+  if (typeof window === 'undefined') return [...DEFAULT_TEACHER_GROUPS];
+  try {
+    const stored = localStorage.getItem(KEY_CUSTOM_TEACHER_GROUPS);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return [...DEFAULT_TEACHER_GROUPS];
+}
+
+/**
+ * Menyimpan daftar kelompok guru dan memicu event reaktif
+ */
+export function saveTeacherGroups(groups: string[]): string[] {
+  const clean = Array.from(new Set(groups.map((g) => g.trim()).filter(Boolean)));
+  const finalGroups = clean.length > 0 ? clean : [...DEFAULT_TEACHER_GROUPS];
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(KEY_CUSTOM_TEACHER_GROUPS, JSON.stringify(finalGroups));
+    window.dispatchEvent(new CustomEvent('smp_teacher_groups_updated', { detail: finalGroups }));
+  }
+  return finalGroups;
+}
+
+/**
+ * Menambah kelompok guru baru
+ */
+export function addTeacherGroup(newGroup: string): string[] {
+  const name = newGroup.trim();
+  if (!name) return getTeacherGroups();
+  const current = getTeacherGroups();
+  if (!current.some((g) => g.toLowerCase() === name.toLowerCase())) {
+    const updated = [...current, name];
+    return saveTeacherGroups(updated);
+  }
+  return current;
+}
+
+/**
+ * Menghapus kelompok guru dari daftar
+ */
+export function deleteTeacherGroup(groupToDelete: string): string[] {
+  const current = getTeacherGroups();
+  const filtered = current.filter((g) => g !== groupToDelete);
+  return saveTeacherGroups(filtered.length > 0 ? filtered : [...DEFAULT_TEACHER_GROUPS]);
+}
+
+/**
+ * Mereset daftar kelompok ke bawaan sistem
+ */
+export function resetTeacherGroups(): string[] {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(KEY_CUSTOM_TEACHER_GROUPS);
+    window.dispatchEvent(new CustomEvent('smp_teacher_groups_updated', { detail: [...DEFAULT_TEACHER_GROUPS] }));
+  }
+  return [...DEFAULT_TEACHER_GROUPS];
+}
 
 /**
  * Mendapatkan kelompok guru berdasarkan properti teacher_group atau inferensi dari jabatan
  */
-export function getTeacherGroup(teacher: Teacher): TeacherGroupType {
-  if (teacher.teacher_group && (TEACHER_GROUPS as readonly string[]).includes(teacher.teacher_group)) {
-    return teacher.teacher_group as TeacherGroupType;
+export function getTeacherGroup(teacher: Teacher): string {
+  if (teacher.teacher_group && teacher.teacher_group.trim()) {
+    return teacher.teacher_group.trim();
   }
 
   const role = (teacher.role_title || '').toLowerCase();
@@ -100,6 +168,7 @@ export function getTeacherGroup(teacher: Teacher): TeacherGroupType {
  * Guru Tahfizh = 30
  * Guru Ekstra = 40
  * Tenaga Kependidikan = 50
+ * Kelompok kustom lainnya = 55
  */
 export function getTeacherRank(teacher: Teacher): number {
   const group = getTeacherGroup(teacher);
@@ -128,7 +197,7 @@ export function getTeacherRank(teacher: Teacher): number {
   if (group === 'Guru Ekstra') return 40;
   if (group === 'Tenaga Kependidikan') return 50;
 
-  return 60;
+  return 55;
 }
 
 /**
@@ -149,46 +218,57 @@ export function sortTeachersStructuralFirst(teachers: Teacher[]): Teacher[] {
 }
 
 /**
- * Warna badge kelompok untuk tampilan antarmuka
+ * Warna badge kelompok untuk tampilan antarmuka dengan kontras tinggi
  */
 export function getGroupBadgeColor(group: string): { bg: string; text: string; border: string } {
   switch (group) {
     case 'Struktural':
       return {
-        bg: 'bg-indigo-50 dark:bg-indigo-950/60',
-        text: 'text-indigo-800 dark:text-indigo-200',
-        border: 'border-indigo-200 dark:border-indigo-800',
+        bg: 'bg-indigo-100 dark:bg-indigo-950/80',
+        text: 'text-indigo-900 dark:text-indigo-100 font-bold',
+        border: 'border-indigo-300 dark:border-indigo-700',
       };
     case 'Wali Kelas':
       return {
-        bg: 'bg-emerald-50 dark:bg-emerald-950/60',
-        text: 'text-emerald-800 dark:text-emerald-200',
-        border: 'border-emerald-200 dark:border-emerald-800',
+        bg: 'bg-emerald-100 dark:bg-emerald-950/80',
+        text: 'text-emerald-900 dark:text-emerald-100 font-bold',
+        border: 'border-emerald-300 dark:border-emerald-700',
       };
     case 'Guru Tahfizh':
       return {
-        bg: 'bg-teal-50 dark:bg-[#031e21]',
-        text: 'text-teal-800 dark:text-teal-200',
-        border: 'border-teal-200 dark:border-[#0f4950]',
+        bg: 'bg-teal-100 dark:bg-[#042d31]',
+        text: 'text-teal-900 dark:text-teal-100 font-bold',
+        border: 'border-teal-300 dark:border-teal-600',
       };
     case 'Guru Ekstra':
       return {
-        bg: 'bg-amber-50 dark:bg-amber-950/60',
-        text: 'text-amber-800 dark:text-amber-200',
-        border: 'border-amber-200 dark:border-amber-800',
+        bg: 'bg-amber-100 dark:bg-amber-950/80',
+        text: 'text-amber-900 dark:text-amber-100 font-bold',
+        border: 'border-amber-300 dark:border-amber-700',
       };
     case 'Tenaga Kependidikan':
       return {
-        bg: 'bg-slate-100 dark:bg-[#0b383d]',
-        text: 'text-slate-800 dark:text-teal-100',
-        border: 'border-slate-300 dark:border-[#0f4950]',
+        bg: 'bg-slate-200 dark:bg-[#0b383d]',
+        text: 'text-slate-900 dark:text-white font-bold',
+        border: 'border-slate-400 dark:border-[#0f4950]',
       };
     case 'Guru Mapel':
-    default:
       return {
-        bg: 'bg-sky-50 dark:bg-sky-950/60',
-        text: 'text-sky-800 dark:text-sky-200',
-        border: 'border-sky-200 dark:border-sky-800',
+        bg: 'bg-sky-100 dark:bg-sky-950/80',
+        text: 'text-sky-900 dark:text-sky-100 font-bold',
+        border: 'border-sky-300 dark:border-sky-700',
       };
+    default: {
+      // Dynamic fallback color for custom user-created groups
+      const hash = group.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+      const palettes = [
+        { bg: 'bg-purple-100 dark:bg-purple-950/80', text: 'text-purple-900 dark:text-purple-100 font-bold', border: 'border-purple-300 dark:border-purple-700' },
+        { bg: 'bg-rose-100 dark:bg-rose-950/80', text: 'text-rose-900 dark:text-rose-100 font-bold', border: 'border-rose-300 dark:border-rose-700' },
+        { bg: 'bg-cyan-100 dark:bg-cyan-950/80', text: 'text-cyan-900 dark:text-cyan-100 font-bold', border: 'border-cyan-300 dark:border-cyan-700' },
+        { bg: 'bg-lime-100 dark:bg-lime-950/80', text: 'text-lime-900 dark:text-lime-100 font-bold', border: 'border-lime-300 dark:border-lime-700' },
+        { bg: 'bg-fuchsia-100 dark:bg-fuchsia-950/80', text: 'text-fuchsia-900 dark:text-fuchsia-100 font-bold', border: 'border-fuchsia-300 dark:border-fuchsia-700' },
+      ];
+      return palettes[hash % palettes.length];
+    }
   }
 }

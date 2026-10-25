@@ -19,11 +19,31 @@
     color-scheme: dark;
   }
 
-  /* Clear placeholder visibility in dark mode */
+  /* Clear high-contrast placeholder visibility in dark mode */
   html.dark input::placeholder,
   html.dark textarea::placeholder {
-    color: #5eead4;
-    opacity: 0.65;
+    color: #99f6e4;
+    opacity: 0.9;
+  }
+
+  /* Enhanced contrast for secondary and muted text elements in dark mode */
+  html.dark .text-slate-400 {
+    color: #94a3b8;
+  }
+
+  html.dark .text-slate-500 {
+    color: #cbd5e1;
+  }
+
+  html.dark .text-slate-600 {
+    color: #e2e8f0;
+  }
+
+  html.dark .text-teal-200\/70,
+  html.dark .text-teal-300\/60,
+  html.dark .text-teal-300\/70,
+  html.dark .text-teal-300\/80 {
+    color: #ccfbf1;
   }
 }
 

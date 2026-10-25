@@ -202,6 +202,35 @@ export async function updateAdminPinInDb(newPin: string): Promise<boolean> {
   return true;
 }
 
+// Cache whether remote Supabase smp_teachers table contains teacher_group column
+let isTeacherGroupColumnSupported: boolean | null = typeof window !== 'undefined'
+  ? (localStorage.getItem('smp_has_teacher_group_col') === 'true'
+      ? true
+      : localStorage.getItem('smp_has_teacher_group_col') === 'false'
+      ? false
+      : null)
+  : null;
+
+function formatTeacherForSupabase(t: Partial<Teacher>): Record<string, any> {
+  const payload: Record<string, any> = {
+    id: t.id,
+    ptk_id: t.ptk_id,
+    niy: t.niy || t.nip || '-',
+    nip: t.niy || t.nip || '-',
+    name: t.name,
+    phone_wa: t.phone_wa || '',
+    rank_group: t.rank_group,
+    role_title: t.role_title,
+    avatar_url: t.avatar_url || '',
+    is_active: t.is_active,
+  };
+  // Only include teacher_group if column is confirmed to exist on remote Supabase
+  if (isTeacherGroupColumnSupported === true && t.teacher_group) {
+    payload.teacher_group = t.teacher_group;
+  }
+  return payload;
+}
+
 // ---------------------------------------------------------------------------
 // 2. TEACHERS
 // ---------------------------------------------------------------------------
@@ -214,6 +243,13 @@ export async function fetchTeachers(): Promise<Teacher[]> {
       const { data, error } = await supabase.from('smp_teachers').select('*').order('name', { ascending: true });
       if (!error && Array.isArray(data)) {
         if (data.length > 0) {
+          // Detect whether remote table has teacher_group column
+          const hasCol = 'teacher_group' in data[0];
+          isTeacherGroupColumnSupported = hasCol;
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('smp_has_teacher_group_col', String(hasCol));
+          }
+
           const mappedTeachers: Teacher[] = data.map((row) => {
             const rawTeacher = {
               id: row.id,
@@ -241,29 +277,21 @@ export async function fetchTeachers(): Promise<Teacher[]> {
         } else {
           // Table exists but is empty -> auto seed from local
           const localTeachers = getCachedTeachers();
-          const dbPayload = localTeachers.map((t) => ({
-            id: t.id,
-            ptk_id: t.ptk_id,
-            niy: t.niy || t.nip || '-',
-            nip: t.niy || t.nip || '-',
-            name: t.name,
-            phone_wa: t.phone_wa || '',
-            rank_group: t.rank_group,
-            role_title: t.role_title,
-            teacher_group: t.teacher_group || getTeacherGroup(t),
-            avatar_url: t.avatar_url || '',
-            is_active: t.is_active,
-          }));
+          const dbPayload = localTeachers.map((t) => formatTeacherForSupabase(t));
           (async () => {
             try {
               const { error: seedErr } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
-              if (seedErr && (seedErr.message?.includes('teacher_group') || seedErr.code === 'PGRST204')) {
-                const fallbackPayload = dbPayload.map((p) => {
-                  const copy = { ...p };
-                  delete (copy as any).teacher_group;
-                  return copy;
-                });
-                await supabase.from('smp_teachers').upsert(fallbackPayload, { onConflict: 'ptk_id' });
+              if (seedErr) {
+                if (seedErr.message?.includes('teacher_group') || seedErr.code === 'PGRST204') {
+                  isTeacherGroupColumnSupported = false;
+                  if (typeof window !== 'undefined') localStorage.setItem('smp_has_teacher_group_col', 'false');
+                  const fallbackPayload = dbPayload.map((p) => {
+                    const copy = { ...p };
+                    delete (copy as any).teacher_group;
+                    return copy;
+                  });
+                  await supabase.from('smp_teachers').upsert(fallbackPayload, { onConflict: 'ptk_id' });
+                }
               }
             } catch (e) {
               console.warn(e);
@@ -307,25 +335,15 @@ export async function saveTeacher(teacher: Teacher): Promise<Teacher> {
 
   const supabase = getSupabase();
   if (supabase) {
-    const dbPayload: Record<string, any> = {
-      id: cleanTeacher.id,
-      ptk_id: cleanTeacher.ptk_id,
-      niy: cleanTeacher.niy,
-      nip: cleanTeacher.niy,
-      name: cleanTeacher.name,
-      phone_wa: cleanTeacher.phone_wa,
-      rank_group: cleanTeacher.rank_group,
-      role_title: cleanTeacher.role_title,
-      teacher_group: cleanTeacher.teacher_group,
-      avatar_url: cleanTeacher.avatar_url || '',
-      is_active: cleanTeacher.is_active,
-    };
+    const dbPayload = formatTeacherForSupabase(cleanTeacher);
 
     (async () => {
       try {
         const { error } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
         if (error) {
           if (error.message?.includes('teacher_group') || error.code === 'PGRST204') {
+            isTeacherGroupColumnSupported = false;
+            if (typeof window !== 'undefined') localStorage.setItem('smp_has_teacher_group_col', 'false');
             const fallbackPayload = { ...dbPayload };
             delete fallbackPayload.teacher_group;
             await supabase.from('smp_teachers').upsert(fallbackPayload, { onConflict: 'ptk_id' });
@@ -408,23 +426,13 @@ export async function bulkImportTeachers(newTeachers: Omit<Teacher, 'id'>[]): Pr
 
   const supabase = getSupabase();
   if (supabase && toSave.length > 0) {
-    const dbPayload: Record<string, any>[] = toSave.map((t) => ({
-      id: t.id,
-      ptk_id: t.ptk_id,
-      niy: t.niy,
-      nip: t.niy,
-      name: t.name,
-      phone_wa: t.phone_wa,
-      rank_group: t.rank_group,
-      role_title: t.role_title,
-      teacher_group: t.teacher_group,
-      avatar_url: t.avatar_url,
-      is_active: t.is_active,
-    }));
+    const dbPayload: Record<string, any>[] = toSave.map((t) => formatTeacherForSupabase(t));
     (async () => {
       try {
         const { error: bulkErr } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
         if (bulkErr && (bulkErr.message?.includes('teacher_group') || bulkErr.code === 'PGRST204')) {
+          isTeacherGroupColumnSupported = false;
+          if (typeof window !== 'undefined') localStorage.setItem('smp_has_teacher_group_col', 'false');
           const fallbackPayload = dbPayload.map((p) => {
             const copy = { ...p };
             delete copy.teacher_group;
