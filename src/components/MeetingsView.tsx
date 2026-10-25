@@ -26,6 +26,13 @@ import {
   deleteMeetingCategory,
 } from '../lib/storage';
 import { generateUUID } from '../lib/uuid';
+import {
+  getTeacherGroup,
+  getGroupBadgeColor,
+  sortTeachersStructuralFirst,
+  TEACHER_GROUPS,
+  TeacherGroupType,
+} from '../lib/teacherGroups';
 
 interface MeetingsViewProps {
   meetings: Meeting[];
@@ -61,9 +68,12 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   const [completingTargetMeeting, setCompletingTargetMeeting] = useState<Meeting | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
 
+  const sortedTeachers = React.useMemo(() => sortTeachersStructuralFirst(teachers), [teachers]);
+
   // Attendee picker filters
   const [attendeeSearch, setAttendeeSearch] = useState('');
   const [attendeeRoleFilter, setAttendeeRoleFilter] = useState('all');
+  const [attendeeGroupFilter, setAttendeeGroupFilter] = useState('all');
 
   const [formData, setFormData] = useState<Omit<Meeting, 'id'>>({
     title: '',
@@ -72,14 +82,14 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     start_time: '08:00',
     end_time: '11:00',
     room: 'Aula Pertemuan Utama Yayasan',
-    leader_name: 'Drs. H. Bambang Sudarsono, M.Pd.',
-    leader_niy: 'YHB-1994-001',
-    secretary_name: 'Siti Rahmawati, S.Pd.',
-    secretary_niy: 'YHB-2008-028',
+    leader_name: sortedTeachers[0]?.name || 'Drs. H. Bambang Sudarsono, M.Pd.',
+    leader_niy: sortedTeachers[0]?.niy || sortedTeachers[0]?.nip || 'YHB-1994-001',
+    secretary_name: sortedTeachers[1]?.name || 'Siti Rahmawati, S.Pd.',
+    secretary_niy: sortedTeachers[1]?.niy || sortedTeachers[1]?.nip || 'YHB-2008-028',
     tolerance_minutes: 15,
     status: 'active',
     target_type: 'all',
-    invited_teacher_ids: teachers.map((t) => t.id),
+    invited_teacher_ids: sortedTeachers.map((t) => t.id),
     notes: '',
   });
 
@@ -88,6 +98,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     setFormError(null);
     setAttendeeSearch('');
     setAttendeeRoleFilter('all');
+    setAttendeeGroupFilter('all');
     setFormData({
       title: '',
       category: categories[0] || 'Rapat Dinas',
@@ -95,14 +106,14 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
       start_time: '08:00',
       end_time: '11:00',
       room: 'Aula Pertemuan Utama Yayasan',
-      leader_name: teachers[0]?.name || 'Drs. H. Bambang Sudarsono, M.Pd.',
-      leader_niy: teachers[0]?.niy || teachers[0]?.nip || 'YHB-1994-001',
-      secretary_name: teachers[1]?.name || 'Siti Rahmawati, S.Pd.',
-      secretary_niy: teachers[1]?.niy || teachers[1]?.nip || 'YHB-2008-028',
+      leader_name: sortedTeachers[0]?.name || 'Drs. H. Bambang Sudarsono, M.Pd.',
+      leader_niy: sortedTeachers[0]?.niy || sortedTeachers[0]?.nip || 'YHB-1994-001',
+      secretary_name: sortedTeachers[1]?.name || 'Siti Rahmawati, S.Pd.',
+      secretary_niy: sortedTeachers[1]?.niy || sortedTeachers[1]?.nip || 'YHB-2008-028',
       tolerance_minutes: 15,
       status: 'active',
       target_type: 'all',
-      invited_teacher_ids: teachers.map((t) => t.id),
+      invited_teacher_ids: sortedTeachers.map((t) => t.id),
       notes: '',
     });
     setIsModalOpen(true);
@@ -529,14 +540,14 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
 
               {/* Pimpinan Rapat (Nama & NIY) */}
               <div className="p-3.5 bg-teal-50/70 dark:bg-[#042024] rounded-xl border border-teal-200 dark:border-[#0f4950] space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                   <span className="font-bold text-teal-900 dark:text-teal-200 block text-[11px] uppercase tracking-wide">
                     Pimpinan Rapat (Tampil di Tanda Tangan SPJ Laporan)
                   </span>
-                  {teachers.length > 0 && (
+                  {sortedTeachers.length > 0 && (
                     <select
                       onChange={(e) => {
-                        const t = teachers.find((x) => x.id === e.target.value);
+                        const t = sortedTeachers.find((x) => x.id === e.target.value);
                         if (t) {
                           setFormData((prev) => ({
                             ...prev,
@@ -545,13 +556,13 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                           }));
                         }
                       }}
-                      className="text-[11px] px-2 py-1 bg-white dark:bg-[#031e21] border border-teal-300 dark:border-[#0f4950] rounded text-teal-950 dark:text-white font-medium"
+                      className="text-[11px] px-2 py-1 bg-white dark:bg-[#031e21] border border-teal-300 dark:border-[#0f4950] rounded text-teal-950 dark:text-white font-medium w-full sm:w-auto max-w-full sm:max-w-xs truncate min-w-0 cursor-pointer"
                       defaultValue=""
                     >
-                      <option value="" disabled>-- Pilih dari Daftar Guru --</option>
-                      {teachers.map((t) => (
+                      <option value="" disabled>-- Pilih Pimpinan Rapat --</option>
+                      {sortedTeachers.map((t) => (
                         <option key={t.id} value={t.id} className="bg-white dark:bg-[#072b2f]">
-                          {t.name} ({t.niy || t.nip || '-'})
+                          {t.name} ({t.niy || t.nip || '-'}) - {t.role_title}
                         </option>
                       ))}
                     </select>
@@ -585,14 +596,14 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
 
               {/* Notulis Rapat (Nama & NIY) */}
               <div className="p-3.5 bg-slate-50 dark:bg-[#042024] rounded-xl border border-slate-200 dark:border-[#0f4950] space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                   <span className="font-bold text-slate-800 dark:text-teal-200 block text-[11px] uppercase tracking-wide">
                     Notulis / Panitia Rapat
                   </span>
-                  {teachers.length > 0 && (
+                  {sortedTeachers.length > 0 && (
                     <select
                       onChange={(e) => {
-                        const t = teachers.find((x) => x.id === e.target.value);
+                        const t = sortedTeachers.find((x) => x.id === e.target.value);
                         if (t) {
                           setFormData((prev) => ({
                             ...prev,
@@ -601,13 +612,13 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                           }));
                         }
                       }}
-                      className="text-[11px] px-2 py-1 bg-white dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded text-slate-800 dark:text-white font-medium"
+                      className="text-[11px] px-2 py-1 bg-white dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded text-slate-800 dark:text-white font-medium w-full sm:w-auto max-w-full sm:max-w-xs truncate min-w-0 cursor-pointer"
                       defaultValue=""
                     >
-                      <option value="" disabled>-- Pilih dari Daftar Guru --</option>
-                      {teachers.map((t) => (
+                      <option value="" disabled>-- Pilih Notulis Rapat --</option>
+                      {sortedTeachers.map((t) => (
                         <option key={t.id} value={t.id} className="bg-white dark:bg-[#072b2f]">
-                          {t.name} ({t.niy || t.nip || '-'})
+                          {t.name} ({t.niy || t.nip || '-'}) - {t.role_title}
                         </option>
                       ))}
                     </select>
@@ -696,99 +707,158 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
 
                 {/* Selective Attendee Picker */}
                 {formData.target_type === 'custom' && (
-                  <div className="space-y-2.5 pt-1 animate-in fade-in duration-150">
-                    {/* Quick Role Filters & Action Buttons */}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="space-y-3 pt-1 animate-in fade-in duration-150">
+                    {/* Quick Select by Group Buttons */}
+                    <div className="bg-slate-100/80 dark:bg-[#031e21] p-2.5 rounded-xl border border-slate-200 dark:border-[#0f4950] space-y-2">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-slate-700 dark:text-teal-200 uppercase tracking-wide">
+                          Pilih Cepat Berdasarkan Kelompok:
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                invited_teacher_ids: sortedTeachers.map((t) => t.id),
+                              }))
+                            }
+                            className="text-teal-700 dark:text-teal-300 hover:underline font-bold"
+                          >
+                            Semua ({sortedTeachers.length})
+                          </button>
+                          <span className="text-slate-300 dark:text-teal-700">·</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                invited_teacher_ids: [],
+                              }))
+                            }
+                            className="text-rose-600 dark:text-rose-400 hover:underline font-bold"
+                          >
+                            Kosongkan
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {TEACHER_GROUPS.map((grp) => {
+                          const groupTeachers = sortedTeachers.filter((t) => t.is_active && getTeacherGroup(t) === grp);
+                          if (groupTeachers.length === 0) return null;
+
+                          const groupIds = groupTeachers.map((t) => t.id);
+                          const currentSelected = formData.invited_teacher_ids || [];
+                          const allInGroupSelected = groupIds.every((id) => currentSelected.includes(id));
+                          const countInGroupSelected = groupIds.filter((id) => currentSelected.includes(id)).length;
+
+                          return (
+                            <button
+                              key={grp}
+                              type="button"
+                              onClick={() => {
+                                setFormData((prev) => {
+                                  const current = prev.invited_teacher_ids || [];
+                                  if (allInGroupSelected) {
+                                    // Deselect this group
+                                    const next = current.filter((id) => !groupIds.includes(id));
+                                    return { ...prev, invited_teacher_ids: next };
+                                  } else {
+                                    // Select all in this group
+                                    const next = Array.from(new Set([...current, ...groupIds]));
+                                    return { ...prev, invited_teacher_ids: next };
+                                  }
+                                });
+                              }}
+                              className={`px-2.5 py-1 text-[11px] rounded-lg font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                allInGroupSelected
+                                  ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
+                                  : countInGroupSelected > 0
+                                  ? 'bg-teal-50 dark:bg-[#0b383d] text-teal-900 dark:text-teal-200 border-teal-400 dark:border-teal-700 font-bold'
+                                  : 'bg-white dark:bg-[#072b2f] text-slate-700 dark:text-teal-200 border-slate-300 dark:border-[#0f4950] hover:bg-slate-50 dark:hover:bg-[#0b383d]'
+                              }`}
+                            >
+                              <span>{grp}</span>
+                              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                                allInGroupSelected
+                                  ? 'bg-teal-950 text-teal-200'
+                                  : 'bg-slate-200 dark:bg-[#031e21] text-slate-700 dark:text-teal-300'
+                              }`}>
+                                {countInGroupSelected}/{groupTeachers.length}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Filter Tabs & Search */}
+                    <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setAttendeeRoleFilter('all')}
-                          className={`px-2 py-1 text-[11px] rounded-md font-medium border ${
-                            attendeeRoleFilter === 'all'
+                          onClick={() => setAttendeeGroupFilter('all')}
+                          className={`px-2.5 py-1 text-[11px] rounded-md font-semibold border cursor-pointer ${
+                            attendeeGroupFilter === 'all'
                               ? 'bg-teal-800 text-white border-teal-800'
                               : 'bg-white dark:bg-[#031e21] text-slate-600 dark:text-teal-200 border-slate-300 dark:border-[#0f4950]'
                           }`}
                         >
-                          Semua Jabatan
+                          Semua Kelompok
                         </button>
-                        {Array.from(new Set(teachers.map((t) => t.role_title).filter(Boolean)))
-                          .slice(0, 4)
-                          .map((role) => (
-                            <button
-                              key={role}
-                              type="button"
-                              onClick={() => setAttendeeRoleFilter(role)}
-                              className={`px-2 py-1 text-[11px] rounded-md font-medium border truncate max-w-[140px] ${
-                                attendeeRoleFilter === role
-                                  ? 'bg-teal-800 text-white border-teal-800'
-                                  : 'bg-white dark:bg-[#031e21] text-slate-600 dark:text-teal-200 border-slate-300 dark:border-[#0f4950]'
-                              }`}
-                            >
-                              {role}
-                            </button>
-                          ))}
+                        {TEACHER_GROUPS.map((grp) => (
+                          <button
+                            key={grp}
+                            type="button"
+                            onClick={() => setAttendeeGroupFilter(grp)}
+                            className={`px-2.5 py-1 text-[11px] rounded-md font-medium border cursor-pointer ${
+                              attendeeGroupFilter === grp
+                                ? 'bg-teal-800 text-white border-teal-800'
+                                : 'bg-white dark:bg-[#031e21] text-slate-600 dark:text-teal-200 border-slate-300 dark:border-[#0f4950]'
+                            }`}
+                          >
+                            {grp}
+                          </button>
+                        ))}
                       </div>
 
-                      <div className="flex items-center gap-1.5 text-[11px]">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              invited_teacher_ids: teachers.map((t) => t.id),
-                            }))
-                          }
-                          className="text-teal-700 dark:text-teal-300 hover:underline font-semibold"
-                        >
-                          Centang Semua
-                        </button>
-                        <span className="text-slate-300 dark:text-teal-700">·</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              invited_teacher_ids: [],
-                            }))
-                          }
-                          className="text-rose-600 dark:text-rose-400 hover:underline font-semibold"
-                        >
-                          Hapus Pilihan
-                        </button>
-                      </div>
+                      <input
+                        type="text"
+                        value={attendeeSearch}
+                        onChange={(e) => setAttendeeSearch(e.target.value)}
+                        placeholder="Cari nama guru, NIY, jabatan, atau mapel..."
+                        className="w-full px-3 py-1.5 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
+                      />
                     </div>
 
-                    {/* Search Teacher inside Picker */}
-                    <input
-                      type="text"
-                      value={attendeeSearch}
-                      onChange={(e) => setAttendeeSearch(e.target.value)}
-                      placeholder="Cari nama guru atau NIY peserta..."
-                      className="w-full px-3 py-1.5 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
-                    />
-
-                    {/* Checklist of teachers */}
-                    <div className="max-h-48 overflow-y-auto space-y-1 p-2 bg-white dark:bg-[#031e21] rounded-xl border border-slate-200 dark:border-[#0f4950]">
-                      {teachers
+                    {/* Checklist of teachers sorted structural-first */}
+                    <div className="max-h-56 overflow-y-auto space-y-1 p-2 bg-white dark:bg-[#031e21] rounded-xl border border-slate-200 dark:border-[#0f4950]">
+                      {sortedTeachers
                         .filter((t) => t.is_active)
                         .filter((t) => {
-                          if (attendeeRoleFilter !== 'all' && t.role_title !== attendeeRoleFilter) return false;
+                          const grp = getTeacherGroup(t);
+                          if (attendeeGroupFilter !== 'all' && grp !== attendeeGroupFilter) return false;
                           if (!attendeeSearch) return true;
                           const q = attendeeSearch.toLowerCase();
                           return (
                             t.name.toLowerCase().includes(q) ||
                             (t.niy || t.nip || '').toLowerCase().includes(q) ||
-                            t.role_title.toLowerCase().includes(q)
+                            t.role_title.toLowerCase().includes(q) ||
+                            grp.toLowerCase().includes(q)
                           );
                         })
                         .map((t) => {
                           const isChecked = (formData.invited_teacher_ids || []).includes(t.id);
+                          const grp = getTeacherGroup(t);
+                          const badgeColor = getGroupBadgeColor(grp);
+
                           return (
                             <label
                               key={t.id}
-                              className={`p-2 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-colors ${
+                              className={`p-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-colors ${
                                 isChecked
-                                  ? 'border-teal-500 bg-teal-50/60 dark:bg-teal-950/60 text-slate-900 dark:text-white'
+                                  ? 'border-teal-500 bg-teal-50/70 dark:bg-teal-950/60 text-slate-900 dark:text-white'
                                   : 'border-slate-200 dark:border-[#0f4950]/80 text-slate-600 dark:text-teal-200/80 hover:bg-slate-50 dark:hover:bg-[#072b2f]'
                               }`}
                             >
@@ -803,16 +873,21 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                                       : [...currentList, t.id];
                                     setFormData((prev) => ({ ...prev, invited_teacher_ids: nextList }));
                                   }}
-                                  className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500"
+                                  className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500 cursor-pointer"
                                 />
                                 <div className="min-w-0">
-                                  <p className="font-semibold truncate text-slate-900 dark:text-white">{t.name}</p>
-                                  <p className="text-[10px] text-slate-500 dark:text-teal-300/70 font-mono">
-                                    NIY. {t.niy || t.nip || '-'} · {t.role_title}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold truncate text-slate-900 dark:text-white">{t.name}</span>
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border ${badgeColor.bg} ${badgeColor.text} ${badgeColor.border}`}>
+                                      {grp}
+                                    </span>
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 dark:text-teal-300/80 font-mono mt-0.5">
+                                    NIY. {t.niy || t.nip || '-'} · <span className="font-sans font-medium text-slate-700 dark:text-teal-200">{t.role_title}</span>
                                   </p>
                                 </div>
                               </div>
-                              <span className="text-[10px] text-slate-400 dark:text-teal-400/80 shrink-0">{t.rank_group}</span>
+                              <span className="text-[10px] text-slate-400 dark:text-teal-400/80 shrink-0 hidden sm:inline-block">{t.rank_group}</span>
                             </label>
                           );
                         })}

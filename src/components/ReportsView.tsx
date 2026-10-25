@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Printer, Download, FileSpreadsheet, FileText, CheckCircle2, Calendar, MapPin, User, Check, Building2 } from 'lucide-react';
 import { Attendance, Meeting, SchoolProfile, Teacher } from '../types';
+import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
 
 interface ReportsViewProps {
   meetings: Meeting[];
@@ -28,16 +29,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const attendanceMap = new Map<string, Attendance>();
   meetingAttendances.forEach((a) => attendanceMap.set(a.teacher_id, a));
 
-  // Filter active teachers according to current meeting's target_type & invited_teacher_ids
+  // Filter active teachers according to current meeting's target_type & invited_teacher_ids, sorted structural-first
   const isCustomMeeting =
     currentMeeting &&
     currentMeeting.target_type === 'custom' &&
     Array.isArray(currentMeeting.invited_teacher_ids) &&
     currentMeeting.invited_teacher_ids.length > 0;
 
-  const activeTeachers = teachers
-    .filter((t) => t.is_active)
-    .filter((t) => !isCustomMeeting || currentMeeting.invited_teacher_ids!.includes(t.id));
+  const activeTeachers = sortTeachersStructuralFirst(
+    teachers
+      .filter((t) => t.is_active)
+      .filter((t) => !isCustomMeeting || currentMeeting.invited_teacher_ids!.includes(t.id))
+  );
 
   const total = activeTeachers.length;
   const hadir = meetingAttendances.filter((a) => a.status === 'hadir').length;
@@ -171,12 +174,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {/* Select Meeting */}
           <select
             value={selectedMeetingId}
             onChange={(e) => setSelectedMeetingId(e.target.value)}
-            className="text-xs font-semibold border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-2 bg-slate-50 dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden max-w-xs truncate"
+            className="text-xs font-semibold border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-2 bg-slate-50 dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden w-full sm:w-auto sm:max-w-xs truncate min-w-0"
           >
             {meetings.map((m) => (
               <option key={m.id} value={m.id} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
@@ -288,7 +291,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
               <tr className="bg-slate-100 border-b border-slate-400 text-slate-900 font-bold uppercase text-[10px] tracking-wider text-center">
                 <th className="py-2 px-2 border-r border-slate-400 w-10">No</th>
                 <th className="py-2 px-3 border-r border-slate-400 text-left">Nama Guru & Pegawai</th>
-                <th className="py-2 px-3 border-r border-slate-400 text-left">NIY / Status</th>
+                <th className="py-2 px-3 border-r border-slate-400 text-left">NIY</th>
                 <th className="py-2 px-3 border-r border-slate-400 text-left">Jabatan</th>
                 <th className="py-2 px-2 border-r border-slate-400 w-24">Jam Hadir</th>
                 <th className="py-2 px-2 border-r border-slate-400 w-24">Status</th>
@@ -312,13 +315,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                       {t.name}
                     </td>
 
-                    <td className="py-2 px-3 border-r border-slate-300 text-slate-800">
-                      <div className="font-mono text-[11px] font-bold text-slate-900">{t.niy || t.nip || '-'}</div>
-                      <div className="text-[10px] text-slate-600">{t.rank_group}</div>
+                    {/* Pure NIY Column - Status moved to Jabatan column */}
+                    <td className="py-2 px-3 border-r border-slate-300 font-mono text-[11px] font-bold text-slate-900 whitespace-nowrap">
+                      {t.niy || t.nip || '-'}
                     </td>
 
-                    <td className="py-2 px-3 border-r border-slate-300 text-slate-800 text-[11px] font-medium">
-                      {t.role_title}
+                    <td className="py-2 px-3 border-r border-slate-300 text-slate-800 text-[11px]">
+                      <div className="font-semibold text-slate-900">{t.role_title}</div>
+                      <div className="text-[10px] text-slate-600">{t.rank_group}</div>
                     </td>
 
                     {/* Explicit high-contrast text-slate-900 so check-in time is clearly visible in both light & dark mode */}
@@ -371,7 +375,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 5. Attendance Recapitulation Box */}
-        <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 mb-8 font-sans text-xs print:bg-white print:border-slate-400 recap-box page-break-inside-avoid">
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 mb-8 font-sans text-xs print:bg-white print:border-slate-400 recap-box page-break-inside-avoid break-inside-avoid">
           <h4 className="font-bold text-slate-900 mb-2 uppercase text-[11px] tracking-wide">
             Rekapitulasi Kehadiran Peserta:
           </h4>
@@ -395,39 +399,45 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 6. Formal Closing Signatures (Headmaster, Meeting Leader, and Meeting Secretary) */}
-        <div className="pt-4 grid grid-cols-3 text-center text-xs font-sans signature-block page-break-inside-avoid gap-4">
-          {/* Kepala Sekolah */}
-          <div>
-            <p className="text-slate-700">Mengetahui,</p>
-            <p className="font-bold text-slate-900">Kepala Sekolah</p>
-            <div className="h-14" />
-            <p className="font-bold underline text-slate-900">{schoolProfile.headmaster_name}</p>
-            <p className="text-slate-700 font-mono text-[11px]">NIY. {schoolProfile.headmaster_niy}</p>
-          </div>
+        <div className="pt-6 w-full signature-block page-break-inside-avoid break-inside-avoid">
+          <table className="w-full text-center text-xs font-sans border-none signature-table">
+            <tbody>
+              <tr>
+                {/* Kepala Sekolah */}
+                <td className="w-1/3 align-top px-2">
+                  <p className="text-slate-700">Mengetahui,</p>
+                  <p className="font-bold text-slate-900">Kepala Sekolah</p>
+                  <div className="h-16" />
+                  <p className="font-bold underline text-slate-900">{schoolProfile.headmaster_name}</p>
+                  <p className="text-slate-700 font-mono text-[11px]">NIY. {schoolProfile.headmaster_niy}</p>
+                </td>
 
-          {/* Pimpinan Rapat Tertentu */}
-          <div>
-            <p className="text-slate-700">&nbsp;</p>
-            <p className="font-bold text-slate-900">Pimpinan Rapat</p>
-            <div className="h-14" />
-            <p className="font-bold underline text-slate-900">{currentMeeting?.leader_name}</p>
-            <p className="text-slate-700 font-mono text-[11px]">
-              {currentMeeting?.leader_niy ? `NIY. ${currentMeeting.leader_niy}` : 'Pimpinan Agenda'}
-            </p>
-          </div>
+                {/* Pimpinan Rapat Tertentu */}
+                <td className="w-1/3 align-top px-2">
+                  <p className="text-slate-700">&nbsp;</p>
+                  <p className="font-bold text-slate-900">Pimpinan Rapat</p>
+                  <div className="h-16" />
+                  <p className="font-bold underline text-slate-900">{currentMeeting?.leader_name}</p>
+                  <p className="text-slate-700 font-mono text-[11px]">
+                    {currentMeeting?.leader_niy ? `NIY. ${currentMeeting.leader_niy}` : 'Pimpinan Agenda'}
+                  </p>
+                </td>
 
-          {/* Notulis Rapat Tertentu */}
-          <div>
-            <p className="text-slate-700">
-              {schoolProfile.city || 'Kota'}, {currentMeeting?.meeting_date ? new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('id-ID')}
-            </p>
-            <p className="font-bold text-slate-900">Notulis Rapat</p>
-            <div className="h-14" />
-            <p className="font-bold underline text-slate-900">{currentMeeting?.secretary_name || '-'}</p>
-            <p className="text-slate-700 font-mono text-[11px]">
-              {currentMeeting?.secretary_niy ? `NIY. ${currentMeeting.secretary_niy}` : 'Notulis'}
-            </p>
-          </div>
+                {/* Notulis Rapat Tertentu */}
+                <td className="w-1/3 align-top px-2">
+                  <p className="text-slate-700">
+                    {schoolProfile.city || 'Kota'}, {currentMeeting?.meeting_date ? new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('id-ID')}
+                  </p>
+                  <p className="font-bold text-slate-900">Notulis Rapat</p>
+                  <div className="h-16" />
+                  <p className="font-bold underline text-slate-900">{currentMeeting?.secretary_name || '-'}</p>
+                  <p className="text-slate-700 font-mono text-[11px]">
+                    {currentMeeting?.secretary_niy ? `NIY. ${currentMeeting.secretary_niy}` : 'Notulis'}
+                  </p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

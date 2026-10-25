@@ -49,6 +49,7 @@
   html.dark body,
   #root,
   #root > div,
+  #root > div > div,
   main,
   header {
     background-color: #ffffff !important;
@@ -64,6 +65,20 @@
     overflow-y: visible !important;
     border: none !important;
     box-shadow: none !important;
+  }
+
+  /* Remove flex layout on root containers so multi-page fragmentation works reliably in all browsers */
+  #root,
+  #root > div,
+  #root > div > div,
+  main {
+    display: block !important;
+    position: static !important;
+    float: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
   
   .no-print,
@@ -101,6 +116,7 @@
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
+    display: block !important;
   }
 
   .report-table-wrapper {
@@ -109,6 +125,7 @@
     overflow-y: visible !important;
     margin: 0 !important;
     padding: 0 !important;
+    display: block !important;
   }
 
   thead {
@@ -130,13 +147,26 @@
   .signature-block {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    display: grid !important;
-    grid-template-columns: repeat(3, 1fr) !important;
+    break-inside: avoid-page !important;
     width: 100% !important;
     margin-top: 24px !important;
     padding-top: 16px !important;
     visibility: visible !important;
     opacity: 1 !important;
+    display: block !important;
+  }
+
+  .signature-table {
+    width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    border-collapse: collapse !important;
+    border: none !important;
+  }
+
+  .signature-table td {
+    border: none !important;
+    padding: 8px !important;
   }
 
   /* Modal unroll for printing ID cards */

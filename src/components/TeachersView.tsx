@@ -4,6 +4,12 @@ import { Users, Plus, Upload, Printer, Search, Edit2, Trash2, Check, X, Shield, 
 import { SchoolProfile, Teacher } from '../types';
 import { bulkImportTeachers, deleteTeacher, saveTeacher } from '../lib/storage';
 import { generateUUID } from '../lib/uuid';
+import {
+  getTeacherGroup,
+  getGroupBadgeColor,
+  sortTeachersStructuralFirst,
+  TEACHER_GROUPS,
+} from '../lib/teacherGroups';
 
 interface TeachersViewProps {
   teachers: Teacher[];
@@ -13,6 +19,7 @@ interface TeachersViewProps {
 
 export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProfile, onRefresh }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -33,6 +40,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
     phone_wa: '',
     rank_group: 'Pegawai Tetap Yayasan',
     role_title: 'Guru Mata Pelajaran',
+    teacher_group: 'Guru Mapel',
     avatar_url: '',
     is_active: true,
   });
@@ -82,6 +90,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
       phone_wa: '',
       rank_group: 'Pegawai Tetap Yayasan',
       role_title: 'Guru Mata Pelajaran',
+      teacher_group: 'Guru Mapel',
       avatar_url: '',
       is_active: true,
     });
@@ -98,6 +107,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
       phone_wa: t.phone_wa,
       rank_group: t.rank_group,
       role_title: t.role_title,
+      teacher_group: t.teacher_group || getTeacherGroup(t),
       avatar_url: t.avatar_url || '',
       is_active: t.is_active,
     });
@@ -121,12 +131,17 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
       return;
     }
 
-    const teacherToSave: Teacher = {
-      id: editingTeacher ? editingTeacher.id : generateUUID(),
+    const draft = {
       ...formData,
       ptk_id: formData.ptk_id.trim(),
       niy: formData.niy.trim() || '-',
       nip: formData.niy.trim() || '-',
+    };
+
+    const teacherToSave: Teacher = {
+      id: editingTeacher ? editingTeacher.id : generateUUID(),
+      ...draft,
+      teacher_group: formData.teacher_group || getTeacherGroup(draft as Teacher),
     };
 
     await saveTeacher(teacherToSave);
@@ -154,6 +169,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
         let ptk_id = parts[3]?.trim() || '';
         let role = parts[4]?.trim() || 'Guru Mata Pelajaran';
         let rank = parts[5]?.trim() || 'Pegawai Tetap Yayasan';
+        let grp = parts[6]?.trim() || '';
 
         if (parts[0]?.length === 36 && parts[0]?.includes('-')) {
           ptk_id = parts[0].trim();
@@ -168,7 +184,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
         }
 
         if (name && name.toLowerCase() !== 'nama' && name.toLowerCase() !== 'nama guru') {
-          parsed.push({
+          const draft = {
             name,
             niy,
             nip: niy,
@@ -177,6 +193,10 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
             role_title: role,
             rank_group: rank,
             is_active: true,
+          };
+          parsed.push({
+            ...draft,
+            teacher_group: grp || getTeacherGroup(draft as Teacher),
           });
         }
       }
@@ -198,13 +218,18 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
     }, 2000);
   };
 
-  const filteredTeachers = teachers.filter((t) => {
+  const sortedTeachers = React.useMemo(() => sortTeachersStructuralFirst(teachers), [teachers]);
+
+  const filteredTeachers = sortedTeachers.filter((t) => {
+    const grp = getTeacherGroup(t);
+    if (selectedGroupFilter !== 'all' && grp !== selectedGroupFilter) return false;
     const q = searchQuery.toLowerCase();
     const niyVal = (t.niy || t.nip || '').toLowerCase();
     return (
       t.name.toLowerCase().includes(q) ||
       niyVal.includes(q) ||
       t.role_title.toLowerCase().includes(q) ||
+      grp.toLowerCase().includes(q) ||
       t.ptk_id.toLowerCase().includes(q)
     );
   });
@@ -216,7 +241,7 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
         <div>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Data Guru & ID Card Portrait (Tabel smp_teachers)</h2>
           <p className="text-xs text-slate-500 dark:text-teal-300/80 mt-0.5">
-            Daftar PTK ber-NIY (Nomor Induk Yayasan), impor token ptk_id kartu fisik, dan cetak ID Card format portrait tegak (54 x 85.6 mm).
+            Daftar PTK ber-NIY (Nomor Induk Yayasan), pengelompokan struktural/tendik, impor token ptk_id kartu fisik, dan cetak ID Card portrait.
           </p>
         </div>
 
@@ -253,21 +278,61 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
         </div>
       </div>
 
-      {/* Search Input Bar */}
-      <div className="bg-white dark:bg-[#072b2f] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 dark:text-teal-400 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cari berdasarkan nama, NIY, mapel, atau ptk_id UUID..."
-            className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
-          />
+      {/* Search & Group Filter Bar */}
+      <div className="bg-white dark:bg-[#072b2f] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 dark:text-teal-400 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari berdasarkan nama, NIY, kelompok, mapel, atau ptk_id..."
+              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-teal-300/60 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
+            />
+          </div>
+
+          <div className="text-xs text-slate-500 dark:text-teal-300 font-mono self-end sm:self-center">
+            Menampilkan: <span className="font-bold text-slate-900 dark:text-white">{filteredTeachers.length}</span> dari {teachers.length} Guru
+          </div>
         </div>
 
-        <div className="text-xs text-slate-500 dark:text-teal-300 font-mono">
-          Total: <span className="font-bold text-slate-900 dark:text-white">{filteredTeachers.length}</span> Guru
+        {/* Group Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100 dark:border-[#0f4950]/80">
+          <button
+            onClick={() => setSelectedGroupFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+              selectedGroupFilter === 'all'
+                ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
+                : 'bg-slate-50 dark:bg-[#031e21] text-slate-600 dark:text-teal-200 border-slate-300 dark:border-[#0f4950] hover:bg-slate-100 dark:hover:bg-[#0b383d]'
+            }`}
+          >
+            Semua ({sortedTeachers.length})
+          </button>
+          {TEACHER_GROUPS.map((grp) => {
+            const count = sortedTeachers.filter((t) => getTeacherGroup(t) === grp).length;
+            const isSelected = selectedGroupFilter === grp;
+            return (
+              <button
+                key={grp}
+                onClick={() => setSelectedGroupFilter(grp)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-teal-800 text-white border-teal-800 shadow-xs'
+                    : 'bg-slate-50 dark:bg-[#031e21] text-slate-600 dark:text-teal-200 border-slate-300 dark:border-[#0f4950] hover:bg-slate-100 dark:hover:bg-[#0b383d]'
+                }`}
+              >
+                <span>{grp}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  isSelected
+                    ? 'bg-teal-950 text-teal-200'
+                    : 'bg-slate-200 dark:bg-[#0b383d] text-slate-700 dark:text-teal-200'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -313,8 +378,21 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                     </td>
 
                     <td className="py-3 px-4 text-slate-600 dark:text-teal-100">
-                      <div className="font-medium text-slate-800 dark:text-white">{t.role_title}</div>
-                      <div className="text-[11px] text-slate-500 dark:text-teal-300/70">{t.rank_group}</div>
+                      {(() => {
+                        const grp = getTeacherGroup(t);
+                        const badgeColor = getGroupBadgeColor(grp);
+                        return (
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-slate-900 dark:text-white">{t.role_title}</span>
+                              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold border ${badgeColor.bg} ${badgeColor.text} ${badgeColor.border}`}>
+                                {grp}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 dark:text-teal-300/70 mt-0.5">{t.rank_group}</div>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     <td className="py-3 px-4 font-mono text-[11px] text-slate-700 dark:text-teal-200">
@@ -469,6 +547,26 @@ export const TeachersView: React.FC<TeachersViewProps> = ({ teachers, schoolProf
                     <option value="Tenaga Kependidikan" />
                   </datalist>
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
+                  Kelompok Guru & Pegawai *
+                </label>
+                <select
+                  value={formData.teacher_group || 'Guru Mapel'}
+                  onChange={(e) => setFormData({ ...formData, teacher_group: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden text-xs font-semibold cursor-pointer"
+                >
+                  {TEACHER_GROUPS.map((grp) => (
+                    <option key={grp} value={grp} className="bg-white dark:bg-[#072b2f]">
+                      {grp}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500 dark:text-teal-300/70 mt-1">
+                  Kelompok mempermudah seleksi peserta rapat khusus (Struktural, Wali Kelas, dsb.) dan mengurutkan pejabat di bagian teratas laporan.
+                </p>
               </div>
 
               <div className="pt-3 border-t border-slate-200 dark:border-[#0f4950] flex items-center justify-end gap-2">

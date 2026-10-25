@@ -66,11 +66,9 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
           )}
 
           <div>
-            {schoolProfile.foundation_name && (
-              <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300">
-                {schoolProfile.foundation_name}
-              </p>
-            )}
+            <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300">
+              dePresent Sistem Presensi Kegiatan
+            </p>
             <h2 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
               {schoolProfile.school_name || 'SMP Harapan Bangsa'}
             </h2>
@@ -156,8 +154,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
         </form>
 
         <div className="text-[11px] text-slate-400 dark:text-teal-200/70 pt-1 border-t border-slate-100 dark:border-[#0f4950]">
-          <p>PIN standar sistem: <strong className="font-mono text-slate-600 dark:text-teal-200">1234</strong></p>
-          <p className="mt-0.5">Dapat diganti kapan saja di menu Pengaturan Profil</p>
+          <p>Masukkan 4 digit PIN keamanan untuk verifikasi akses administrator.</p>
         </div>
       </div>
     </div>

@@ -53,7 +53,7 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
   // Validate dynamic 15s token (toleransi 60 detik untuk scan + pilih nama tanpa perlu PIN)
   const [isTokenExpired, setIsTokenExpired] = useState(false);
 
-  // Anti-Titip Absen (Device Lock 1 HP per Rapat - Kunci Ketat tanpa opsi pinjam rekan)
+  // Verifikasi kehadiran mandiri per rapat
   const [existingDeviceLock, setExistingDeviceLock] = useState<DeviceLockInfo | null>(null);
 
   useEffect(() => {
@@ -181,7 +181,7 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
     const statusLabel = status === 'hadir' ? 'Hadir Tepat Waktu' : 'Hadir Terlambat';
 
-    // 1. Simpan Device Lock ke Local Storage (1 HP = 1 Guru)
+    // 1. Simpan catatan kehadiran perangkat lokal
     const lockInfo: DeviceLockInfo = {
       teacherId: selectedTeacher.id,
       teacherName: selectedTeacher.name,
@@ -307,7 +307,7 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
           </div>
         )}
 
-        {/* SCREEN CASE 1: HP INI SUDAH TERKUNCI / SUDAH DIAPLIKASIKAN UNTUK 1 GURU (ANTI-TITIP ABSEN) */}
+        {/* SCREEN CASE 1: PERANGKAT SUDAH TERCATAT PRESENSI UNTUK RAPAT INI */}
         {existingDeviceLock && !checkinDone ? (
           <div className="bg-white dark:bg-[#072b2f] p-6 rounded-2xl border border-slate-200 dark:border-[#0f4950] shadow-sm space-y-5 text-center animate-in zoom-in-95 duration-200">
             <div className="relative mx-auto w-16 h-16">
@@ -321,13 +321,13 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
             <div className="space-y-1.5">
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950 px-3 py-1 rounded-full inline-block">
-                HP Ini Telah Mengisi Presensi
+                Presensi Berhasil
               </span>
               <h3 className="text-base font-black text-slate-900 dark:text-white pt-1">
-                Presensi Terverifikasi di Perangkat Ini
+                Presensi Anda Telah Tercatat
               </h3>
               <p className="text-xs text-slate-500 dark:text-teal-200/70">
-                Fitur Anti-Titip Absen aktif: 1 perangkat smartphone dikunci untuk 1 guru pada agenda rapat ini.
+                Kehadiran Anda pada agenda rapat ini telah berhasil diverifikasi.
               </p>
             </div>
 
@@ -360,11 +360,8 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
               </div>
             </div>
 
-            <div className="p-3 bg-teal-50 dark:bg-[#031e21] border border-teal-200 dark:border-teal-800 rounded-xl text-[11px] text-teal-950 dark:text-teal-200 text-left leading-relaxed flex items-start gap-2">
-              <Lock className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
-              <span>
-                Smartphone Anda sudah berhasil diabsenkan. Anda tidak dapat menggunakan HP yang sama untuk mengabsenkan rekan lain (titip absen).
-              </span>
+            <div className="p-3 bg-teal-50 dark:bg-[#031e21] border border-teal-200 dark:border-teal-800 rounded-xl text-[11px] text-teal-950 dark:text-teal-200 text-center leading-relaxed">
+              Terima kasih, data kehadiran Anda telah masuk dalam laporan presensi kegiatan.
             </div>
           </div>
         ) : checkinDone ? (
@@ -405,11 +402,6 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
               <span>{checkinDone.waNotice}</span>
             </div>
 
-            <div className="p-3 bg-slate-100 dark:bg-[#031e21] rounded-xl text-[11px] text-slate-600 dark:text-teal-200/80 flex items-center justify-center gap-1.5 border dark:border-[#0f4950]">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>Perangkat ini telah dikunci untuk presensi Anda (Anti-Titip Absen aktif).</span>
-            </div>
-
             <p className="text-xs text-slate-500 dark:text-teal-200/70">
               Nama Anda telah otomatis tercatat dan tampil di layar proyektor ruang rapat.
             </p>
@@ -422,10 +414,6 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
                 <label className="block text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide">
                   Cari & Pilih Nama Anda
                 </label>
-                <span className="text-[10px] text-teal-800 dark:text-teal-200 bg-teal-50 dark:bg-[#031e21] border border-teal-200 dark:border-teal-800 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-teal-600 dark:text-teal-400" />
-                  <span>1 HP = 1 Guru</span>
-                </span>
               </div>
 
               <div className="relative">

@@ -7,6 +7,7 @@ export interface Teacher {
   phone_wa: string;
   rank_group: string; // Pangkat / Golongan (e.g. "Pembina / IV-a" atau "Guru Tetap Yayasan")
   role_title: string; // Jabatan / Mapel (e.g. "Guru Bahasa Indonesia")
+  teacher_group?: string; // Kelompok: 'Struktural' | 'Wali Kelas' | 'Guru Mapel' | 'Guru Ekstra' | 'Guru Tahfizh' | 'Tenaga Kependidikan'
   avatar_url?: string;
   is_active: boolean;
   created_at?: string;

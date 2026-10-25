@@ -86,6 +86,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
       setSecondsRemaining((prev) => {
         if (prev <= 1) {
           generateRollingQr(meeting);
+          onAttendanceRecorded();
           return ROTATION_INTERVAL_SECONDS;
         }
         return prev - 1;
@@ -93,7 +94,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [meeting]);
+  }, [meeting, onAttendanceRecorded]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -137,8 +138,8 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
       meetingId: meeting.id,
       teacherId: teacher.id,
       status: 'hadir',
-      method: 'projector_scan',
-      notes: 'Presensi via Scan Layar Proyektor',
+      method: 'manual',
+      notes: 'Presensi Manual di Layar',
     });
 
     setSelfCheckinSuccess(`${teacher.name} berhasil presensi!`);
@@ -221,7 +222,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
         <div className={`lg:col-span-5 p-6 rounded-2xl border shadow-xs flex flex-col items-center justify-center text-center space-y-4 ${
           isFullscreen ? 'bg-[#072b2f] border-[#0f4950] text-white' : 'bg-white dark:bg-[#072b2f] border-slate-200 dark:border-[#0f4950] text-slate-900 dark:text-teal-50'
         }`}>
-          {/* Header with Anti-Proxy Rotating Badge */}
+          {/* Header */}
           <div className="space-y-1.5 w-full">
             <div className="flex items-center justify-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-[#042024] px-2.5 py-1 rounded-md flex items-center gap-1.5 border border-teal-200/60 dark:border-[#0f4950]">
@@ -267,7 +268,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
               />
             </div>
             <p className="text-[10px] text-slate-400 dark:text-teal-300/60 pt-0.5">
-              Kode QR kadaluarsa otomatis untuk mencegah link dibagikan ke luar ruangan rapat.
+              Kode QR berganti secara berkala untuk menjaga kebaruan sesi presensi.
             </p>
           </div>
 
@@ -415,13 +416,33 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
 
                     <div className="text-right shrink-0">
                       <div className="flex items-center gap-1 justify-end">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span className="font-mono text-xs font-semibold text-slate-700 dark:text-teal-200">
-                          {timeStr}
-                        </span>
+                        {att.status === 'izin' ? (
+                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/70 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded">
+                            Izin
+                          </span>
+                        ) : att.status === 'sakit' ? (
+                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800 px-2 py-0.5 rounded">
+                            Sakit
+                          </span>
+                        ) : att.status === 'alpa' ? (
+                          <span className="text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/70 border border-red-200 dark:border-red-800 px-2 py-0.5 rounded">
+                            Tidak Hadir
+                          </span>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span className="font-mono text-xs font-semibold text-slate-700 dark:text-teal-200">
+                              {timeStr}
+                            </span>
+                          </>
+                        )}
                       </div>
                       <span className="text-[10px] text-slate-400 dark:text-teal-300/60">
-                        {att.method === 'card_scan' ? 'Scan Kartu' : 'Scan Proyektor'}
+                        {att.method === 'card_scan'
+                          ? 'Scan Kartu'
+                          : att.method === 'manual'
+                          ? 'Manual'
+                          : 'Scan Layar'}
                       </span>
                     </div>
                   </div>

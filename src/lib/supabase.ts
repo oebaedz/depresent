@@ -215,14 +215,17 @@ CREATE TABLE IF NOT EXISTS smp_teachers (
   phone_wa TEXT NOT NULL DEFAULT '',
   rank_group TEXT NOT NULL DEFAULT 'Pegawai Tetap Yayasan',
   role_title TEXT NOT NULL DEFAULT 'Guru Mata Pelajaran',
+  teacher_group TEXT NOT NULL DEFAULT 'Guru Mapel', -- 'Struktural', 'Wali Kelas', 'Guru Mapel', 'Guru Tahfizh', 'Guru Ekstra', 'Tenaga Kependidikan'
   avatar_url TEXT DEFAULT '',
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
 ALTER TABLE smp_teachers ADD COLUMN IF NOT EXISTS niy TEXT DEFAULT '-';
+ALTER TABLE smp_teachers ADD COLUMN IF NOT EXISTS teacher_group TEXT DEFAULT 'Guru Mapel';
 CREATE INDEX IF NOT EXISTS idx_smp_teachers_ptk_id ON smp_teachers (ptk_id);
 CREATE INDEX IF NOT EXISTS idx_smp_teachers_niy ON smp_teachers (niy);
+CREATE INDEX IF NOT EXISTS idx_smp_teachers_group ON smp_teachers (teacher_group);
 
 -- 3. TABEL AGENDA RAPAT (PIMPINAN & NOTULIS PER AGENDA)
 CREATE TABLE IF NOT EXISTS smp_meetings (

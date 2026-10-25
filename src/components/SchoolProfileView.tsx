@@ -483,7 +483,7 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
                   maxLength={6}
                   value={currentPinInput}
                   onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ''))}
-                  placeholder="PIN saat ini (default: 1234)"
+                  placeholder="Masukkan PIN saat ini"
                   className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg text-xs font-mono bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
                 />
               </div>

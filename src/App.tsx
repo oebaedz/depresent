@@ -78,7 +78,8 @@ export default function App() {
   const [attendances, setAttendances] = useState<Attendance[]>(() => getCachedAttendances());
 
   // Connection & Modals
-  const [supabaseStatus, setSupabaseStatus] = useState<'demo' | 'tables_missing' | 'connected'>('demo');
+  const [supabaseStatus, setSupabaseStatus] = useState<'local' | 'tables_missing' | 'connected' | 'demo'>('local');
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isVercelModalOpen, setIsVercelModalOpen] = useState(false);
   const [isWahaModalOpen, setIsWahaModalOpen] = useState(false);
@@ -167,7 +168,7 @@ export default function App() {
       const client = getSupabase();
 
       if (!client) {
-        setSupabaseStatus('demo');
+        setSupabaseStatus('local');
       } else {
         setSupabaseStatus('connected');
       }
@@ -195,6 +196,8 @@ export default function App() {
       }
     } catch (err) {
       console.error('Error syncing dePresent data:', err);
+    } finally {
+      setIsInitialLoading(false);
     }
   }, [selectedMeetingId]);
 
@@ -255,17 +258,15 @@ export default function App() {
     };
   }, []);
 
-  // Polling fallback ultra-ringan tiap 3 detik untuk garansi update layar proyektor / dashboard saat scan HP
+  // Sinkronisasi logo tab browser dengan logo sekolah yayasan jika ada
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const freshAtt = await fetchAttendances();
-        setAttendances(freshAtt);
-      } catch {}
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
+    if (typeof document !== 'undefined' && schoolProfile.logo_url) {
+      let link = document.querySelector("link[rel*='icon']") as HTMLLinkElement | null;
+      if (link) {
+        link.href = schoolProfile.logo_url;
+      }
+    }
+  }, [schoolProfile.logo_url]);
 
   // Listener event lokal & multi-tab browser
   useEffect(() => {
@@ -455,8 +456,19 @@ export default function App() {
 
         {/* 3. Dynamic Active View Content Container */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          <div className="transition-all duration-150">
-            {activeTab === 'dashboard' && (
+          {isInitialLoading && getSupabase() ? (
+            <div className="space-y-6 animate-pulse">
+              <div className="h-16 bg-slate-200 dark:bg-[#072b2f] rounded-2xl border border-slate-300 dark:border-[#0f4950]" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-24 bg-slate-200 dark:bg-[#072b2f] rounded-xl border border-slate-300 dark:border-[#0f4950]" />
+                ))}
+              </div>
+              <div className="h-96 bg-slate-200 dark:bg-[#072b2f] rounded-2xl border border-slate-300 dark:border-[#0f4950]" />
+            </div>
+          ) : (
+            <div className="transition-all duration-150">
+              {activeTab === 'dashboard' && (
               <DashboardView
                 meetings={meetings}
                 teachers={teachers}
@@ -524,7 +536,8 @@ export default function App() {
               />
             )}
           </div>
-        </main>
+        )}
+      </main>
       </div>
 
       {/* 4. Global Modals */}

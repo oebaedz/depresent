@@ -252,12 +252,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
         </div>
 
         {/* Selected Meeting */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <label className="text-xs font-semibold text-slate-600 dark:text-teal-100 whitespace-nowrap">Agenda Rapat:</label>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+          <label className="text-xs font-semibold text-slate-600 dark:text-teal-100 shrink-0">Agenda Rapat:</label>
           <select
             value={selectedMeetingId}
             onChange={(e) => setSelectedMeetingId(e.target.value)}
-            className="text-xs font-medium border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-1.5 bg-slate-50 dark:bg-[#031e21] text-slate-800 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden max-w-xs truncate"
+            className="text-xs font-medium border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-1.5 bg-slate-50 dark:bg-[#031e21] text-slate-800 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden w-full sm:w-auto sm:max-w-xs truncate min-w-0"
           >
             {meetings.map((m) => (
               <option key={m.id} value={m.id} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">

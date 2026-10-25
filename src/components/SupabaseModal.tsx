@@ -74,7 +74,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
     setAnonKey('');
     saveSupabaseCredentials('', '');
     setTestResult(null);
-    setSyncResult('Kredensial dibersihkan, aplikasi kembali ke mode penyimpanan lokal demo.');
+    setSyncResult('Kredensial dinonaktifkan, aplikasi beralih ke penyimpanan lokal browser.');
     setTimeout(() => setSyncResult(null), 3000);
     onConnectionSuccess();
   };
@@ -195,7 +195,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
               onClick={handleResetToDemo}
               className="px-3 py-2 text-xs font-medium text-slate-500 dark:text-teal-300/70 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#0b383d] rounded-lg transition-colors ml-auto cursor-pointer"
             >
-              Reset ke Demo Lokal
+              Hapus Kredensial / Mode Lokal
             </button>
           </div>
 

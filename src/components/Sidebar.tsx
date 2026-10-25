@@ -26,7 +26,7 @@ interface SidebarProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   isSupabaseConnected: boolean;
-  supabaseStatus: 'demo' | 'tables_missing' | 'connected';
+  supabaseStatus: 'local' | 'tables_missing' | 'connected' | 'demo';
   isAdminUnlocked: boolean;
   onAdminLock: () => void;
   onAdminUnlockRequest: () => void;
@@ -185,10 +185,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
 
-          {/* Supabase / Mode Demo Status Button */}
+          {/* Supabase / Cloud Database Status Button */}
           <button
             onClick={onOpenSupabaseModal}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors ${
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors cursor-pointer ${
               supabaseStatus === 'connected'
                 ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300 hover:bg-emerald-950/60'
                 : supabaseStatus === 'tables_missing'
@@ -203,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ? 'Supabase Terhubung'
                   : supabaseStatus === 'tables_missing'
                   ? 'Tabel SQL Kurang'
-                  : 'Mode Demo (Lokal)'}
+                  : 'Penyimpanan Lokal'}
               </span>
             </div>
             {supabaseStatus === 'connected' ? (
@@ -212,7 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
             ) : (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-950 text-teal-300 font-mono">
-                Demo
+                Lokal
               </span>
             )}
           </button>

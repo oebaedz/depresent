@@ -2,6 +2,7 @@ import { Attendance, AttendanceMethod, AttendanceStatus, Meeting, SchoolProfile,
 import { INITIAL_ATTENDANCES, INITIAL_MEETINGS, INITIAL_SCHOOL_PROFILE, INITIAL_TEACHERS } from './demoData';
 import { getSupabase } from './supabase';
 import { generateUUID, isValidUUID } from './uuid';
+import { getTeacherGroup, sortTeachersStructuralFirst } from './teacherGroups';
 
 const KEY_PROFILE = 'smp_school_profile_v3';
 const KEY_TEACHERS = 'smp_teachers_v3';
@@ -52,19 +53,23 @@ export function getCachedProfile(): SchoolProfile {
 }
 
 export function getCachedTeachers(): Teacher[] {
-  if (typeof window === 'undefined') return ensureValidUUIDs(INITIAL_TEACHERS);
+  if (typeof window === 'undefined') return sortTeachersStructuralFirst(ensureValidUUIDs(INITIAL_TEACHERS));
   try {
     const stored = localStorage.getItem(KEY_TEACHERS);
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return ensureValidUUIDs(parsed);
+        const enriched = parsed.map((t: Teacher) => ({
+          ...t,
+          teacher_group: t.teacher_group || getTeacherGroup(t),
+        }));
+        return sortTeachersStructuralFirst(ensureValidUUIDs(enriched));
       }
     }
   } catch {
     // fallback
   }
-  return ensureValidUUIDs(INITIAL_TEACHERS);
+  return sortTeachersStructuralFirst(ensureValidUUIDs(INITIAL_TEACHERS));
 }
 
 export function getCachedMeetings(): Meeting[] {
@@ -209,22 +214,30 @@ export async function fetchTeachers(): Promise<Teacher[]> {
       const { data, error } = await supabase.from('smp_teachers').select('*').order('name', { ascending: true });
       if (!error && Array.isArray(data)) {
         if (data.length > 0) {
-          const mappedTeachers: Teacher[] = data.map((row) => ({
-            id: row.id,
-            ptk_id: row.ptk_id,
-            niy: row.niy || row.nip || '-',
-            nip: row.nip || row.niy || '-',
-            name: row.name,
-            phone_wa: row.phone_wa || '',
-            rank_group: row.rank_group || 'Guru Tetap Yayasan (GTY)',
-            role_title: row.role_title || 'Guru Mata Pelajaran',
-            avatar_url: row.avatar_url || '',
-            is_active: row.is_active !== false,
-            created_at: row.created_at,
-          }));
+          const mappedTeachers: Teacher[] = data.map((row) => {
+            const rawTeacher = {
+              id: row.id,
+              ptk_id: row.ptk_id,
+              niy: row.niy || row.nip || '-',
+              nip: row.nip || row.niy || '-',
+              name: row.name,
+              phone_wa: row.phone_wa || '',
+              rank_group: row.rank_group || 'Guru Tetap Yayasan (GTY)',
+              role_title: row.role_title || 'Guru Mata Pelajaran',
+              teacher_group: row.teacher_group || '',
+              avatar_url: row.avatar_url || '',
+              is_active: row.is_active !== false,
+              created_at: row.created_at,
+            };
+            return {
+              ...rawTeacher,
+              teacher_group: rawTeacher.teacher_group || getTeacherGroup(rawTeacher),
+            };
+          });
 
-          localStorage.setItem(KEY_TEACHERS, JSON.stringify(mappedTeachers));
-          return mappedTeachers;
+          const sortedTeachers = sortTeachersStructuralFirst(mappedTeachers);
+          localStorage.setItem(KEY_TEACHERS, JSON.stringify(sortedTeachers));
+          return sortedTeachers;
         } else {
           // Table exists but is empty -> auto seed from local
           const localTeachers = getCachedTeachers();
@@ -237,12 +250,21 @@ export async function fetchTeachers(): Promise<Teacher[]> {
             phone_wa: t.phone_wa || '',
             rank_group: t.rank_group,
             role_title: t.role_title,
+            teacher_group: t.teacher_group || getTeacherGroup(t),
             avatar_url: t.avatar_url || '',
             is_active: t.is_active,
           }));
           (async () => {
             try {
-              await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
+              const { error: seedErr } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
+              if (seedErr && (seedErr.message?.includes('teacher_group') || seedErr.code === 'PGRST204')) {
+                const fallbackPayload = dbPayload.map((p) => {
+                  const copy = { ...p };
+                  delete (copy as any).teacher_group;
+                  return copy;
+                });
+                await supabase.from('smp_teachers').upsert(fallbackPayload, { onConflict: 'ptk_id' });
+              }
             } catch (e) {
               console.warn(e);
             }
@@ -260,15 +282,17 @@ export async function fetchTeachers(): Promise<Teacher[]> {
 
 export async function saveTeacher(teacher: Teacher): Promise<Teacher> {
   const cleanId = isValidUUID(teacher.id) ? teacher.id : generateUUID();
+  const inferredGroup = teacher.teacher_group || getTeacherGroup(teacher);
   const cleanTeacher: Teacher = {
     ...teacher,
     id: cleanId,
     niy: teacher.niy || teacher.nip || '-',
     nip: teacher.niy || teacher.nip || '-',
     ptk_id: teacher.ptk_id.trim(),
+    teacher_group: inferredGroup,
   };
 
-  // Instant local-first optimistic update
+  // Instant local-first optimistic update with structural-first sorting
   const teachers = getCachedTeachers();
   const index = teachers.findIndex((t) => t.id === cleanTeacher.id || t.ptk_id === cleanTeacher.ptk_id);
   let updated: Teacher[];
@@ -278,11 +302,12 @@ export async function saveTeacher(teacher: Teacher): Promise<Teacher> {
   } else {
     updated = [cleanTeacher, ...teachers];
   }
-  localStorage.setItem(KEY_TEACHERS, JSON.stringify(updated));
+  const sorted = sortTeachersStructuralFirst(updated);
+  localStorage.setItem(KEY_TEACHERS, JSON.stringify(sorted));
 
   const supabase = getSupabase();
   if (supabase) {
-    const dbPayload = {
+    const dbPayload: Record<string, any> = {
       id: cleanTeacher.id,
       ptk_id: cleanTeacher.ptk_id,
       niy: cleanTeacher.niy,
@@ -291,6 +316,7 @@ export async function saveTeacher(teacher: Teacher): Promise<Teacher> {
       phone_wa: cleanTeacher.phone_wa,
       rank_group: cleanTeacher.rank_group,
       role_title: cleanTeacher.role_title,
+      teacher_group: cleanTeacher.teacher_group,
       avatar_url: cleanTeacher.avatar_url || '',
       is_active: cleanTeacher.is_active,
     };
@@ -298,7 +324,15 @@ export async function saveTeacher(teacher: Teacher): Promise<Teacher> {
     (async () => {
       try {
         const { error } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
-        if (error) console.error('Gagal simpan guru ke Supabase:', error.message);
+        if (error) {
+          if (error.message?.includes('teacher_group') || error.code === 'PGRST204') {
+            const fallbackPayload = { ...dbPayload };
+            delete fallbackPayload.teacher_group;
+            await supabase.from('smp_teachers').upsert(fallbackPayload, { onConflict: 'ptk_id' });
+          } else {
+            console.error('Gagal simpan guru ke Supabase:', error.message);
+          }
+        }
       } catch (e) {
         console.warn('Could not sync teacher to Supabase:', e);
       }
@@ -311,7 +345,7 @@ export async function deleteTeacher(id: string): Promise<void> {
   // 1. Instant local update
   const teachers = getCachedTeachers();
   const updated = teachers.filter((t) => t.id !== id);
-  localStorage.setItem(KEY_TEACHERS, JSON.stringify(updated));
+  localStorage.setItem(KEY_TEACHERS, JSON.stringify(sortTeachersStructuralFirst(updated)));
 
   const attendances = getCachedAttendances();
   const updatedAtt = attendances.filter((a) => a.teacher_id !== id);
@@ -345,7 +379,8 @@ export async function bulkImportTeachers(newTeachers: Omit<Teacher, 'id'>[]): Pr
 
     const existing = existingPtkMap.get(cleanPtk.toLowerCase());
     const niyVal = item.niy || item.nip || '-';
-    const teacherObj: Teacher = {
+    const draft = {
+      ...item,
       id: existing && isValidUUID(existing.id) ? existing.id : generateUUID(),
       ptk_id: cleanPtk,
       niy: niyVal,
@@ -357,17 +392,23 @@ export async function bulkImportTeachers(newTeachers: Omit<Teacher, 'id'>[]): Pr
       avatar_url: item.avatar_url || '',
       is_active: true,
     };
+
+    const teacherObj: Teacher = {
+      ...draft,
+      teacher_group: item.teacher_group || getTeacherGroup(draft as Teacher),
+    };
+
     toSave.push(teacherObj);
     existingPtkMap.set(cleanPtk.toLowerCase(), teacherObj);
     count++;
   }
 
-  const merged = Array.from(existingPtkMap.values());
+  const merged = sortTeachersStructuralFirst(Array.from(existingPtkMap.values()));
   localStorage.setItem(KEY_TEACHERS, JSON.stringify(merged));
 
   const supabase = getSupabase();
   if (supabase && toSave.length > 0) {
-    const dbPayload = toSave.map((t) => ({
+    const dbPayload: Record<string, any>[] = toSave.map((t) => ({
       id: t.id,
       ptk_id: t.ptk_id,
       niy: t.niy,
@@ -376,12 +417,21 @@ export async function bulkImportTeachers(newTeachers: Omit<Teacher, 'id'>[]): Pr
       phone_wa: t.phone_wa,
       rank_group: t.rank_group,
       role_title: t.role_title,
+      teacher_group: t.teacher_group,
       avatar_url: t.avatar_url,
       is_active: t.is_active,
     }));
     (async () => {
       try {
-        await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
+        const { error: bulkErr } = await supabase.from('smp_teachers').upsert(dbPayload, { onConflict: 'ptk_id' });
+        if (bulkErr && (bulkErr.message?.includes('teacher_group') || bulkErr.code === 'PGRST204')) {
+          const fallbackPayload = dbPayload.map((p) => {
+            const copy = { ...p };
+            delete copy.teacher_group;
+            return copy;
+          });
+          await supabase.from('smp_teachers').upsert(fallbackPayload, { onConflict: 'ptk_id' });
+        }
       } catch (e) {
         console.warn('Bulk import sync warning:', e);
       }
