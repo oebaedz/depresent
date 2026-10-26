@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana implementasi untuk 4 fitur: penguncian presensi HP saat QR expired, fitur pemilihan peserta rapat selektif (semua vs guru tertentu) dengan filter jabatan, transformasi tema ke palet Dark Teal elegan plus toggle Dark Mode, dan perbaikan cetak ID Card portrait berstandar A4 print CSS.",
-  "updatedAt":  "2026-10-21T23:16:32.345154054Z",
+  "summary":  "Rencana komprehensif implementasi Fitur Undangan Rapat dengan Konfirmasi Kehadiran (RSVP) via WhatsApp, Buku/Laporan Ekspedisi Surat Resmi ber-Kop Surat dan Tanda Tangan, serta Ekspor Excel (.xlsx). Memuat alur tautan responsif ke HP guru (?rsvp=...), integrasi WAHA WhatsApp API, tabel ekspedisi dengan pencatatan nomor surat, dan menu baru 'Surat & Ekspedisi' di Sidebar dePresent.",
+  "updatedAt":  "2026-10-26T10:34:26.962704953Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

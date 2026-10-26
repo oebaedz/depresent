@@ -1,6 +1,6 @@
-# Peningkatan Presensi dePresent: QR Expiry Guard, Pemilihan Peserta Rapat, Tema Dark Teal & Dark Mode, serta Perbaikan Cetak ID Card
+# Fitur Undangan Rapat, Konfirmasi Kehadiran (RSVP) WhatsApp, dan Laporan Ekspedisi Surat Resmi dePresent
 
-Rencana implementasi untuk menyempurnakan alur presensi mobile (validasi kedaluwarsa QR dinamis), fleksibilitas pemilihan guru peserta rapat kedinasan, pembaruan estetika modern dengan palet Dark Teal dan Dark Mode toggle, serta perbaikan cetak ID Card portrait guru.
+Rencana implementasi untuk menambahkan sistem manajemen Undangan Rapat kedinasan dengan tautan konfirmasi kehadiran mandiri (RSVP) yang dikirimkan via WhatsApp ke masing-masing guru, pencatatan otomatis status kehadiran/izin/sakit, serta Buku/Laporan Ekspedisi Surat resmi ber-Kop Surat cetak dan ekspor Excel (.xlsx).
 
 ---
 
@@ -8,71 +8,87 @@ Rencana implementasi untuk menyempurnakan alur presensi mobile (validasi kedaluw
 
 > [!IMPORTANT]
 > Ringkasan keputusan berdasarkan konfirmasi pengguna:
-> - **Perilaku QR Expired di HP**: Menampilkan peringatan kadaluarsa yang jelas, menonaktifkan pemilihan nama dan tombol simpan presensi, serta menginstruksikan guru untuk mengarahkan kamera ke layar proyektor rapat yang menampilkan QR bergulir terbaru (toleransi 60 detik).
-> - **Pemilihan Peserta Rapat**: Agenda rapat mendukung opsi **Semua Guru** (default) atau **Pilih Guru Tertentu** dengan fitur *quick-filter* berdasarkan kelompok jabatan/mapel serta centang daftar guru manual. Perhitungan kehadiran (dashboard, laporan resmi SPJ, dan auto-alpa) hanya menghitung guru yang diundang.
-> - **Tema Dark Teal & Dark Mode**: Menerapkan palet warna *Deep Teal* (`teal-950`, `teal-900`, `teal-800`, `teal-600`, aksen `emerald-500` & `amber-500`) dengan toggle *Light / Dark Mode* yang tersimpan di `localStorage` dan tersinkronisasi di seluruh komponen.
-> - **Perbaikan Cetak ID Card**: Mengatasi masalah pemotongan overflow pada modal cetak, menambahkan kelas CSS cetak khusus (`print-color-adjust: exact`, `break-inside-avoid`, grid A4 3 kolom), dan memastikan QR ptk_id ter-render tajam tanpa terpotong.
+> - **Alur Konfirmasi Kehadiran (RSVP)**: Mengirimkan pesan WhatsApp personal ke nomor guru dengan tautan unik mandiri (`?rsvp=<meetingId>&t=<teacherId>`). Saat guru membuka tautan di HP mereka, tampil layar konfirmasi resmi dengan pilihan **Akan Hadir**, **Izin (Disertai Alasan)**, atau **Sakit (Disertai Keterangan)**. Panitia juga dapat mencatat atau memperbarui konfirmasi secara manual di dashboard.
+> - **Format Laporan Ekspedisi Surat**: Menyediakan 2 format laporan ekspedisi yang lengkap:
+>   1. **Format Cetak Resmi**: Menggunakan Kop Surat resmi sekolah lengkap dengan Nomor Surat, Perihal, Tabel Tanda Terima Ekspedisi (Nama, NIP/NIY, Nomor Surat, Waktu Kirim/Terima, Status Konfirmasi, dan Kolom Tanda Tangan Fisik), serta blok pengesahan 3 pihak (Kepala Sekolah, Pimpinan Rapat, Petugas Ekspedisi / Tata Usaha).
+>   2. **Ekspor Excel (.xlsx)**: File spreadsheet rapi menggunakan SheetJS dengan metadata rapat, rekapitulasi angka pengiriman, dan baris detail ekspedisi.
+> - **Penempatan Menu**: Ditambahkan sebagai menu tersendiri di Sidebar dengan nama **"Surat & Ekspedisi"** (antara Agenda Rapat dan Laporan Resmi).
 
 ---
 
 ## 1. Overview & Core Concept
 
 - **Apa yang Dibangun**:
-  1. **QR Expiry Guard**: Di halaman presensi mobile (`MobileCheckinView`), jika token QR proyektor telah kedaluwarsa (>60 detik), sistem secara tegas menonaktifkan formulir presensi dan tombol kirim, menampilkan banner instruksi pindai ulang.
-  2. **Selective Meeting Attendees**: Di `MeetingsView`, admin rapat dapat menentukan apakah suatu agenda berlaku untuk seluruh dewan guru atau kelompok peserta spesifik (misalnya rapat MGMP guru mapel, rapat wali kelas, atau rapat pimpinan).
-  3. **Dark Teal Palette & Dark Mode**: Transformasi gaya visual aplikasi ke *Deep Oceanic Teal*, menggantikan nuansa biru standar dengan palet teal yang teduh dan elegan, dilengkapi tombol pengalih tema terang/gelap pada bilah navigasi atas.
-  4. **ID Card Printing Engine Fix**: Perbaikan tata letak cetak ID Card Portrait (54 x 85.6 mm) agar dapat dicetak ke kertas A4 (9 kartu per lembar) atau disimpan ke PDF dengan warna latar utuh dan tanpa terpotong batas modal.
+  1. **Manajemen Surat Undangan Rapat**: Panitia dapat memilih agenda rapat, mengisi Nomor Surat Dinas (e.g. `421.3/048/SMP.M.1/X/2026`), Perihal, Tanggal Pengiriman, serta memilih target penerima (semua peserta rapat atau dipilih perorangan/kelompok).
+  2. **Pengiriman WhatsApp & Tautan RSVP Mandiri**: Mengintegrasikan layanan WAHA untuk mengirimkan pesan undangan WhatsApp personal berisikan agenda, tanggal, jam, tempat, dan tautan mandiri RSVP.
+  3. **Layar Konfirmasi Mobile (RSVP Web View)**: Halaman mobile responsif bertema Dark Teal yang bersih dan ramah HP tanpa perlu login rumit. Guru langsung melihat ringkasan agenda, memilih status RSVP (*Akan Hadir*, *Izin*, *Sakit*), memasukkan catatan jika berhalangan, dan menekan konfirmasi dengan umpan balik instan.
+  4. **Buku Ekspedisi Surat (Expedition Book)**: Tabel pembukuan ekspedisi surat keluar yang mencatat No, Nomor Surat, Nama Penerima, Jabatan/Kelompok, Tanggal & Jam Pengiriman, Kanal Distribusi (WhatsApp / Fisik), Status RSVP, Waktu Konfirmasi, Catatan, dan Tanda Tangan.
+  5. **Cetak Kop Surat & Ekspor Excel**: Cetak siap pakai berstandar kedinasan (`print-color-adjust: exact`, `@media print`) dan tombol ekspor spreadsheet `.xlsx`.
 
-- **Target Pengguna**: Pimpinan yayasan, kepala sekolah, notulis/panitia rapat, dan guru peserta kegiatan.
+- **Target Pengguna**: Petugas Tata Usaha (TU), Sekretaris/Panitia Rapat, Kepala Sekolah, dan Dewan Guru penerima undangan.
 
 ---
 
 ## 2. User Experience & Visual Design
 
 ### A. Alur Pengguna (User Flows)
-1. **Guru Memindai QR Proyektor (Mobile Check-in)**:
-   - Guru memindai QR dinamis di layar proyektor.
-   - Jika QR masih aktif: nama guru yang diundang ke rapat tersebut muncul, guru memilih namanya dan menekan "Konfirmasi Kehadiran Saya". HP terkunci untuk 1 guru (Anti-Titip Absen).
-   - Jika QR kedaluwarsa: muncul banner peringatan kuning-oranye tegas, tombol konfirmasi dinonaktifkan dengan label *"Kode QR Kedaluwarsa — Pindai Ulang di Layar"*, dan guru tidak dapat memilih atau mengirimkan presensi.
-2. **Pembuatan / Pengeditan Agenda Rapat**:
-   - Panitia memilih kategori, tanggal, waktu, pimpinan rapat, dan notulis.
-   - Di bagian **Target Peserta Rapat**, terdapat pilihan:
-     - `Semua Guru & Pegawai` (default)
-     - `Pilih Guru Tertentu` (menampilkan ringkasan jumlah guru terpilih, tombol *Pilih Semua*, *Hapus Pilihan*, filter cepat per Jabatan, dan daftar checklist pencarian guru).
-3. **Penyelarasan Presensi & Laporan**:
-   - Dashboard KPI, layar proyektor, pengingat WhatsApp WAHA, dan Laporan Resmi SPJ secara otomatis menyesuaikan total peserta hanya dengan menghitung guru yang terdaftar dalam agenda tersebut.
-4. **Cetak ID Card Portrait**:
-   - Di menu Data Guru, panitia menekan "Cetak ID Card Portrait" (semua atau perorangan).
-   - Jendela pratinjau cetak terbuka dengan opsi ukuran cetak A4 teroptimasi. Ketika tombol "Cetak / Simpan PDF" ditekan, browser membuka dialog cetak yang bersih: tanpa sidebar, tanpa latar overlay abu-abu, warna latar dan logo tetap tercetak tajam (`print-color-adjust: exact`).
-5. **Dark Mode Toggle**:
-   - Ikon Sun / Moon yang elegan di header atas memungkinkan pengalihan tema instan antara mode terang beraksen deep teal dan mode gelap teal pekat.
 
-### B. Palet Warna & Tipografi
-- **Mode Terang (Light Mode)**:
-  - Background Canvas: Slate 50 (`#F8FAFC`)
-  - Primary Brand: Deep Teal (`#0F766E` / `teal-700` & `#115E59` / `teal-800`)
-  - Headers / Sidebar: Dark Teal Slate (`#042F2E` / `teal-950`)
-  - Accent / Status: Emerald (`#10B981`), Amber (`#D97706`), Rose (`#E11D48`)
-- **Mode Gelap (Dark Mode)**:
-  - Background Canvas: Dark Neutral / Deep Teal (`#021B1A` / `#0F172A`)
-  - Surface Containers: Dark Teal Slate (`#082F2D` / `#134E4A`) dengan garis batas halus (`border-teal-800/40`)
-  - Typography: Crisp white (`#F8FAFC`) untuk judul, soft teal/slate (`#94A3B8` / `#5EEAD4`) untuk teks sekunder
-  - Focus Ring: Teal 500 (`#14B8A6`)
-- **Tipografi**: Display font `Plus Jakarta Sans`, tabular numerals `JetBrains Mono` / `tabular-nums` pada seluruh tabel dan jam.
+1. **Pembuatan & Penyiapan Undangan (Panitia di Dashboard)**:
+   - Panitia membuka menu **"Surat & Ekspedisi"** di Sidebar.
+   - Memilih agenda rapat dari dropdown agenda yang tersedia.
+   - Memasukkan format Nomor Pokok Surat (misal: `421.3/{no}/SMP.M.1/X/2026`) atau nomor surat otomatis berurutan.
+   - Sistem menampilkan daftar peserta yang diundang beserta status pengiriman dan status RSVP saat ini.
+2. **Pengiriman Undangan (Broadcast / Individual WAHA)**:
+   - Panitia menekan tombol *"Kirim Undangan WhatsApp (Semua)"* atau tombol kirim per guru.
+   - Sistem menyusun pesan personal dengan format rapi (Nama Guru, Agenda, Hari/Tanggal, Waktu, Lokasi, Pimpinan) serta menyematkan URL konfirmasi:
+     `https://app-url/?rsvp=<meetingId>&t=<teacherId>`
+   - Status pengiriman surat otomatis berubah menjadi *Terkirim (WA)* dengan tanggal & jam pengiriman tercatat di buku ekspedisi.
+3. **Konfirmasi Kehadiran oleh Guru di Smartphone**:
+   - Guru mengklik tautan RSVP dari pesan WhatsApp.
+   - Aplikasi memuat **Layar Konfirmasi Kehadiran dePresent** yang dioptimalkan untuk layar ponsel:
+     - Kartu ringkasan agenda dinas (Judul, Tanggal, Jam, Ruangan, Pimpinan).
+     - Identitas penerima surat (Nama, NIP/NIY, Jabatan).
+     - 3 Pilihan Status:
+       - **Akan Hadir** (Aksen Emerald / Hijau)
+       - **Izin Dinas / Keperluan** (Aksen Amber / Kuning) + formulir catatan alasan
+       - **Sakit** (Aksen Sky / Biru) + formulir keterangan
+     - Tombol konfirmasi dengan status tersimpan seketika.
+     - Guru menerima pesan terima kasih dan kartu bukti konfirmasi digital.
+4. **Pencetakan Buku Ekspedisi Surat**:
+   - Panitia menekan tombol *"Cetak Laporan Ekspedisi"*.
+   - Dialog cetak browser terbuka menampilkan format lembar kedinasan:
+     - Kop Surat resmi sekolah (Logo, Nama Yayasan, Nama Sekolah, Alamat, NPSN, Kontak).
+     - Judul: **BUKU EKSPEDISI DAN TANDA TERIMA SURAT UNDANGAN**.
+     - Rincian agenda: Nomor Surat Pokok, Perihal, Hari/Tanggal, Waktu, Tempat.
+     - Tabel ekspedisi bergaris tegas: No, Nama Pegawai / Guru, Jabatan, Tanggal Kirim, Media Kirim, Status Konfirmasi Kehadiran, Tanda Tangan / Bukti Terima.
+     - Titimangsa dan 3 kolom pengesahan: Kepala Sekolah, Pimpinan Rapat, dan Petugas Ekspedisi / Pengadministrasi Persuratan.
+5. **Ekspor File Excel (.xlsx)**:
+   - Panitia menekan tombol *"Ekspor Excel (.xlsx)"*.
+   - File tersimpan dengan nama rapi: `Buku_Ekspedisi_Undangan_<Nama_Rapat>_<Tanggal>.xlsx`.
+
+### B. Visual Identity & Theme
+- Mengikuti palet **Deep Oceanic Teal** (`teal-950`, `teal-900`, `teal-800`, `teal-600`) dengan mode terang (*Light*) dan gelap (*Dark*) yang konsisten.
+- Kartu ringkasan metrik ekspedisi menggunakan kartu ringkas bergaris tipis (`border border-teal-800/30`):
+  - Total Penerima Undangan
+  - Undangan Terkirim via WA
+  - Konfirmasi Akan Hadir
+  - Konfirmasi Izin / Sakit
+  - Belum Konfirmasi
+- Layar cetak (@media print) memiliki margin A4 standar, tabel bergaris hitam solid 1px kedinasan, teks 11pt–12pt, dan tanpa elemen tombol antarmuka layar (`no-print`).
 
 ---
 
 ## 3. Key Product Decisions & Trade-Offs
 
-- **Penguncian Formulir saat QR Kedaluwarsa**:
-  - *Keputusan*: Menampilkan peringatan jelas dan menonaktifkan interaksi tombol submit jika token QR >60 detik.
-  - *Alasan*: Menjamin integritas kehadiran fisik di dalam ruangan rapat tanpa merusak pengalaman guru yang sudah berada di halaman.
-- **Struktur Data Peserta Rapat (Selective Attendees)**:
-  - *Keputusan*: Menambahkan `target_type: 'all' | 'custom'` dan `invited_teacher_ids: string[]` pada antarmuka `Meeting`.
-  - *Alasan*: Menjaga kompatibilitas mundur dengan rapat-rapat yang sudah dibuat sebelumnya (jika `target_type` tidak ada atau `'all'`, sistem otomatis menganggap seluruh dewan guru sebagai peserta).
-- **Perbaikan Cetak Berbasis CSS Media Print Murni**:
-  - *Keputusan*: Menambahkan aturan cetak `@media print` terisolasi di mana elemen modal cetak menjadi satu-satunya kontainer yang ditampilkan, menonaktifkan overflow scrolling dan memicu tata letak grid A4 3x3 yang rapi.
-  - *Alasan*: Menghindari ketergantungan pada library pihak ketiga yang berat dan memastikan hasil cetak PDF vektor tajam langsung dari browser.
+- **Alur RSVP Mandiri Berbasis URL Query Param (`?rsvp=...`)**:
+  - *Keputusan*: Menggunakan query parameter `?rsvp=<meetingId>&t=<teacherId>` yang langsung memicu view mandiri tanpa login password yang membebani guru.
+  - *Alasan*: Guru dapat langsung mengonfirmasi dalam 3 detik setelah menerima pesan WhatsApp. ID guru dan ID rapat sudah terverifikasi di parameter URL.
+- **Penyimpanan Lokal-Pertama dengan Sinkronisasi Supabase**:
+  - *Keputusan*: Model data `Invitation` disimpan di `localStorage` (`smp_invitations_v1`) dan disiapkan untuk tabel Supabase `smp_invitations`.
+  - *Alasan*: Memastikan aplikasi bekerja 100% instan secara offline / lokal tanpa jeda jaringan, serta tetap sinkron ketika database Supabase terhubung.
+- **Dukungan Konfirmasi Manual oleh Panitia**:
+  - *Keputusan*: Selain konfirmasi online dari HP guru, tabel ekspedisi di dashboard admin memiliki tombol cepat untuk menandai status RSVP jika ada guru yang konfirmasi secara lisan/telepon.
+  - *Alasan*: Menghindari kebuntuan jika ada guru senior yang kesulitan membuka browser di ponselnya.
 
 ---
 
@@ -82,49 +98,75 @@ Rencana implementasi untuk menyempurnakan alur presensi mobile (validasi kedaluw
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        dePresent Architecture                          │
+│              Sistem Undangan & Ekspedisi Surat dePresent               │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
-│  [ Theme Store ] ───> LocalStorage ('smp_theme') ───> document.root   │
-│                             │                                          │
-│                             ▼                                          │
-│                     [ Dark Teal Theme ]                                │
-│                                                                        │
-│  [ Meeting Model ]                                                     │
-│     ├── target_type ('all' | 'custom')                                 │
-│     └── invited_teacher_ids (string[])                                 │
-│               │                                                        │
-│               ▼                                                        │
-│  ┌─────────────────────────┬─────────────────────────┐                 │
-│  │ Dashboard / Reports     │ Mobile Checkin View     │                 │
-│  │ - Filter expected PTK   │ - Filter selectable PTK │                 │
-│  │ - Accurate % & Absent   │ - QR Expiry Guard       │                 │
-│  └─────────────────────────┴─────────────────────────┘                 │
-│                                                                        │
-│  [ ID Card Generator ] ───> @media print CSS Engine ───> PDF / Printer │
-│     ├── Standard Portrait (54 x 85.6 mm)                               │
-│     ├── 3-column A4 grid layout                                        │
-│     └── Forced background color preservation                           │
+│  [ Agenda Rapat ] ───> [ Pilih Penerima (Semua / Tertentu) ]           │
+│                              │                                         │
+│                              ▼                                         │
+│                 [ Surat & Ekspedisi View ]                             │
+│                  - Input No. Surat & Tanggal Kirim                     │
+│                  - Preview Format Pesan WA & Link                      │
+│                  - Generate / Sync Data 'Invitation'                   │
+│                              │                                         │
+│             ┌────────────────┴────────────────┐                        │
+│             ▼                                 ▼                        │
+│   [ Kirim WhatsApp WAHA ]           [ Input Manual Panitia ]           │
+│    Payload: { target, message }      (Ubah status RSVP langsung)       │
+│    Link: ?rsvp=meeting&t=teacher              │                        │
+│             │                                 │                        │
+│             ▼                                 │                        │
+│   [ Guru Terima Pesan WA ]                    │                        │
+│             │                                 │                        │
+│             ▼                                 │                        │
+│   [ Layar Konfirmasi Mobile ]                 │                        │
+│    - Pilih Hadir / Izin / Sakit               │                        │
+│    - Catatan tambahan (opsional)              │                        │
+│             │                                 │                        │
+│             └────────────────┬────────────────┘                        │
+│                              │                                         │
+│                              ▼                                         │
+│                   [ Buku Ekspedisi Surat ]                             │
+│                              │                                         │
+│             ┌────────────────┴────────────────┐                        │
+│             ▼                                 ▼                        │
+│   [ Cetak Kop Surat Resmi ]          [ Ekspor Excel .xlsx ]            │
+│   - Format Dinas bergaris            - SheetJS Workbook                │
+│   - 3 Kolom Tanda Tangan             - Tabel Data & Rekap              │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Rincian Komponen yang Dimodifikasi:
-1. `src/types/index.ts`: Menambahkan properti `target_type` dan `invited_teacher_ids` pada antarmuka `Meeting`.
-2. `src/components/MobileCheckinView.tsx`:
-   - Penegakan `isTokenExpired`: blokir interaksi pemilihan guru dan formulir submit saat kedaluwarsa.
-   - Filter `filteredTeachers` hanya menampilkan guru yang diundang ke rapat tersebut jika rapat bersangkutan memiliki `invited_teacher_ids`.
-   - Penerapan warna dark teal.
-3. `src/components/MeetingsView.tsx`:
-   - Antarmuka pemilihan peserta rapat: tombol alih "Semua Guru" vs "Pilih Guru Tertentu".
-   - Panel *quick-filter* per jabatan/kelompok guru + checklist nama guru dengan pencarian.
-   - Tampilan badge jumlah peserta pada kartu agenda rapat.
-4. `src/components/DashboardView.tsx` & `src/components/ReportsView.tsx`:
-   - Perhitungan total peserta, persentase kehadiran, dan daftar guru belum hadir disaring berdasarkan `meeting.invited_teacher_ids`.
-   - Laporan resmi SPJ dan ekspor Excel hanya memuat guru yang terdaftar dalam agenda.
-5. `src/components/TeachersView.tsx` & `src/index.css`:
-   - Perbaikan aturan `@media print` untuk ID Card portrait: menyembunyikan background overlay modal, menampilkan container cetak secara penuh, mengaktifkan `print-color-adjust: exact`, dan menata grid 3 kartu per baris.
-6. `src/App.tsx`, `src/components/Sidebar.tsx`, dan navigasi:
-   - State `theme` (`'light'` / `'dark'`) dengan inisialisasi dari `localStorage`.
-   - Tombol toggle Sun / Moon di bilah navigasi atas.
-   - Penyesuaian kelas tema dari biru standar ke Dark Teal (`bg-teal-950`, `bg-teal-900`, `text-teal-400`, dll.).
+### Rincian Model Data & State:
+1. **Model Data `Invitation` (di `src/types/index.ts`)**:
+   ```typescript
+   export type RsvpStatus = 'unconfirmed' | 'attending' | 'permission' | 'sick';
+   export type DispatchChannel = 'whatsapp' | 'manual' | 'printed';
+   export type DispatchStatus = 'pending' | 'sent' | 'failed';
+
+   export interface Invitation {
+     id: string;
+     meeting_id: string;
+     teacher_id: string;
+     letter_number: string; // e.g. "421.3/048/SMP.M.1/X/2026"
+     dispatch_date: string; // YYYY-MM-DD
+     dispatch_channel: DispatchChannel;
+     dispatch_status: DispatchStatus;
+     sent_at?: string; // ISO string
+     rsvp_status: RsvpStatus;
+     rsvp_notes?: string;
+     rsvp_at?: string; // ISO string
+     created_at?: string;
+   }
+   ```
+2. **Helpers Penyimpanan (di `src/lib/storage.ts`)**:
+   - `getCachedInvitations()`: Mengambil daftar undangan dari cache `localStorage`.
+   - `saveInvitation(invitation)`: Menambah atau memperbarui rekaman ekspedisi undangan.
+   - `saveBatchInvitations(invitations)`: Menyimpan sekaligus daftar undangan saat broadcast atau pembuatan nomor surat massal.
+   - `submitRsvpConfirmation(meetingId, teacherId, status, notes)`: Fungsi aman untuk mencatat konfirmasi kehadiran guru dari halaman mobile.
+3. **Komponen Baru**:
+   - `src/components/InvitationsView.tsx`: Halaman utama Surat & Ekspedisi dengan filter rapat, ringkasan KPI ekspedisi, broadcast WAHA, tabel ekspedisi, cetak Kop Surat resmi, dan ekspor XLSX.
+   - `src/components/RsvpConfirmationView.tsx`: Tampilan responsif mobile saat URL berparameter `?rsvp=...` diakses guru dari WhatsApp.
+4. **Pembaruan Navigasi & Tampilan**:
+   - `src/components/Sidebar.tsx`: Menambahkan opsi navigasi `'invitations'` dengan label **"Surat & Ekspedisi"** dan ikon surat dinas (`ScrollText` atau `FileSpreadsheet`).
+   - `src/App.tsx`: Menangani deteksi URL query parameter `?rsvp=...`, menghubungkan tab navigasi ke `InvitationsView`, dan menyediakan state undangan yang reaktif.

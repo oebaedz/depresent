@@ -81,3 +81,26 @@ export interface WahaConfig {
 export interface AttendanceWithTeacher extends Attendance {
   teacher: Teacher;
 }
+
+export type RsvpStatus = 'unconfirmed' | 'attending' | 'permission' | 'sick';
+export type DispatchChannel = 'whatsapp' | 'manual' | 'printed';
+export type DispatchStatus = 'pending' | 'sent' | 'failed';
+
+export interface Invitation {
+  id: string;
+  meeting_id: string;
+  teacher_id: string;
+  letter_number: string; // e.g. "421.3/048/SMP.M.1/X/2026"
+  dispatch_date: string; // YYYY-MM-DD
+  dispatch_channel: DispatchChannel;
+  dispatch_status: DispatchStatus;
+  sent_at?: string; // ISO string
+  rsvp_status: RsvpStatus;
+  rsvp_notes?: string;
+  rsvp_at?: string; // ISO string
+  created_at?: string;
+}
+
+export interface InvitationWithTeacher extends Invitation {
+  teacher: Teacher;
+}

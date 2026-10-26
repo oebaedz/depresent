@@ -1,4 +1,4 @@
-import { Attendance, AttendanceMethod, AttendanceStatus, Meeting, SchoolProfile, Teacher } from '../types';
+import { Attendance, AttendanceMethod, AttendanceStatus, Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher } from '../types';
 import { INITIAL_ATTENDANCES, INITIAL_MEETINGS, INITIAL_SCHOOL_PROFILE, INITIAL_TEACHERS } from './demoData';
 import { getSupabase } from './supabase';
 import { generateUUID, isValidUUID } from './uuid';
@@ -8,6 +8,7 @@ const KEY_PROFILE = 'smp_school_profile_v3';
 const KEY_TEACHERS = 'smp_teachers_v3';
 const KEY_MEETINGS = 'smp_meetings_v3';
 const KEY_ATTENDANCES = 'smp_attendances_v3';
+const KEY_INVITATIONS = 'smp_invitations_v1';
 
 // Helper to ensure all IDs in an array of records are valid UUIDs
 function ensureValidUUIDs<T extends { id: string }>(records: T[]): T[] {
@@ -32,6 +33,9 @@ export function initLocalStorage() {
   }
   if (!localStorage.getItem(KEY_ATTENDANCES)) {
     localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(INITIAL_ATTENDANCES));
+  }
+  if (!localStorage.getItem(KEY_INVITATIONS)) {
+    localStorage.setItem(KEY_INVITATIONS, JSON.stringify([]));
   }
 }
 
@@ -977,4 +981,162 @@ export async function syncInitialDataToSupabase(): Promise<{ success: boolean; m
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, message: `Gagal menyinkronkan data ke Supabase: ${msg}` };
   }
+}
+
+// ---------------------------------------------------------------------------
+// INVITATION & EXPEDITION PERSISTENCE
+// ---------------------------------------------------------------------------
+
+export function getCachedInvitations(): Invitation[] {
+  if (typeof window === 'undefined') return [];
+  const stored = localStorage.getItem(KEY_INVITATIONS);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchInvitations(): Promise<Invitation[]> {
+  const cached = getCachedInvitations();
+  const supabase = getSupabase();
+  if (!supabase) return cached;
+
+  try {
+    const { data, error } = await supabase.from('smp_invitations').select('*');
+    if (error) {
+      // If table doesn't exist yet, silently use local cache
+      return cached;
+    }
+    if (data && Array.isArray(data)) {
+      const mergedMap = new Map<string, Invitation>();
+      cached.forEach((item) => mergedMap.set(item.id, item));
+      data.forEach((item: any) => mergedMap.set(item.id, item));
+      const list = Array.from(mergedMap.values());
+      localStorage.setItem(KEY_INVITATIONS, JSON.stringify(list));
+      return list;
+    }
+  } catch (e) {
+    console.warn('Could not fetch invitations from Supabase, using local:', e);
+  }
+  return cached;
+}
+
+export async function saveInvitation(invitation: Invitation): Promise<void> {
+  const list = getCachedInvitations();
+  const index = list.findIndex((inv) => inv.id === invitation.id);
+  const updated = [...list];
+  if (index >= 0) {
+    updated[index] = invitation;
+  } else {
+    updated.unshift(invitation);
+  }
+  localStorage.setItem(KEY_INVITATIONS, JSON.stringify(updated));
+
+  const supabase = getSupabase();
+  if (supabase) {
+    (async () => {
+      try {
+        await supabase.from('smp_invitations').upsert(invitation);
+      } catch (e) {
+        // graceful ignore if table not present
+      }
+    })();
+  }
+}
+
+export async function saveBatchInvitations(invitations: Invitation[]): Promise<void> {
+  const list = getCachedInvitations();
+  const map = new Map<string, Invitation>();
+  list.forEach((item) => map.set(item.id, item));
+  invitations.forEach((item) => map.set(item.id, item));
+
+  const updated = Array.from(map.values());
+  localStorage.setItem(KEY_INVITATIONS, JSON.stringify(updated));
+
+  const supabase = getSupabase();
+  if (supabase && invitations.length > 0) {
+    (async () => {
+      try {
+        await supabase.from('smp_invitations').upsert(invitations);
+      } catch (e) {
+        // graceful ignore if table not present
+      }
+    })();
+  }
+}
+
+export async function deleteInvitation(id: string): Promise<void> {
+  const list = getCachedInvitations();
+  const updated = list.filter((inv) => inv.id !== id);
+  localStorage.setItem(KEY_INVITATIONS, JSON.stringify(updated));
+
+  const supabase = getSupabase();
+  if (supabase) {
+    (async () => {
+      try {
+        await supabase.from('smp_invitations').delete().eq('id', id);
+      } catch (e) {
+        // graceful
+      }
+    })();
+  }
+}
+
+/**
+ * Konfirmasi kehadiran mandiri (RSVP) oleh guru melalui link web WhatsApp
+ */
+export async function submitRsvpConfirmation(
+  meetingId: string,
+  teacherId: string,
+  rsvpStatus: RsvpStatus,
+  rsvpNotes?: string
+): Promise<{ success: boolean; invitation?: Invitation; message: string }> {
+  const list = getCachedInvitations();
+  let existing = list.find((inv) => inv.meeting_id === meetingId && inv.teacher_id === teacherId);
+
+  const nowIso = new Date().toISOString();
+
+  if (!existing) {
+    // Buat entri undangan jika belum ada
+    existing = {
+      id: generateUUID(),
+      meeting_id: meetingId,
+      teacher_id: teacherId,
+      letter_number: '-',
+      dispatch_date: new Date().toISOString().split('T')[0],
+      dispatch_channel: 'whatsapp',
+      dispatch_status: 'sent',
+      sent_at: nowIso,
+      rsvp_status: rsvpStatus,
+      rsvp_notes: rsvpNotes || '',
+      rsvp_at: nowIso,
+      created_at: nowIso,
+    };
+  } else {
+    existing = {
+      ...existing,
+      rsvp_status: rsvpStatus,
+      rsvp_notes: rsvpNotes !== undefined ? rsvpNotes : existing.rsvp_notes,
+      rsvp_at: nowIso,
+    };
+  }
+
+  await saveInvitation(existing);
+
+  const statusLabel =
+    rsvpStatus === 'attending'
+      ? 'Akan Hadir'
+      : rsvpStatus === 'permission'
+      ? 'Izin'
+      : rsvpStatus === 'sick'
+      ? 'Sakit'
+      : 'Belum Konfirmasi';
+
+  return {
+    success: true,
+    invitation: existing,
+    message: `Konfirmasi kehadiran Anda (${statusLabel}) berhasil dicatat. Terima kasih!`,
+  };
 }

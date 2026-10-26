@@ -164,7 +164,7 @@ export function saveWahaConfig(config: WahaConfig) {
 export interface WahaLog {
   id: string;
   timestamp: string;
-  type: 'scan_confirm' | 'reminder' | 'group_recap';
+  type: 'scan_confirm' | 'reminder' | 'group_recap' | 'invitation';
   target: string; // phone number or group ID
   status: 'success' | 'failed' | 'simulated';
   message: string;
@@ -201,7 +201,7 @@ export function addWahaLog(log: Omit<WahaLog, 'id' | 'timestamp'>) {
  * Payload strictly matches: { target, message }
  */
 export async function invokeWahaNotification(params: {
-  action: 'check_in_confirmation' | 'meeting_reminder' | 'group_recap';
+  action: 'check_in_confirmation' | 'meeting_reminder' | 'group_recap' | 'invitation_dispatch';
   recipient?: string; // target WhatsApp number or group chatId
   message: string;
   metadata?: Record<string, unknown>;
@@ -219,6 +219,8 @@ export async function invokeWahaNotification(params: {
       ? 'scan_confirm'
       : params.action === 'meeting_reminder'
       ? 'reminder'
+      : params.action === 'invitation_dispatch'
+      ? 'invitation'
       : 'group_recap';
 
   // 1. Strict validation matching Edge Function requirements: { target, message }

@@ -8,18 +8,22 @@ import { TeachersView } from './components/TeachersView';
 import { ReportsView } from './components/ReportsView';
 import { SchoolProfileView } from './components/SchoolProfileView';
 import { MobileCheckinView } from './components/MobileCheckinView';
+import { InvitationsView } from './components/InvitationsView';
+import { RsvpConfirmationView } from './components/RsvpConfirmationView';
 import { AdminPinModal } from './components/AdminPinModal';
 import { SupabaseModal } from './components/SupabaseModal';
 import { VercelDeployModal } from './components/VercelDeployModal';
 import { WahaModal } from './components/WahaModal';
-import { Attendance, Meeting, SchoolProfile, Teacher } from './types';
+import { Attendance, Invitation, Meeting, SchoolProfile, Teacher } from './types';
 import {
   fetchAttendances,
+  fetchInvitations,
   fetchMeetings,
   fetchSchoolProfile,
   fetchSingleMeeting,
   fetchTeachers,
   getCachedAttendances,
+  getCachedInvitations,
   getCachedMeetings,
   getCachedProfile,
   getCachedTeachers,
@@ -62,6 +66,19 @@ export default function App() {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
+  // Check if current URL is a teacher RSVP link (e.g. ?rsvp=<meetingId>&t=<teacherId>)
+  const [rsvpParams] = useState<{ meetingId: string; teacherId: string } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const meetingId = params.get('rsvp');
+      const teacherId = params.get('t') || params.get('teacher');
+      if (meetingId && teacherId) {
+        return { meetingId, teacherId };
+      }
+    }
+    return null;
+  });
+
   // Check if current URL is a teacher mobile checkin link (e.g. ?checkin=<meetingId>)
   const [mobileCheckinMeetingId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -76,6 +93,7 @@ export default function App() {
   const [teachers, setTeachers] = useState<Teacher[]>(() => getCachedTeachers());
   const [meetings, setMeetings] = useState<Meeting[]>(() => getCachedMeetings());
   const [attendances, setAttendances] = useState<Attendance[]>(() => getCachedAttendances());
+  const [invitations, setInvitations] = useState<Invitation[]>(() => getCachedInvitations());
 
   // Connection & Modals
   const [supabaseStatus, setSupabaseStatus] = useState<'local' | 'tables_missing' | 'connected' | 'demo'>('local');
@@ -173,17 +191,19 @@ export default function App() {
         setSupabaseStatus('connected');
       }
 
-      const [profileData, teacherData, meetingData, attendanceData] = await Promise.all([
+      const [profileData, teacherData, meetingData, attendanceData, invitationData] = await Promise.all([
         fetchSchoolProfile(),
         fetchTeachers(),
         fetchMeetings(),
         fetchAttendances(),
+        fetchInvitations(),
       ]);
 
       setSchoolProfile(profileData);
       setTeachers(teacherData);
       setMeetings(meetingData);
       setAttendances(attendanceData);
+      setInvitations(invitationData);
 
       if (profileData.admin_pin) {
         setAdminPin(profileData.admin_pin);
@@ -308,6 +328,24 @@ export default function App() {
   const targetCheckinMeeting = mobileMeeting || meetings.find((m) => m.id === mobileCheckinMeetingId);
 
   // -------------------------------------------------------------------------
+  // RSVP CONFIRMATION MODE (Isolated View for Teachers via WhatsApp Link)
+  // -------------------------------------------------------------------------
+  if (rsvpParams) {
+    return (
+      <RsvpConfirmationView
+        meetingId={rsvpParams.meetingId}
+        teacherId={rsvpParams.teacherId}
+        meetings={meetings}
+        teachers={teachers}
+        schoolProfile={schoolProfile}
+        onDone={() => {
+          if (typeof window !== 'undefined') window.location.href = window.location.pathname;
+        }}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // MOBILE CHECKIN MODE (Isolated Sandboxed View for Teachers via QR Scan)
   // -------------------------------------------------------------------------
   if (mobileCheckinMeetingId) {
@@ -315,7 +353,7 @@ export default function App() {
       return (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-center">
           <div className="bg-white p-7 rounded-2xl border border-slate-200 shadow-md max-w-sm w-full space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-900 text-white font-black flex items-center justify-center text-lg mx-auto animate-pulse">
+            <div className="w-12 h-12 rounded-xl bg-teal-800 text-white font-black flex items-center justify-center text-lg mx-auto animate-pulse">
               dP
             </div>
             <div className="space-y-1">
@@ -355,6 +393,7 @@ export default function App() {
     scanner: { title: 'Scan Panitia', subtitle: 'Pindai ID Card fisik guru menggunakan kamera pemindai' },
     projector: { title: 'Layar Proyektor Rapat', subtitle: 'Tampilan layar lebar panggung rapat & presensi mandiri' },
     meetings: { title: 'Agenda Rapat & Kegiatan', subtitle: 'Kelola jadwal rapat kedinasan, pimpinan & notulis' },
+    invitations: { title: 'Surat Undangan & Buku Ekspedisi', subtitle: 'Penerbitan surat dinas, pengiriman RSVP WhatsApp WAHA, dan cetak buku ekspedisi resmi' },
     teachers: { title: 'Data Guru & ID Card Portrait', subtitle: 'Manajemen PTK ber-NIY dan cetak ID Card format tegak' },
     reports: { title: 'Laporan Resmi Kedinasan', subtitle: 'Format siap cetak Kop Surat Yayasan dan ekspor spreadsheet XLSX' },
     profile: { title: 'Profil Yayasan & Sekolah', subtitle: 'Konfigurasi identitas yayasan, sekolah, logo & PIN admin' },
@@ -507,6 +546,16 @@ export default function App() {
                 teachers={teachers}
                 onRefresh={loadAllData}
                 onSelectActiveMeeting={(id) => setSelectedMeetingId(id)}
+              />
+            )}
+
+            {activeTab === 'invitations' && (
+              <InvitationsView
+                meetings={meetings}
+                teachers={teachers}
+                invitations={invitations}
+                onRefreshInvitations={loadAllData}
+                schoolProfile={schoolProfile}
               />
             )}
 

@@ -17,10 +17,11 @@ import {
   Unlock,
   ShieldCheck,
   ShieldAlert,
+  Mail,
 } from 'lucide-react';
 import { SchoolProfile } from '../types';
 
-export type ActiveTab = 'dashboard' | 'scanner' | 'projector' | 'meetings' | 'teachers' | 'reports' | 'profile';
+export type ActiveTab = 'dashboard' | 'scanner' | 'projector' | 'meetings' | 'invitations' | 'teachers' | 'reports' | 'profile';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -58,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'scanner', label: 'Scan Panitia', icon: <QrCode className="w-4 h-4" /> },
     { id: 'projector', label: 'Layar Proyektor', icon: <Tv className="w-4 h-4" /> },
     { id: 'meetings', label: 'Agenda Rapat', icon: <Calendar className="w-4 h-4" /> },
+    { id: 'invitations', label: 'Surat & Ekspedisi', icon: <Mail className="w-4 h-4" /> },
     { id: 'teachers', label: 'Data Guru & ID Card', icon: <Users className="w-4 h-4" /> },
     { id: 'reports', label: 'Laporan Resmi', icon: <FileText className="w-4 h-4" /> },
     { id: 'profile', label: 'Profil Sekolah', icon: <Settings className="w-4 h-4" /> },
