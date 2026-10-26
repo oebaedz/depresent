@@ -242,6 +242,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <span className="text-[10px] text-teal-400/70 font-mono">Git</span>
           </button>
+
+          {/* Attribution Footer */}
+          <div className="pt-2 text-center text-[10px] text-teal-300/60 border-t border-teal-900/40">
+            <a
+              href="https://github.com/oebaedz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-teal-200 underline font-medium inline-block transition-colors"
+            >
+              dePresent made by Mr Zee
+            </a>
+          </div>
         </div>
       </aside>
     </>

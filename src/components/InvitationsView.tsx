@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import {
   Mail,
@@ -7,19 +7,17 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
-  Clock,
   Copy,
-  ExternalLink,
   Search,
-  Sparkles,
+  Check,
   MessageSquare,
   Building2,
   Calendar,
   MapPin,
   User,
   HeartPulse,
-  RefreshCw,
-  Edit2
+  Save,
+  Clock
 } from 'lucide-react';
 import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
@@ -48,13 +46,25 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  // Letter numbering settings
-  const [letterPrefix, setLetterPrefix] = useState('421.3');
-  const [letterSuffix, setLetterSuffix] = useState('/SMP.M.1/X/2026');
-  const [startNumber, setStartNumber] = useState(1);
-  const [dispatchDate, setDispatchDate] = useState(() => new Date().toISOString().split('T')[0]);
+  // 1 Nomor surat untuk 1 kegiatan (sama untuk seluruh peserta rapat)
+  const [letterNumber, setLetterNumber] = useState<string>('421.3/048/SMP.M.1/X/2026');
+  const [dispatchDate, setDispatchDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || meetings[0];
+
+  // Sync letter number from existing invitations of this meeting
+  useEffect(() => {
+    if (!currentMeeting) return;
+    const inv = invitations.find(
+      (i) => i.meeting_id === currentMeeting.id && i.letter_number && i.letter_number !== '-'
+    );
+    if (inv?.letter_number) {
+      setLetterNumber(inv.letter_number);
+      if (inv.dispatch_date) {
+        setDispatchDate(inv.dispatch_date);
+      }
+    }
+  }, [currentMeeting, invitations]);
 
   // Teachers expected for this meeting (respecting target_type and invited_teacher_ids)
   const meetingTeachers = useMemo(() => {
@@ -88,7 +98,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Metrics
+  // Metrics (Izin Dinas -> Izin)
   const stats = useMemo(() => {
     const total = meetingTeachers.length;
     let sentCount = 0;
@@ -111,21 +121,20 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     return { total, sentCount, attendingCount, permissionCount, sickCount, unconfirmedCount };
   }, [meetingTeachers, currentMeetingInvitationsMap]);
 
-  // Generate automated letter numbers for all teachers in this meeting
-  const handleGenerateLetterNumbers = async () => {
-    if (!currentMeeting) return;
+  // Apply single letter number to all teachers for this meeting
+  const handleApplyLetterNumber = async () => {
+    if (!currentMeeting || !letterNumber.trim()) return;
+    const cleanNum = letterNumber.trim();
     const toSave: Invitation[] = [];
 
-    meetingTeachers.forEach((teacher, idx) => {
-      const numStr = String(startNumber + idx).padStart(3, '0');
-      const letterNum = `${letterPrefix}/${numStr}${letterSuffix}`;
+    meetingTeachers.forEach((teacher) => {
       const existing = currentMeetingInvitationsMap.get(teacher.id);
 
       toSave.push({
         id: existing?.id || Math.random().toString(36).substring(2, 9),
         meeting_id: currentMeeting.id,
         teacher_id: teacher.id,
-        letter_number: letterNum,
+        letter_number: cleanNum,
         dispatch_date: dispatchDate,
         dispatch_channel: existing?.dispatch_channel || 'whatsapp',
         dispatch_status: existing?.dispatch_status || 'pending',
@@ -139,7 +148,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
     await saveBatchInvitations(toSave);
     onRefreshInvitations();
-    showToast(`Berhasil menerbitkan nomor surat otomatis untuk ${toSave.length} guru.`);
+    showToast(`Nomor surat "${cleanNum}" diterapkan untuk seluruh ${toSave.length} peserta rapat.`);
   };
 
   // Generate personalized WhatsApp message and RSVP URL
@@ -149,7 +158,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     return `${base}?rsvp=${currentMeeting.id}&t=${teacherId}`;
   };
 
-  const getPersonalizedMessage = (teacher: Teacher, letterNum?: string) => {
+  const getPersonalizedMessage = (teacher: Teacher) => {
     const rsvpUrl = getPersonalizedUrl(teacher.id);
     const dateFormatted = new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', {
       weekday: 'long',
@@ -158,8 +167,10 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       year: 'numeric',
     });
 
+    const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
+
     return `*SURAT UNDANGAN KEDINASAN*
-Nomor: ${letterNum || '-'}
+Nomor: ${activeLetterNum}
 Perihal: Undangan ${currentMeeting.title}
 
 Kepada Yth.
@@ -183,7 +194,7 @@ Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.
 Wassalamu'alaikum Wr. Wb.
 
 _Tata Usaha & Kepanitiaan ${schoolProfile.school_name}_
-_Aplikasi dePresent_`;
+_Aplikasi dePresent made by Mr Zee_`;
   };
 
   // Dispatch individual WhatsApp invitation
@@ -194,8 +205,8 @@ _Aplikasi dePresent_`;
     }
 
     const existing = currentMeetingInvitationsMap.get(teacher.id);
-    const letterNum = existing?.letter_number || `${letterPrefix}/${String(startNumber).padStart(3, '0')}${letterSuffix}`;
-    const msg = getPersonalizedMessage(teacher, letterNum);
+    const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
+    const msg = getPersonalizedMessage(teacher);
 
     const res = await invokeWahaNotification({
       action: 'invitation_dispatch',
@@ -204,7 +215,7 @@ _Aplikasi dePresent_`;
       metadata: {
         meetingId: currentMeeting.id,
         teacherId: teacher.id,
-        letterNumber: letterNum,
+        letterNumber: activeLetterNum,
       },
     });
 
@@ -213,7 +224,7 @@ _Aplikasi dePresent_`;
         id: existing?.id || Math.random().toString(36).substring(2, 9),
         meeting_id: currentMeeting.id,
         teacher_id: teacher.id,
-        letter_number: letterNum,
+        letter_number: activeLetterNum,
         dispatch_date: dispatchDate,
         dispatch_channel: 'whatsapp',
         dispatch_status: 'sent',
@@ -248,6 +259,7 @@ _Aplikasi dePresent_`;
 
     let successCount = 0;
     const toSave: Invitation[] = [];
+    const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
 
     for (let i = 0; i < unsentTeachers.length; i++) {
       const teacher = unsentTeachers[i];
@@ -255,8 +267,7 @@ _Aplikasi dePresent_`;
 
       if (teacher.phone_wa) {
         const existing = currentMeetingInvitationsMap.get(teacher.id);
-        const letterNum = existing?.letter_number || `${letterPrefix}/${String(startNumber + i).padStart(3, '0')}${letterSuffix}`;
-        const msg = getPersonalizedMessage(teacher, letterNum);
+        const msg = getPersonalizedMessage(teacher);
 
         const res = await invokeWahaNotification({
           action: 'invitation_dispatch',
@@ -270,7 +281,7 @@ _Aplikasi dePresent_`;
             id: existing?.id || Math.random().toString(36).substring(2, 9),
             meeting_id: currentMeeting.id,
             teacher_id: teacher.id,
-            letter_number: letterNum,
+            letter_number: activeLetterNum,
             dispatch_date: dispatchDate,
             dispatch_channel: 'whatsapp',
             dispatch_status: 'sent',
@@ -299,11 +310,13 @@ _Aplikasi dePresent_`;
   // Quick manual RSVP change by panitia/TU
   const handleUpdateRsvpManual = async (teacher: Teacher, newStatus: RsvpStatus) => {
     const existing = currentMeetingInvitationsMap.get(teacher.id);
+    const activeLetterNum = letterNumber.trim() || existing?.letter_number || '421.3/048/SMP.M.1/X/2026';
+
     const updated: Invitation = {
       id: existing?.id || Math.random().toString(36).substring(2, 9),
       meeting_id: currentMeeting.id,
       teacher_id: teacher.id,
-      letter_number: existing?.letter_number || '-',
+      letter_number: activeLetterNum,
       dispatch_date: existing?.dispatch_date || dispatchDate,
       dispatch_channel: existing?.dispatch_channel || 'manual',
       dispatch_status: existing?.dispatch_status || 'sent',
@@ -315,7 +328,8 @@ _Aplikasi dePresent_`;
     };
     await saveInvitation(updated);
     onRefreshInvitations();
-    showToast(`Status RSVP ${teacher.name} diubah menjadi ${newStatus}.`);
+    const label = newStatus === 'attending' ? 'Hadir' : newStatus === 'permission' ? 'Izin' : newStatus === 'sick' ? 'Sakit' : 'Belum';
+    showToast(`Status RSVP ${teacher.name} diubah menjadi ${label}.`);
   };
 
   // Copy RSVP link
@@ -330,7 +344,7 @@ _Aplikasi dePresent_`;
     window.print();
   };
 
-  // Export Expedition Book to Excel (.xlsx)
+  // Export Expedition Book to Excel (.xlsx) without per-participant letter number column
   const handleExportXLSX = () => {
     if (!currentMeeting) return;
 
@@ -340,11 +354,13 @@ _Aplikasi dePresent_`;
       [schoolProfile.address || ''],
       [],
       ['Agenda Rapat', currentMeeting.title],
+      ['Nomor Surat Dinas', letterNumber.trim()],
       ['Kategori', currentMeeting.category],
       ['Hari / Tanggal', currentMeeting.meeting_date],
       ['Waktu', `${currentMeeting.start_time} - ${currentMeeting.end_time} WIB`],
       ['Ruangan', currentMeeting.room],
       ['Pimpinan Rapat', currentMeeting.leader_name],
+      ['Tanggal Pengiriman', dispatchDate],
       [],
       ['REKAPITULASI EKSPEDISI'],
       ['Total Undangan', stats.total],
@@ -356,7 +372,6 @@ _Aplikasi dePresent_`;
       [],
       [
         'No',
-        'Nomor Surat',
         'Nama Guru / Pegawai',
         'NIY / NIP',
         'Jabatan / Mapel',
@@ -384,13 +399,12 @@ _Aplikasi dePresent_`;
 
       rows.push([
         idx + 1,
-        inv?.letter_number || '-',
         teacher.name,
         teacher.niy || teacher.nip || '-',
         teacher.role_title,
         teacher.teacher_group || 'Guru Mapel',
         teacher.phone_wa || '-',
-        inv?.dispatch_date || '-',
+        inv?.dispatch_date || dispatchDate,
         inv?.dispatch_channel === 'whatsapp' ? 'WhatsApp' : 'Fisik/Manual',
         inv?.dispatch_status === 'sent' ? 'Terkirim' : 'Pending',
         rsvpLabel,
@@ -404,7 +418,6 @@ _Aplikasi dePresent_`;
     // Auto fit column widths
     const colWidths = [
       { wch: 5 },  // No
-      { wch: 28 }, // No Surat
       { wch: 30 }, // Nama
       { wch: 18 }, // NIY
       { wch: 25 }, // Jabatan
@@ -478,8 +491,8 @@ _Aplikasi dePresent_`;
               </span>
               Surat Undangan & Buku Ekspedisi
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Penerbitan surat undangan resmi, pengiriman tautan RSVP via WhatsApp WAHA, dan pencatatan buku ekspedisi kedinasan.
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-teal-200/70 mt-1">
+              Penerbitan surat dinas bersama, pengiriman tautan RSVP via WhatsApp WAHA, dan pencatatan buku ekspedisi kedinasan.
             </p>
           </div>
 
@@ -487,7 +500,7 @@ _Aplikasi dePresent_`;
           <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold border border-slate-300 dark:border-slate-700 transition-colors shadow-xs"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 dark:bg-[#072b2f] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs cursor-pointer"
             >
               <Printer className="w-4 h-4 text-teal-600 dark:text-teal-400" />
               Cetak Laporan Ekspedisi
@@ -495,7 +508,7 @@ _Aplikasi dePresent_`;
 
             <button
               onClick={handleExportXLSX}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-colors"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
               <FileSpreadsheet className="w-4 h-4" />
               Ekspor Excel (.xlsx)
@@ -503,17 +516,17 @@ _Aplikasi dePresent_`;
           </div>
         </div>
 
-        {/* Meeting Selector & Numbering Bar */}
+        {/* Meeting Selector & Single Letter Numbering Bar */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Select Meeting */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-4 shadow-xs space-y-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-teal-300/80">
               Pilih Agenda Rapat
             </label>
             <select
               value={selectedMeetingId}
               onChange={(e) => setSelectedMeetingId(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 dark:text-slate-100 focus:outline-hidden focus:border-teal-500"
+              className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-2 text-xs font-medium text-slate-900 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
             >
               {meetings.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -523,127 +536,119 @@ _Aplikasi dePresent_`;
             </select>
 
             {currentMeeting && (
-              <div className="pt-1 text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
+              <div className="pt-1 text-[11px] text-slate-500 dark:text-teal-200/70 space-y-0.5">
                 <p>📍 {currentMeeting.room} • ⏰ {currentMeeting.start_time} - {currentMeeting.end_time} WIB</p>
-                <p>👤 Pimpinan: <span className="font-semibold text-slate-700 dark:text-slate-300">{currentMeeting.leader_name}</span></p>
+                <p>👤 Pimpinan: <span className="font-semibold text-slate-700 dark:text-teal-200">{currentMeeting.leader_name}</span></p>
               </div>
             )}
           </div>
 
-          {/* Letter Numbering Generator */}
-          <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs space-y-3">
+          {/* 1 Nomor Surat untuk 1 Kegiatan (Berlaku untuk semua peserta) */}
+          <div className="lg:col-span-2 bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-4 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Format Penomoran Surat Dinas
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-teal-300/80">
+                Nomor Surat Kedinasan (1 Nomor untuk Kegiatan Ini)
               </span>
               <button
                 type="button"
-                onClick={handleGenerateLetterNumbers}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30 text-xs font-semibold transition-colors"
+                onClick={handleApplyLetterNumber}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30 text-xs font-semibold transition-colors cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                Terbitkan Nomor Otomatis
+                <Save className="w-3.5 h-3.5" />
+                Simpan & Terapkan Nomor
               </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div>
-                <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Prefix / Kode</label>
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] text-slate-500 dark:text-teal-200/70 mb-1">
+                  Nomor Surat Dinas Rapat
+                </label>
                 <input
                   type="text"
-                  value={letterPrefix}
-                  onChange={(e) => setLetterPrefix(e.target.value)}
-                  placeholder="421.3"
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-mono"
+                  value={letterNumber}
+                  onChange={(e) => setLetterNumber(e.target.value)}
+                  placeholder="Contoh: 421.3/048/SMP.M.1/X/2026"
+                  className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-teal-100 font-mono font-medium focus:outline-hidden focus:border-teal-500"
                 />
               </div>
+
               <div>
-                <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Suffix / Indeks & Tahun</label>
-                <input
-                  type="text"
-                  value={letterSuffix}
-                  onChange={(e) => setLetterSuffix(e.target.value)}
-                  placeholder="/SMP.M.1/X/2026"
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100 font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">Tgl Pengiriman</label>
+                <label className="block text-[11px] text-slate-500 dark:text-teal-200/70 mb-1">
+                  Tanggal Pengiriman
+                </label>
                 <input
                   type="date"
                   value={dispatchDate}
                   onChange={(e) => setDispatchDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-slate-100"
+                  className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
                 />
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-400">
-              Contoh keluaran:{' '}
-              <span className="font-mono text-teal-600 dark:text-teal-400 font-semibold">
-                {letterPrefix}/{String(startNumber).padStart(3, '0')}{letterSuffix}
-              </span>
+            <p className="text-[11px] text-slate-400 dark:text-teal-200/60">
+              Nomor surat ini tercantum pada pesan WhatsApp guru, kop surat ekspedisi, serta rekapitulasi kehadiran.
             </p>
           </div>
         </div>
 
         {/* Metric Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">Total Undangan</span>
+          <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-3.5 shadow-xs">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-teal-200/70 block">Total Undangan</span>
             <span className="text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums">{stats.total}</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-teal-500/30 rounded-2xl p-3.5 shadow-xs">
+          <div className="bg-white dark:bg-[#072b2f] border border-teal-500/30 rounded-2xl p-3.5 shadow-xs">
             <span className="text-[11px] font-medium text-teal-600 dark:text-teal-400 block">Terkirim WA</span>
             <span className="text-2xl font-bold text-teal-600 dark:text-teal-400 font-mono tabular-nums">{stats.sentCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-emerald-500/30 rounded-2xl p-3.5 shadow-xs">
+          <div className="bg-white dark:bg-[#072b2f] border border-emerald-500/30 rounded-2xl p-3.5 shadow-xs">
             <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 block">Akan Hadir</span>
             <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">{stats.attendingCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-amber-500/30 rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 block">Izin Dinas</span>
+          <div className="bg-white dark:bg-[#072b2f] border border-amber-500/30 rounded-2xl p-3.5 shadow-xs">
+            <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 block">Izin</span>
             <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">{stats.permissionCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-sky-500/30 rounded-2xl p-3.5 shadow-xs">
+          <div className="bg-white dark:bg-[#072b2f] border border-sky-500/30 rounded-2xl p-3.5 shadow-xs">
             <span className="text-[11px] font-medium text-sky-600 dark:text-sky-400 block">Sakit</span>
             <span className="text-2xl font-bold text-sky-600 dark:text-sky-400 font-mono tabular-nums">{stats.sickCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 block">Belum Konfirmasi</span>
-            <span className="text-2xl font-bold text-slate-500 dark:text-slate-400 font-mono tabular-nums">{stats.unconfirmedCount}</span>
+          <div className="bg-white dark:bg-[#072b2f] border border-slate-300 dark:border-[#0f4950] rounded-2xl p-3.5 shadow-xs">
+            <span className="text-[11px] font-medium text-slate-500 dark:text-teal-200/70 block">Belum Konfirmasi</span>
+            <span className="text-2xl font-bold text-slate-500 dark:text-teal-300/80 font-mono tabular-nums">{stats.unconfirmedCount}</span>
           </div>
         </div>
 
         {/* Bulk Action & Filters */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Search & Status Filter */}
           <div className="flex items-center gap-2.5 flex-1 flex-wrap">
             <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-4 h-4 text-slate-400 dark:text-teal-300/60 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Cari nama guru, NIY..."
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-hidden focus:border-teal-500"
+                className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-teal-100 placeholder-slate-400 dark:placeholder-teal-300/40 focus:outline-hidden focus:border-teal-500"
               />
             </div>
 
             <select
               value={filterRsvp}
               onChange={(e) => setFilterRsvp(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-teal-500"
+              className="bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
             >
               <option value="all">Semua Status RSVP</option>
               <option value="unsent">Belum Terkirim WA</option>
               <option value="attending">Akan Hadir</option>
-              <option value="permission">Izin Dinas</option>
+              <option value="permission">Izin</option>
               <option value="sick">Sakit</option>
               <option value="unconfirmed">Belum Konfirmasi</option>
             </select>
@@ -654,7 +659,7 @@ _Aplikasi dePresent_`;
             <button
               onClick={handleSendBulkWA}
               disabled={isSendingBulk || stats.total === 0}
-              className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-700 to-teal-600 hover:from-teal-600 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-teal-950/30 transition-all disabled:opacity-50"
+              className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-700 to-teal-600 hover:from-teal-600 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-teal-950/30 transition-all disabled:opacity-50 cursor-pointer"
             >
               {isSendingBulk ? (
                 <>
@@ -673,14 +678,13 @@ _Aplikasi dePresent_`;
           </div>
         </div>
 
-        {/* Expedition Table (Screen View) */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+        {/* Expedition Table (Screen View - Tanpa kolom No. Surat per peserta) */}
+        <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-950 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 uppercase font-semibold text-[10px] tracking-wider">
+              <thead className="bg-slate-50 dark:bg-[#031e21] text-slate-600 dark:text-teal-200/90 border-b border-slate-200 dark:border-[#0f4950] uppercase font-semibold text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3 px-3.5 w-12 text-center">No</th>
-                  <th className="py-3 px-3.5">No. Surat</th>
                   <th className="py-3 px-3.5">Nama Guru / Pegawai</th>
                   <th className="py-3 px-3.5">Jabatan / Kelompok</th>
                   <th className="py-3 px-3.5">No. WhatsApp</th>
@@ -689,10 +693,10 @@ _Aplikasi dePresent_`;
                   <th className="py-3 px-3.5 text-right">Aksi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+              <tbody className="divide-y divide-slate-100 dark:divide-[#0f4950]/60 font-medium">
                 {displayedTeachers.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                    <td colSpan={7} className="py-8 text-center text-slate-400 dark:text-teal-300/60">
                       Tidak ada data guru yang cocok dengan filter.
                     </td>
                   </tr>
@@ -705,27 +709,24 @@ _Aplikasi dePresent_`;
                     return (
                       <tr
                         key={teacher.id}
-                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                        className="hover:bg-slate-50/70 dark:hover:bg-[#0b383d]/50 transition-colors"
                       >
-                        <td className="py-3 px-3.5 text-center font-mono text-slate-400">
+                        <td className="py-3 px-3.5 text-center font-mono text-slate-400 dark:text-teal-300/60">
                           {idx + 1}
-                        </td>
-                        <td className="py-3 px-3.5 font-mono text-teal-700 dark:text-teal-400 font-semibold whitespace-nowrap">
-                          {inv?.letter_number || '-'}
                         </td>
                         <td className="py-3 px-3.5">
                           <div className="font-bold text-slate-900 dark:text-white leading-tight">
                             {teacher.name}
                           </div>
-                          <div className="text-[11px] text-slate-400 font-mono">
+                          <div className="text-[11px] text-slate-400 dark:text-teal-300/70 font-mono">
                             NIY: {teacher.niy || teacher.nip || '-'}
                           </div>
                         </td>
                         <td className="py-3 px-3.5">
-                          <div className="text-slate-800 dark:text-slate-200">{teacher.role_title}</div>
-                          <div className="text-[10px] text-slate-400">{teacher.teacher_group || 'Guru Mapel'}</div>
+                          <div className="text-slate-800 dark:text-teal-100">{teacher.role_title}</div>
+                          <div className="text-[10px] text-slate-400 dark:text-teal-300/60">{teacher.teacher_group || 'Guru Mapel'}</div>
                         </td>
-                        <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-slate-300">
+                        <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-teal-200/90">
                           {teacher.phone_wa || <span className="text-rose-400">(Belum ada)</span>}
                         </td>
                         <td className="py-3 px-3.5 whitespace-nowrap">
@@ -736,43 +737,43 @@ _Aplikasi dePresent_`;
                                 Terkirim WA
                               </span>
                               {inv?.sent_at && (
-                                <span className="text-[10px] text-slate-400">
+                                <span className="text-[10px] text-slate-400 dark:text-teal-300/60">
                                   {new Date(inv.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-[11px] text-slate-400">Belum Dikirim</span>
+                            <span className="text-[11px] text-slate-400 dark:text-teal-300/60">Belum Dikirim</span>
                           )}
                         </td>
                         <td className="py-3 px-3.5 whitespace-nowrap">
                           {rsvp === 'attending' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
                               <CheckCircle2 className="w-3 h-3" />
                               Akan Hadir
                             </span>
                           )}
                           {rsvp === 'permission' && (
                             <div className="flex flex-col">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30">
                                 <AlertCircle className="w-3 h-3" />
-                                Izin Dinas
+                                Izin
                               </span>
                               {inv?.rsvp_notes && (
-                                <span className="text-[10px] text-slate-400 max-w-[140px] truncate" title={inv.rsvp_notes}>
+                                <span className="text-[10px] text-slate-400 dark:text-teal-200/70 max-w-[140px] truncate" title={inv.rsvp_notes}>
                                   {inv.rsvp_notes}
                                 </span>
                               )}
                             </div>
                           )}
                           {rsvp === 'sick' && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30">
                               <HeartPulse className="w-3 h-3" />
                               Sakit
                             </span>
                           )}
                           {rsvp === 'unconfirmed' && (
-                            <span className="text-[11px] text-slate-400 italic">Belum Konfirmasi</span>
+                            <span className="text-[11px] text-slate-400 dark:text-teal-300/60 italic">Belum Konfirmasi</span>
                           )}
                         </td>
                         <td className="py-3 px-3.5 text-right whitespace-nowrap">
@@ -781,7 +782,7 @@ _Aplikasi dePresent_`;
                             <button
                               onClick={() => handleSendSingleWA(teacher)}
                               title="Kirim Undangan WhatsApp"
-                              className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/20 transition-colors"
+                              className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-300 border border-teal-500/20 transition-colors cursor-pointer"
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
                             </button>
@@ -790,7 +791,7 @@ _Aplikasi dePresent_`;
                             <button
                               onClick={() => handleCopyLink(teacher.id, teacher.name)}
                               title="Salin Tautan RSVP"
-                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors"
+                              className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#031e21] dark:hover:bg-[#0b383d] text-slate-600 dark:text-teal-200 border border-slate-300 dark:border-[#0f4950] transition-colors cursor-pointer"
                             >
                               <Copy className="w-3.5 h-3.5" />
                             </button>
@@ -799,7 +800,7 @@ _Aplikasi dePresent_`;
                             <select
                               value={rsvp}
                               onChange={(e) => handleUpdateRsvpManual(teacher, e.target.value as RsvpStatus)}
-                              className="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-300 focus:outline-hidden"
+                              className="bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-lg px-2 py-1 text-[11px] font-medium text-slate-700 dark:text-teal-200 focus:outline-hidden cursor-pointer"
                             >
                               <option value="unconfirmed">Belum</option>
                               <option value="attending">Hadir</option>
@@ -820,6 +821,7 @@ _Aplikasi dePresent_`;
 
       {/* ========================================================================= */}
       {/* PRINT-ONLY OFFICIAL EXPEDITION REPORT (BER-KOP SURAT & TANDA TANGAN)      */}
+      {/* 1 Nomor Surat di Header Rapat, Hapus Kolom No. Surat per Peserta         */}
       {/* ========================================================================= */}
       <div className="hidden print:block print-container p-6 bg-white text-black font-sans leading-relaxed">
         {/* Kop Surat Resmi */}
@@ -863,15 +865,15 @@ _Aplikasi dePresent_`;
           </p>
         </div>
 
-        {/* Meeting Metadata */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-4 border border-black p-3 bg-gray-50">
+        {/* Meeting Metadata (Menampilkan 1 Nomor Surat untuk seluruh kegiatan) */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-4 border border-black p-3 bg-gray-50">
+          <div>
+            <span className="font-bold inline-block w-28">Nomor Surat</span>
+            <span className="font-mono font-bold">: {letterNumber.trim() || '-'}</span>
+          </div>
           <div>
             <span className="font-bold inline-block w-28">Kategori Rapat</span>
             <span>: {currentMeeting?.category}</span>
-          </div>
-          <div>
-            <span className="font-bold inline-block w-28">Pimpinan Rapat</span>
-            <span>: {currentMeeting?.leader_name}</span>
           </div>
           <div>
             <span className="font-bold inline-block w-28">Hari, Tanggal</span>
@@ -880,31 +882,38 @@ _Aplikasi dePresent_`;
             </span>
           </div>
           <div>
-            <span className="font-bold inline-block w-28">Ruang / Tempat</span>
-            <span>: {currentMeeting?.room}</span>
+            <span className="font-bold inline-block w-28">Pimpinan Rapat</span>
+            <span>: {currentMeeting?.leader_name}</span>
           </div>
           <div>
             <span className="font-bold inline-block w-28">Waktu Pelaksanaan</span>
             <span>: {currentMeeting?.start_time} - {currentMeeting?.end_time} WIB</span>
           </div>
           <div>
+            <span className="font-bold inline-block w-28">Ruang / Tempat</span>
+            <span>: {currentMeeting?.room}</span>
+          </div>
+          <div>
             <span className="font-bold inline-block w-28">Jumlah Penerima</span>
             <span>: {meetingTeachers.length} Orang Guru/Pegawai</span>
           </div>
+          <div>
+            <span className="font-bold inline-block w-28">Tgl Pengiriman</span>
+            <span>: {dispatchDate}</span>
+          </div>
         </div>
 
-        {/* Official Expedition Table */}
+        {/* Official Expedition Table - Tanpa Kolom Nomor Surat per peserta */}
         <table className="w-full text-[10px] border-collapse border border-black mb-6">
           <thead>
             <tr className="bg-gray-100 border-b border-black text-center font-bold">
               <th className="border border-black py-1.5 px-1 w-8">No</th>
-              <th className="border border-black py-1.5 px-2 w-32">Nomor Surat</th>
               <th className="border border-black py-1.5 px-2">Nama Guru / Pegawai</th>
               <th className="border border-black py-1.5 px-2 w-28">NIY / NIP</th>
-              <th className="border border-black py-1.5 px-2">Jabatan</th>
-              <th className="border border-black py-1.5 px-1 w-20">Media & Tgl Kirim</th>
-              <th className="border border-black py-1.5 px-1 w-20">Status RSVP</th>
-              <th className="border border-black py-1.5 px-2 w-28">Tanda Tangan / Paraf Bukti Terima</th>
+              <th className="border border-black py-1.5 px-2">Jabatan / Mapel</th>
+              <th className="border border-black py-1.5 px-1 w-24">Media & Tgl Kirim</th>
+              <th className="border border-black py-1.5 px-1 w-24">Status RSVP</th>
+              <th className="border border-black py-1.5 px-2 w-36">Tanda Tangan / Paraf Bukti Terima</th>
             </tr>
           </thead>
           <tbody>
@@ -919,18 +928,15 @@ _Aplikasi dePresent_`;
                   ? 'Sakit'
                   : 'Belum Konfirmasi';
 
-              const isOdd = (idx + 1) % 2 !== 0;
-
               return (
                 <tr key={teacher.id} className="border-b border-black">
                   <td className="border border-black text-center py-1.5 font-bold">{idx + 1}</td>
-                  <td className="border border-black px-1.5 py-1.5 font-mono">{inv?.letter_number || '-'}</td>
                   <td className="border border-black px-1.5 py-1.5 font-bold">{teacher.name}</td>
                   <td className="border border-black px-1.5 py-1.5 font-mono">{teacher.niy || teacher.nip || '-'}</td>
                   <td className="border border-black px-1.5 py-1.5">{teacher.role_title}</td>
                   <td className="border border-black text-center py-1.5">
                     {inv?.dispatch_channel === 'whatsapp' ? 'WhatsApp' : 'Fisik'}<br />
-                    <span className="text-[9px] text-gray-600">{inv?.dispatch_date || '-'}</span>
+                    <span className="text-[9px] text-gray-600">{inv?.dispatch_date || dispatchDate}</span>
                   </td>
                   <td className="border border-black text-center py-1.5 font-semibold">
                     {rsvpLabel}

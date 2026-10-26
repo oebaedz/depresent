@@ -272,17 +272,40 @@ CREATE TABLE IF NOT EXISTS smp_attendances (
 CREATE INDEX IF NOT EXISTS idx_smp_attendances_meeting ON smp_attendances (meeting_id);
 CREATE INDEX IF NOT EXISTS idx_smp_attendances_teacher ON smp_attendances (teacher_id);
 
+-- 5. TABEL SURAT UNDANGAN & BUKU EKSPEDISI (INVITATIONS & RSVP)
+CREATE TABLE IF NOT EXISTS smp_invitations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  meeting_id UUID NOT NULL REFERENCES smp_meetings(id) ON DELETE CASCADE,
+  teacher_id UUID NOT NULL REFERENCES smp_teachers(id) ON DELETE CASCADE,
+  letter_number TEXT NOT NULL DEFAULT '-',
+  dispatch_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  dispatch_channel TEXT NOT NULL DEFAULT 'whatsapp', -- 'whatsapp', 'manual', 'printed'
+  dispatch_status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'sent', 'failed'
+  sent_at TIMESTAMPTZ,
+  rsvp_status TEXT NOT NULL DEFAULT 'unconfirmed', -- 'unconfirmed', 'attending', 'permission', 'sick'
+  rsvp_notes TEXT DEFAULT '',
+  rsvp_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  CONSTRAINT unique_invitation_per_meeting UNIQUE(meeting_id, teacher_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_smp_invitations_meeting ON smp_invitations (meeting_id);
+CREATE INDEX IF NOT EXISTS idx_smp_invitations_teacher ON smp_invitations (teacher_id);
+CREATE INDEX IF NOT EXISTS idx_smp_invitations_rsvp ON smp_invitations (rsvp_status);
+
 -- AKTIFKAN ROW LEVEL SECURITY (RLS) & BERIKAN IZIN AKSES ANONYMOUS LENGKAP
 ALTER TABLE smp_school_profile ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_teachers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_meetings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_attendances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE smp_invitations ENABLE ROW LEVEL SECURITY;
 
 -- Berikan izin akses penuh ke schema public untuk peranan anon & authenticated
 GRANT ALL ON TABLE smp_school_profile TO anon, authenticated;
 GRANT ALL ON TABLE smp_teachers TO anon, authenticated;
 GRANT ALL ON TABLE smp_meetings TO anon, authenticated;
 GRANT ALL ON TABLE smp_attendances TO anon, authenticated;
+GRANT ALL ON TABLE smp_invitations TO anon, authenticated;
 
 -- Kebijakan RLS Akses Penuh (Supabase Client Applet)
 DROP POLICY IF EXISTS "Public All smp_school_profile" ON smp_school_profile;
@@ -296,6 +319,9 @@ CREATE POLICY "Public All smp_meetings" ON smp_meetings FOR ALL USING (true) WIT
 
 DROP POLICY IF EXISTS "Public All smp_attendances" ON smp_attendances;
 CREATE POLICY "Public All smp_attendances" ON smp_attendances FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public All smp_invitations" ON smp_invitations;
+CREATE POLICY "Public All smp_invitations" ON smp_invitations FOR ALL USING (true) WITH CHECK (true);
 `;
 
 export const SUPABASE_SQL_MIGRATION_V4 = `-- ============================================================
@@ -304,4 +330,36 @@ export const SUPABASE_SQL_MIGRATION_V4 = `-- ===================================
 -- ============================================================
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
+`;
+
+export const SUPABASE_SQL_INVITATIONS = `-- ============================================================
+-- SKEMA TABEL SURAT UNDANGAN & BUKU EKSPEDISI (smp_invitations)
+-- Jalankan skrip ini di SQL Editor Supabase untuk mengaktifkan
+-- sinkronisasi cloud fitur Surat Undangan & Konfirmasi Kehadiran RSVP:
+-- ============================================================
+CREATE TABLE IF NOT EXISTS smp_invitations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  meeting_id UUID NOT NULL REFERENCES smp_meetings(id) ON DELETE CASCADE,
+  teacher_id UUID NOT NULL REFERENCES smp_teachers(id) ON DELETE CASCADE,
+  letter_number TEXT NOT NULL DEFAULT '-',
+  dispatch_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  dispatch_channel TEXT NOT NULL DEFAULT 'whatsapp',
+  dispatch_status TEXT NOT NULL DEFAULT 'pending',
+  sent_at TIMESTAMPTZ,
+  rsvp_status TEXT NOT NULL DEFAULT 'unconfirmed',
+  rsvp_notes TEXT DEFAULT '',
+  rsvp_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  CONSTRAINT unique_invitation_per_meeting UNIQUE(meeting_id, teacher_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_smp_invitations_meeting ON smp_invitations (meeting_id);
+CREATE INDEX IF NOT EXISTS idx_smp_invitations_teacher ON smp_invitations (teacher_id);
+CREATE INDEX IF NOT EXISTS idx_smp_invitations_rsvp ON smp_invitations (rsvp_status);
+
+ALTER TABLE smp_invitations ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON TABLE smp_invitations TO anon, authenticated;
+
+DROP POLICY IF EXISTS "Public All smp_invitations" ON smp_invitations;
+CREATE POLICY "Public All smp_invitations" ON smp_invitations FOR ALL USING (true) WITH CHECK (true);
 `;
