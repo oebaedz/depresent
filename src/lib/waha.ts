@@ -9,8 +9,140 @@ export const DEFAULT_WAHA_CONFIG: WahaConfig = {
   auto_notify_on_scan: true,
   message_template_scan: 'Halo Bpk/Ibu *{nama}*, presensi kehadiran kegiatan/rapat *{rapat}* berhasil dicatat pada pukul *{jam} WIB* (Status: *{status}*). Terima kasih.',
   message_template_reminder: 'Pemberitahuan Sekolah:\nRapat/Kegiatan: *{rapat}*\nTanggal: {tanggal} pukul {jam} WIB\nRuang: {ruang}\nPemimpin: {pimpinan}\n\nMohon Bapak/Ibu hadir tepat waktu dan membawa ID Card fisik untuk presensi QR. Terima kasih.',
-  message_template_recap: '📋 *REKAPITULASI KEHADIRAN RAPAT*\nAgenda: *{rapat}*\nTanggal: {tanggal} ({waktu} WIB)\nLokasi: {ruang}\n\n• Total Guru: {total} orang\n• Hadir Tepat Waktu: {hadir}\n• Terlambat: {terlambat}\n• Izin / Sakit: {izin}\n• Belum Presensi: {belum}\n\n*Persentase Kehadiran: {persen}%*\n_PresensiQR SMP_',
+  message_template_recap: '📋 *REKAPITULASI KEHADIRAN RAPAT*\nAgenda: *{rapat}*\nTanggal: {tanggal} ({waktu} WIB)\nLokasi: {ruang}\n\n• Total Guru: {total} orang\n• Hadir Tepat Waktu: {hadir}\n• Terlambat: {terlambat}\n• Izin / Sakit: {izin}\n• Belum Presensi: {belum}\n\n*Persentase Kehadiran: {persen}%*\n_dePresent SMP_',
 };
+
+export const EDGE_FUNCTION_TEMPLATE_CODE = `import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+}
+
+// ===============================
+// NORMALIZE WHATSAPP TARGET
+// ===============================
+function normalizeTarget(target: string): string {
+  let value = String(target).trim()
+
+  // Kalau sudah berupa chatId WAHA, jangan diubah.
+  if (
+    value.endsWith("@c.us") ||
+    value.endsWith("@g.us") ||
+    value.endsWith("@lid") ||
+    value.endsWith("@newsletter")
+  ) {
+    return value
+  }
+
+  // Hilangkan karakter selain angka dan +
+  value = value.replace(/[^\\d+]/g, "")
+
+  // +628123456789 → 628123456789
+  if (value.startsWith("+")) {
+    value = value.substring(1)
+  }
+
+  // 08123456789 → 628123456789
+  if (value.startsWith("08")) {
+    value = "62" + value.substring(1)
+  }
+
+  // 8123456789 → 628123456789
+  if (value.startsWith("8")) {
+    value = "62" + value
+  }
+
+  return \`\${value}@c.us\`
+}
+
+serve(async (req) => {
+  // CORS PREFLIGHT
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders })
+  }
+
+  try {
+    // AMBIL DATA: target dan message wajib diisi
+    const { target, message } = await req.json()
+
+    if (!target || !message) {
+      return new Response(
+        JSON.stringify({
+          error: "target dan message wajib diisi",
+        }),
+        {
+          status: 400,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      )
+    }
+
+    // ENVIRONMENT VARIABLES
+    const WAHA_URL = Deno.env.get("WAHA_URL")
+    const WAHA_API_KEY = Deno.env.get("WAHA_API_KEY")
+    const WAHA_SESSION = Deno.env.get("WAHA_SESSION") || "default"
+
+    if (!WAHA_URL || !WAHA_API_KEY) {
+      throw new Error("WAHA_URL atau WAHA_API_KEY belum diset")
+    }
+
+    // NORMALIZE TARGET
+    const chatId = normalizeTarget(target)
+
+    // REQUEST KE WAHA (/api/sendText)
+    const response = await fetch(\`\${WAHA_URL}/api/sendText\`, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-Api-Key": WAHA_API_KEY,
+      },
+      body: JSON.stringify({
+        session: WAHA_SESSION,
+        chatId: chatId,
+        text: message,
+      }),
+    })
+
+    const result = await response.json()
+
+    return new Response(
+      JSON.stringify({
+        success: response.ok,
+        target: chatId,
+        waha: result,
+      }),
+      {
+        status: response.status,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    )
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    )
+  }
+})
+`;
 
 export function getWahaConfig(): WahaConfig {
   if (typeof window === 'undefined') return DEFAULT_WAHA_CONFIG;
@@ -64,95 +196,264 @@ export function addWahaLog(log: Omit<WahaLog, 'id' | 'timestamp'>) {
   localStorage.setItem(STORAGE_KEY_WAHA_LOGS, JSON.stringify(updated));
 }
 
+/**
+ * Mengirim pesan notifikasi WhatsApp melalui Supabase Edge Function WAHA
+ * Payload strictly matches: { target, message }
+ */
 export async function invokeWahaNotification(params: {
   action: 'check_in_confirmation' | 'meeting_reminder' | 'group_recap';
-  recipient?: string; // phone number or groupId
+  recipient?: string; // target WhatsApp number or group chatId
   message: string;
   metadata?: Record<string, unknown>;
 }): Promise<{ success: boolean; message: string; responseData?: unknown }> {
   const config = getWahaConfig();
   if (!config.is_enabled) {
-    return { success: false, message: 'Notifikasi WAHA dinonaktifkan di pengaturan.' };
+    return { success: false, message: 'Notifikasi WhatsApp dinonaktifkan di pengaturan WAHA.' };
   }
 
-  const supabase = getSupabase();
-  const { url, anonKey } = getSupabaseCredentials();
+  const rawTarget = String(params.recipient || '').trim();
+  const rawMessage = String(params.message || '').trim();
 
-  // Clean phone number (e.g. 0812... -> 62812...)
-  let target = params.recipient || '';
-  if (target.startsWith('0')) {
-    target = '62' + target.substring(1);
+  const logType =
+    params.action === 'check_in_confirmation'
+      ? 'scan_confirm'
+      : params.action === 'meeting_reminder'
+      ? 'reminder'
+      : 'group_recap';
+
+  // 1. Strict validation matching Edge Function requirements: { target, message }
+  if (!rawTarget) {
+    const errorMsg = 'Nomor tujuan WhatsApp (target) belum diisi.';
+    addWahaLog({
+      type: logType,
+      target: '(Kosong)',
+      status: 'failed',
+      message: rawMessage || '(Pesan kosong)',
+      response: 'Error validasi: target wajib diisi',
+    });
+    return { success: false, message: errorMsg };
   }
-  target = target.replace(/[^0-9@.c_gus]/g, '');
 
+  if (!rawMessage) {
+    const errorMsg = 'Pesan WhatsApp (message) belum diisi.';
+    addWahaLog({
+      type: logType,
+      target: rawTarget,
+      status: 'failed',
+      message: '(Pesan kosong)',
+      response: 'Error validasi: message wajib diisi',
+    });
+    return { success: false, message: errorMsg };
+  }
+
+  // 2. Build payload strictly providing { target, message } with compatibility aliases
   const payload = {
+    target: rawTarget,
+    message: rawMessage,
+    // Complementary aliases
+    chatId: rawTarget,
+    phone: rawTarget,
     action: params.action,
-    chatId: target.includes('@') ? target : `${target}@c.us`,
-    phone: target,
-    message: params.message,
     metadata: params.metadata || {},
     timestamp: new Date().toISOString(),
   };
 
+  const supabase = getSupabase();
+  const { url, anonKey } = getSupabaseCredentials();
+
+  // 3. Simulated fallback if Supabase is not connected
   if (!supabase || !url) {
-    // Simulated delivery for local demo/testing
     console.info('[WAHA Simulator] Edge function payload:', payload);
     addWahaLog({
-      type: params.action === 'check_in_confirmation' ? 'scan_confirm' : params.action === 'meeting_reminder' ? 'reminder' : 'group_recap',
-      target: target || 'Simulasi',
+      type: logType,
+      target: rawTarget,
       status: 'simulated',
-      message: params.message,
-      response: 'Mode simulasi: Supabase belum terhubung. Pesan siap dikirim saat Edge Function dihubungkan.',
+      message: rawMessage,
+      response: 'Mode simulasi: Supabase belum terhubung. Pesan siap dikirim saat kredensial Supabase dihubungkan.',
     });
     return {
       success: true,
-      message: 'Notifikasi disimulasikan (Supabase belum terhubung). Pesan tercatat di log.',
+      message: 'Notifikasi disimulasikan (Supabase belum terhubung). Log tercatat.',
       responseData: { simulated: true, payload },
     };
   }
 
-  try {
-    const functionName = config.edge_function_name.trim() || 'waha-notify';
-    const { data, error } = await supabase.functions.invoke(functionName, {
-      body: payload,
-    });
+  // 4. Send request to Supabase Edge Function
+  const functionName = config.edge_function_name.trim() || 'waha-notify';
 
-    if (error) {
-      console.warn('Edge function invoke error:', error);
-      addWahaLog({
-        type: params.action === 'check_in_confirmation' ? 'scan_confirm' : params.action === 'meeting_reminder' ? 'reminder' : 'group_recap',
-        target,
-        status: 'failed',
-        message: params.message,
-        response: error.message || 'Error Edge Function',
+  try {
+    let data: any = null;
+    let invokeError: any = null;
+
+    try {
+      const res = await supabase.functions.invoke(functionName, {
+        body: payload,
       });
+      data = res.data;
+      invokeError = res.error;
+    } catch (invErr) {
+      invokeError = invErr;
+    }
+
+    // Handle invocation error
+    if (invokeError) {
+      let detailMsg = invokeError.message || 'Error memanggil Edge Function';
+      try {
+        if ('context' in invokeError && (invokeError as any).context) {
+          const resBody = await (invokeError as any).context.json();
+          if (resBody?.error) {
+            detailMsg = resBody.error;
+          } else if (resBody?.message) {
+            detailMsg = resBody.message;
+          }
+        }
+      } catch {
+        // ignore json parse error on context
+      }
+
+      // Try direct HTTP fetch fallback to edge function endpoint
+      if (url && anonKey) {
+        try {
+          const directEndpoint = `${url.replace(/\/$/, '')}/functions/v1/${functionName}`;
+          const directFetch = await fetch(directEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${anonKey}`,
+              apikey: anonKey,
+            },
+            body: JSON.stringify(payload),
+          });
+
+          const directJson = await directFetch.json().catch(() => null);
+
+          if (directFetch.ok && directJson && directJson.success !== false && !directJson.error) {
+            addWahaLog({
+              type: logType,
+              target: directJson.target || rawTarget,
+              status: 'success',
+              message: rawMessage,
+              response: typeof directJson.waha === 'object' ? JSON.stringify(directJson.waha) : JSON.stringify(directJson),
+            });
+            return {
+              success: true,
+              message: `Pesan WhatsApp berhasil dikirim ke ${directJson.target || rawTarget}!`,
+              responseData: directJson,
+            };
+          } else if (directJson && (directJson.error || directJson.success === false)) {
+            const errReason = directJson.error || directJson.waha?.message || detailMsg;
+            addWahaLog({
+              type: logType,
+              target: rawTarget,
+              status: 'failed',
+              message: rawMessage,
+              response: `Error: ${errReason}`,
+            });
+            return {
+              success: false,
+              message: `Gagal mengirim WhatsApp: ${errReason}`,
+              responseData: directJson,
+            };
+          }
+        } catch {
+          // direct fetch also failed
+        }
+      }
+
+      addWahaLog({
+        type: logType,
+        target: rawTarget,
+        status: 'failed',
+        message: rawMessage,
+        response: `Error Edge Function: ${detailMsg}`,
+      });
+
       return {
         success: false,
-        message: `Edge function '${functionName}' merespon dengan error: ${error.message}`,
+        message: `Edge function '${functionName}' gagal: ${detailMsg}`,
+      };
+    }
+
+    // Inspect returned data from Edge Function
+    if (data) {
+      // 1. Edge function returned error: e.g. "target dan message wajib diisi" or "WAHA_URL atau WAHA_API_KEY belum diset"
+      if (data.error) {
+        addWahaLog({
+          type: logType,
+          target: rawTarget,
+          status: 'failed',
+          message: rawMessage,
+          response: `Error: ${data.error}`,
+        });
+        return {
+          success: false,
+          message: `Gagal mengirim WhatsApp: ${data.error}`,
+          responseData: data,
+        };
+      }
+
+      // 2. Edge function returned { success: false, ... }
+      if (data.success === false) {
+        let wahaErrorMsg = 'WAHA mengembalikan status gagal';
+        if (data.waha) {
+          if (typeof data.waha === 'string') {
+            wahaErrorMsg = data.waha;
+          } else if (typeof data.waha === 'object') {
+            wahaErrorMsg = data.waha.message || data.waha.error || JSON.stringify(data.waha);
+          }
+        } else if (data.error) {
+          wahaErrorMsg = data.error;
+        }
+
+        addWahaLog({
+          type: logType,
+          target: data.target || rawTarget,
+          status: 'failed',
+          message: rawMessage,
+          response: `WAHA Error: ${wahaErrorMsg}`,
+        });
+        return {
+          success: false,
+          message: `Pengiriman WAHA gagal: ${wahaErrorMsg}`,
+          responseData: data,
+        };
+      }
+
+      // 3. Success response from Edge Function
+      addWahaLog({
+        type: logType,
+        target: data.target || rawTarget,
+        status: 'success',
+        message: rawMessage,
+        response: typeof data.waha === 'object' ? JSON.stringify(data.waha) : JSON.stringify(data || 'Terkirim ke WAHA'),
+      });
+
+      return {
+        success: true,
+        message: `Pesan WhatsApp berhasil dikirim ke ${data.target || rawTarget}!`,
+        responseData: data,
       };
     }
 
     addWahaLog({
-      type: params.action === 'check_in_confirmation' ? 'scan_confirm' : params.action === 'meeting_reminder' ? 'reminder' : 'group_recap',
-      target,
-      status: 'success',
-      message: params.message,
-      response: JSON.stringify(data || 'Terkirim via WAHA'),
+      type: logType,
+      target: rawTarget,
+      status: 'failed',
+      message: rawMessage,
+      response: 'Tidak ada data respon dari Edge Function.',
     });
-
     return {
-      success: true,
-      message: 'Pesan notifikasi WAHA berhasil dikirim melalui Supabase Edge Function!',
-      responseData: data,
+      success: false,
+      message: 'Tidak ada data respon dari Edge Function.',
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     addWahaLog({
-      type: params.action === 'check_in_confirmation' ? 'scan_confirm' : params.action === 'meeting_reminder' ? 'reminder' : 'group_recap',
-      target,
+      type: logType,
+      target: rawTarget,
       status: 'failed',
-      message: params.message,
-      response: errorMsg,
+      message: rawMessage,
+      response: `Exception: ${errorMsg}`,
     });
     return {
       success: false,

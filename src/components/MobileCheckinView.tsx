@@ -198,7 +198,7 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
     // 2. Trigger WAHA notification
     const wahaConfig = getWahaConfig();
-    let waNotice = 'Notifikasi WA dinonaktifkan';
+    let waNotice = !wahaConfig.is_enabled ? 'Notifikasi WA dinonaktifkan' : !selectedTeacher.phone_wa ? 'No. WA guru belum terdaftar' : '';
     if (wahaConfig.is_enabled && wahaConfig.auto_notify_on_scan && selectedTeacher.phone_wa) {
       const msg = wahaConfig.message_template_scan
         .replace('{nama}', selectedTeacher.name)
@@ -206,13 +206,13 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
         .replace('{jam}', timeStr)
         .replace('{status}', statusLabel);
 
-      invokeWahaNotification({
+      const res = await invokeWahaNotification({
         action: 'check_in_confirmation',
         recipient: selectedTeacher.phone_wa,
         message: msg,
         metadata: { meeting_id: meeting.id, teacher_id: selectedTeacher.id },
       });
-      waNotice = 'Konfirmasi WhatsApp otomatis telah dikirim';
+      waNotice = res.success ? 'Konfirmasi WhatsApp otomatis telah terkirim!' : `Status WA: ${res.message}`;
     }
 
     setCheckinDone({

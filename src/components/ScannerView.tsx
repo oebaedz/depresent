@@ -148,10 +148,28 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
           teacher_id: teacher.id,
         },
       }).then((res) => {
-        setLastScanned((prev) => (prev ? { ...prev, waStatus: res.success ? 'Terkirim via WhatsApp' : 'Gagal WA' } : null));
+        setLastScanned((prev) =>
+          prev
+            ? {
+                ...prev,
+                waStatus: res.success ? 'Terkirim via WhatsApp' : `Gagal WA: ${res.message}`,
+              }
+            : null
+        );
       });
     } else {
-      setLastScanned((prev) => (prev ? { ...prev, waStatus: teacher.phone_wa ? 'WA dimatikan' : 'No WA kosong' } : null));
+      setLastScanned((prev) =>
+        prev
+          ? {
+              ...prev,
+              waStatus: !wahaConfig.is_enabled
+                ? 'WA dinonaktifkan'
+                : !teacher.phone_wa
+                ? 'No. WA guru kosong'
+                : 'Auto-WA scan mati',
+            }
+          : null
+      );
     }
   }, [selectedMeeting, onAttendanceRecorded]);
 
