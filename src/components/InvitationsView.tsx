@@ -349,18 +349,17 @@ _Aplikasi dePresent made by Mr Zee_`;
     if (!currentMeeting) return;
 
     const rows: (string | number)[][] = [
-      ['BUKU EKSPEDISI DAN TANDA TERIMA SURAT UNDANGAN DINAS'],
+      ['BUKU EKSPEDISI DAN TANDA TERIMA SURAT UNDANGAN'],
       [schoolProfile.school_name || 'SMP MUHAMMADIYAH 1 GOMBONG'],
       [schoolProfile.address || ''],
       [],
-      ['Agenda Rapat', currentMeeting.title],
-      ['Nomor Surat Dinas', letterNumber.trim()],
-      ['Kategori', currentMeeting.category],
+      ['Agenda Kegiatan', currentMeeting.title],
+      ['Nomor Surat', letterNumber.trim() || '-'],
       ['Hari / Tanggal', currentMeeting.meeting_date],
-      ['Waktu', `${currentMeeting.start_time} - ${currentMeeting.end_time} WIB`],
+      ['Waktu Pelaksanaan', `${currentMeeting.start_time} - ${currentMeeting.end_time} WIB`],
       ['Ruangan', currentMeeting.room],
       ['Pimpinan Rapat', currentMeeting.leader_name],
-      ['Tanggal Pengiriman', dispatchDate],
+      ['Jumlah Penerima', `${meetingTeachers.length} Orang Guru/Pegawai`],
       [],
       ['REKAPITULASI EKSPEDISI'],
       ['Total Undangan', stats.total],
@@ -373,16 +372,16 @@ _Aplikasi dePresent made by Mr Zee_`;
       [
         'No',
         'Nama Guru / Pegawai',
-        'NIY / NIP',
+        'NIY',
         'Jabatan / Mapel',
         'Kelompok',
         'No. WhatsApp',
         'Tgl Kirim',
         'Media',
         'Status Kirim',
-        'Konfirmasi Kehadiran',
+        'Konfirmasi WA',
         'Waktu Konfirmasi',
-        'Catatan / Alasan',
+        'Keterangan / Catatan',
       ],
     ];
 
@@ -395,12 +394,12 @@ _Aplikasi dePresent made by Mr Zee_`;
           ? 'Izin'
           : inv?.rsvp_status === 'sick'
           ? 'Sakit'
-          : 'Belum Konfirmasi';
+          : '-';
 
       rows.push([
         idx + 1,
         teacher.name,
-        teacher.niy || teacher.nip || '-',
+        teacher.niy || '-',
         teacher.role_title,
         teacher.teacher_group || 'Guru Mapel',
         teacher.phone_wa || '-',
@@ -409,7 +408,7 @@ _Aplikasi dePresent made by Mr Zee_`;
         inv?.dispatch_status === 'sent' ? 'Terkirim' : 'Pending',
         rsvpLabel,
         inv?.rsvp_at ? new Date(inv.rsvp_at).toLocaleString('id-ID') : '-',
-        inv?.rsvp_notes || '',
+        inv?.rsvp_notes || '-',
       ]);
     });
 
@@ -719,7 +718,7 @@ _Aplikasi dePresent made by Mr Zee_`;
                             {teacher.name}
                           </div>
                           <div className="text-[11px] text-slate-400 dark:text-teal-300/70 font-mono">
-                            NIY: {teacher.niy || teacher.nip || '-'}
+                            NIY: {teacher.niy || '-'}
                           </div>
                         </td>
                         <td className="py-3 px-3.5">
@@ -858,22 +857,22 @@ _Aplikasi dePresent made by Mr Zee_`;
         {/* Title */}
         <div className="text-center mb-4">
           <h2 className="text-base font-black uppercase underline tracking-wide">
-            BUKU EKSPEDISI DAN TANDA TERIMA SURAT UNDANGAN DINAS
+            BUKU EKSPEDISI DAN TANDA TERIMA SURAT UNDANGAN
           </h2>
           <p className="text-xs font-semibold mt-0.5">
             Agenda Kegiatan: {currentMeeting?.title}
           </p>
         </div>
 
-        {/* Meeting Metadata (Menampilkan 1 Nomor Surat untuk seluruh kegiatan) */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-4 border border-black p-3 bg-gray-50">
+        {/* Meeting Metadata (Tanpa kategori rapat dan tanpa tanggal pengiriman) */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-4 border border-black p-3 bg-gray-50">
           <div>
             <span className="font-bold inline-block w-28">Nomor Surat</span>
             <span className="font-mono font-bold">: {letterNumber.trim() || '-'}</span>
           </div>
           <div>
-            <span className="font-bold inline-block w-28">Kategori Rapat</span>
-            <span>: {currentMeeting?.category}</span>
+            <span className="font-bold inline-block w-28">Pimpinan Rapat</span>
+            <span>: {currentMeeting?.leader_name}</span>
           </div>
           <div>
             <span className="font-bold inline-block w-28">Hari, Tanggal</span>
@@ -882,72 +881,65 @@ _Aplikasi dePresent made by Mr Zee_`;
             </span>
           </div>
           <div>
-            <span className="font-bold inline-block w-28">Pimpinan Rapat</span>
-            <span>: {currentMeeting?.leader_name}</span>
+            <span className="font-bold inline-block w-28">Ruang / Tempat</span>
+            <span>: {currentMeeting?.room}</span>
           </div>
           <div>
             <span className="font-bold inline-block w-28">Waktu Pelaksanaan</span>
             <span>: {currentMeeting?.start_time} - {currentMeeting?.end_time} WIB</span>
           </div>
           <div>
-            <span className="font-bold inline-block w-28">Ruang / Tempat</span>
-            <span>: {currentMeeting?.room}</span>
-          </div>
-          <div>
             <span className="font-bold inline-block w-28">Jumlah Penerima</span>
             <span>: {meetingTeachers.length} Orang Guru/Pegawai</span>
           </div>
-          <div>
-            <span className="font-bold inline-block w-28">Tgl Pengiriman</span>
-            <span>: {dispatchDate}</span>
-          </div>
         </div>
 
-        {/* Official Expedition Table - Tanpa Kolom Nomor Surat per peserta */}
+        {/* Official Expedition Table - Nama & NIY digabung, tanpa NIP, kolom TTD ganti Konfirmasi WA */}
         <table className="w-full text-[10px] border-collapse border border-black mb-6">
           <thead>
             <tr className="bg-gray-100 border-b border-black text-center font-bold">
               <th className="border border-black py-1.5 px-1 w-8">No</th>
-              <th className="border border-black py-1.5 px-2">Nama Guru / Pegawai</th>
-              <th className="border border-black py-1.5 px-2 w-28">NIY / NIP</th>
-              <th className="border border-black py-1.5 px-2">Jabatan / Mapel</th>
-              <th className="border border-black py-1.5 px-1 w-24">Media & Tgl Kirim</th>
-              <th className="border border-black py-1.5 px-1 w-24">Status RSVP</th>
-              <th className="border border-black py-1.5 px-2 w-36">Tanda Tangan / Paraf Bukti Terima</th>
+              <th className="border border-black py-1.5 px-2 text-left">Nama Guru & NIY</th>
+              <th className="border border-black py-1.5 px-2 text-left w-36">Jabatan / Mapel</th>
+              <th className="border border-black py-1.5 px-1 w-24 text-center">Media & Tgl Kirim</th>
+              <th className="border border-black py-1.5 px-2 w-28 text-center">Konfirmasi WA</th>
+              <th className="border border-black py-1.5 px-2 w-32 text-left">Keterangan</th>
             </tr>
           </thead>
           <tbody>
             {meetingTeachers.map((teacher, idx) => {
               const inv = currentMeetingInvitationsMap.get(teacher.id);
-              const rsvpLabel =
-                inv?.rsvp_status === 'attending'
-                  ? 'Akan Hadir'
-                  : inv?.rsvp_status === 'permission'
-                  ? 'Izin'
-                  : inv?.rsvp_status === 'sick'
-                  ? 'Sakit'
-                  : 'Belum Konfirmasi';
+              const isConfirmed = inv?.rsvp_status && inv.rsvp_status !== 'unconfirmed';
 
               return (
                 <tr key={teacher.id} className="border-b border-black">
                   <td className="border border-black text-center py-1.5 font-bold">{idx + 1}</td>
-                  <td className="border border-black px-1.5 py-1.5 font-bold">{teacher.name}</td>
-                  <td className="border border-black px-1.5 py-1.5 font-mono">{teacher.niy || teacher.nip || '-'}</td>
-                  <td className="border border-black px-1.5 py-1.5">{teacher.role_title}</td>
+                  <td className="border border-black px-2 py-1.5">
+                    <div className="font-bold leading-tight">{teacher.name}</div>
+                    <div className="text-[9px] text-gray-700 font-mono">NIY: {teacher.niy || '-'}</div>
+                  </td>
+                  <td className="border border-black px-2 py-1.5">{teacher.role_title}</td>
                   <td className="border border-black text-center py-1.5">
                     {inv?.dispatch_channel === 'whatsapp' ? 'WhatsApp' : 'Fisik'}<br />
                     <span className="text-[9px] text-gray-600">{inv?.dispatch_date || dispatchDate}</span>
                   </td>
-                  <td className="border border-black text-center py-1.5 font-semibold">
-                    {rsvpLabel}
+                  <td className="border border-black text-center py-1.5 px-2 font-semibold">
+                    {isConfirmed ? (
+                      inv.rsvp_status === 'attending' ? (
+                        <span>Akan Hadir</span>
+                      ) : inv.rsvp_status === 'permission' ? (
+                        <span>Izin</span>
+                      ) : inv.rsvp_status === 'sick' ? (
+                        <span>Sakit</span>
+                      ) : (
+                        '-'
+                      )
+                    ) : (
+                      <span className="font-normal text-gray-500">-</span>
+                    )}
                   </td>
-                  <td className="border border-black py-1.5 px-2 h-9 align-middle">
-                    <div className="flex items-center justify-between text-gray-500">
-                      <span className="font-bold text-[9px]">{idx + 1}.</span>
-                      <span className="text-[8px] text-gray-400">
-                        {inv?.rsvp_status === 'attending' ? '(Konfirmasi WA)' : '..................'}
-                      </span>
-                    </div>
+                  <td className="border border-black py-1.5 px-2 text-[9px] text-gray-700">
+                    {inv?.rsvp_notes || '-'}
                   </td>
                 </tr>
               );
@@ -955,46 +947,32 @@ _Aplikasi dePresent made by Mr Zee_`;
           </tbody>
         </table>
 
-        {/* 3-Column Official Signature Block */}
-        <div className="break-inside-avoid mt-8 grid grid-cols-3 text-center text-xs">
+        {/* 2-Column Official Signature Block (Tanpa TTD Pimpinan Rapat, Tanpa NIP, Nama Tidak All Caps) */}
+        <div className="break-inside-avoid mt-8 grid grid-cols-2 text-center text-xs px-8">
           {/* Petugas Ekspedisi */}
           <div className="flex flex-col justify-between h-28">
             <p>
               Petugas Ekspedisi / TU,
             </p>
             <div>
-              <p className="font-bold underline uppercase">( ............................................ )</p>
-              <p className="text-[10px] text-gray-600">NIP / NIY: -</p>
-            </div>
-          </div>
-
-          {/* Pimpinan Rapat */}
-          <div className="flex flex-col justify-between h-28">
-            <p>
-              Pimpinan Rapat,
-            </p>
-            <div>
-              <p className="font-bold underline uppercase">
-                {currentMeeting?.leader_name || '( ............................................ )'}
-              </p>
-              <p className="text-[10px] text-gray-600">
-                NIY: {currentMeeting?.leader_niy || '-'}
-              </p>
+              <p className="font-bold underline">( ............................................ )</p>
+              <p className="text-[10px] text-gray-700">NIY: -</p>
             </div>
           </div>
 
           {/* Kepala Sekolah */}
           <div className="flex flex-col justify-between h-28">
             <div>
+              <p>{schoolProfile.city || 'Gombong'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
               <p>Mengetahui,</p>
               <p>Kepala Sekolah,</p>
             </div>
             <div>
-              <p className="font-bold underline uppercase">
+              <p className="font-bold underline">
                 {schoolProfile.headmaster_name || '( ............................................ )'}
               </p>
-              <p className="text-[10px] text-gray-600">
-                NIY: {schoolProfile.headmaster_niy || schoolProfile.headmaster_nip || '-'}
+              <p className="text-[10px] text-gray-700">
+                NIY: {schoolProfile.headmaster_niy || '-'}
               </p>
             </div>
           </div>
