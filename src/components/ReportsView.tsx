@@ -47,7 +47,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const terlambat = meetingAttendances.filter((a) => a.status === 'terlambat').length;
   const izin = meetingAttendances.filter((a) => a.status === 'izin').length;
   const sakit = meetingAttendances.filter((a) => a.status === 'sakit').length;
-  const belum = Math.max(0, total - (hadir + terlambat + izin + sakit));
+  const tidakHadir = Math.max(0, total - (hadir + terlambat + izin + sakit));
   const rate = total > 0 ? Math.round(((hadir + terlambat) / total) * 100) : 0;
 
   // Print Handler
@@ -76,12 +76,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       ['Notulis Rapat:', (currentMeeting.secretary_name || '-') + (currentMeeting.secretary_niy ? ` (NIY. ${currentMeeting.secretary_niy})` : '')],
       [],
       ['RINGKASAN KEHADIRAN'],
-      ['Total Guru Terdaftar:', total],
+      ['Total Pegawai Terdaftar:', total],
       ['Hadir Tepat Waktu:', hadir],
       ['Hadir Terlambat:', terlambat],
       ['Izin Dinas:', izin],
       ['Sakit:', sakit],
-      ['Tidak Hadir (Alpa):', meetingAttendances.filter((a) => a.status === 'alpa').length + (currentMeeting.status === 'completed' ? belum : 0)],
+      ['Tidak Hadir:', tidakHadir],
       ['Persentase Kehadiran:', `${rate}%`],
       [],
       ['Mengetahui,', 'Pimpinan Rapat,', 'Notulis Rapat,'],
@@ -100,15 +100,14 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       ],
     ];
 
-    // 2. Sheet Rincian Peserta
+    // 2. Sheet Rincian Peserta (Kolom Nama Pegawai satukan Nama & NIY)
     const detailHeaders = [
       'No',
-      'NIY / NUPTK',
-      'Nama Guru',
-      'Pangkat / Status',
+      'Nama Pegawai',
       'Jabatan / Mata Pelajaran',
+      'Pangkat / Status',
       'Status Kehadiran',
-      'Waktu Presensi',
+      'Jam Hadir',
       'Verifikasi',
       'Catatan / Keterangan',
     ];
@@ -126,12 +125,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
       return [
         idx + 1,
-        t.niy || t.nip || '-',
-        t.name,
-        t.rank_group,
+        `${t.name} (NIY: ${t.niy || t.nip || '-'})`,
         t.role_title,
+        t.rank_group,
         statusText,
-        att ? new Date(att.check_in_time).toLocaleTimeString('id-ID') : '-',
+        att ? new Date(att.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-',
         isPresent ? 'Verified' : '-',
         att?.notes || '-',
       ];
@@ -290,8 +288,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <thead>
               <tr className="bg-slate-100 border-b border-slate-400 text-slate-900 font-bold uppercase text-[10px] tracking-wider text-center">
                 <th className="py-2 px-2 border-r border-slate-400 w-10">No</th>
-                <th className="py-2 px-3 border-r border-slate-400 text-left">Nama Guru & Pegawai</th>
-                <th className="py-2 px-3 border-r border-slate-400 text-left">NIY</th>
+                <th className="py-2 px-3 border-r border-slate-400 text-left">Nama Pegawai</th>
                 <th className="py-2 px-3 border-r border-slate-400 text-left">Jabatan</th>
                 <th className="py-2 px-2 border-r border-slate-400 w-24">Jam Hadir</th>
                 <th className="py-2 px-2 border-r border-slate-400 w-24">Status</th>
@@ -311,13 +308,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                       {index + 1}
                     </td>
 
-                    <td className="py-2 px-3 border-r border-slate-300 font-bold text-slate-900">
-                      {t.name}
-                    </td>
-
-                    {/* Pure NIY Column - Status moved to Jabatan column */}
-                    <td className="py-2 px-3 border-r border-slate-300 font-mono text-[11px] font-bold text-slate-900 whitespace-nowrap">
-                      {t.niy || t.nip || '-'}
+                    {/* Nama Pegawai (Nama & NIY digabung) */}
+                    <td className="py-2 px-3 border-r border-slate-300">
+                      <div className="font-bold text-slate-900 leading-tight">{t.name}</div>
+                      <div className="text-[10px] text-slate-600 font-mono">NIY: {t.niy || t.nip || '-'}</div>
                     </td>
 
                     <td className="py-2 px-3 border-r border-slate-300 text-slate-800 text-[11px]">
@@ -328,7 +322,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     {/* Explicit high-contrast text-slate-900 so check-in time is clearly visible in both light & dark mode */}
                     <td className="py-2 px-2 border-r border-slate-300 text-center font-mono font-bold text-slate-900 text-[11px] tabular-nums">
                       {att ? (
-                        <span>{new Date(att.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span>{new Date(att.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                       ) : (
                         <span className="text-slate-400 font-normal">-</span>
                       )}
@@ -379,9 +373,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <h4 className="font-bold text-slate-900 mb-2 uppercase text-[11px] tracking-wide">
             Rekapitulasi Kehadiran Peserta:
           </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-slate-800 font-medium">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-slate-800 font-medium">
             <div>
-              Total Guru: <strong className="font-mono text-slate-900">{total}</strong> orang
+              Total Pegawai: <strong className="font-mono text-slate-900">{total}</strong> orang
             </div>
             <div>
               Hadir Tepat: <strong className="font-mono text-emerald-800 font-bold">{hadir}</strong> orang
@@ -391,6 +385,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </div>
             <div>
               Izin / Sakit: <strong className="font-mono text-blue-800 font-bold">{izin + sakit}</strong> orang
+            </div>
+            <div>
+              Tidak Hadir: <strong className="font-mono text-red-700 font-bold">{tidakHadir}</strong> orang
             </div>
             <div>
               Persentase: <strong className="font-mono text-slate-900 font-bold">{rate}%</strong>

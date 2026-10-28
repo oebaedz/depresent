@@ -17,12 +17,17 @@ import {
   User,
   HeartPulse,
   Save,
-  Clock
+  Clock,
+  RefreshCw,
+  BellRing,
+  Settings2,
+  X,
+  FileEdit,
 } from 'lucide-react';
-import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher } from '../types';
+import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher, WahaConfig } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
-import { saveBatchInvitations, saveInvitation } from '../lib/storage';
-import { invokeWahaNotification } from '../lib/waha';
+import { saveBatchInvitations, saveInvitation, saveMeeting, sortMeetingsClosestFirst } from '../lib/storage';
+import { DEFAULT_WAHA_CONFIG, getWahaConfig, invokeWahaNotification, saveWahaConfig } from '../lib/waha';
 
 interface InvitationsViewProps {
   meetings: Meeting[];
@@ -39,29 +44,45 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
   onRefreshInvitations,
   schoolProfile,
 }) => {
-  const [selectedMeetingId, setSelectedMeetingId] = useState<string>(meetings[0]?.id || '');
+  // Urutkan rapat: yang terdekat yang akan dilaksanakan muncul di urutan teratas
+  const sortedMeetingsList = useMemo(() => sortMeetingsClosestFirst(meetings), [meetings]);
+  const [selectedMeetingId, setSelectedMeetingId] = useState<string>(() => sortedMeetingsList[0]?.id || meetings[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRsvp, setFilterRsvp] = useState<string>('all');
   const [isSendingBulk, setIsSendingBulk] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isSendingRechatBulk, setIsSendingRechatBulk] = useState(false);
+  const [rechatProgress, setRechatProgress] = useState<{ current: number; total: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Sending indicator per teacher row (loading effect)
+  const [sendingTeacherId, setSendingTeacherId] = useState<string | null>(null);
+  const [sendingType, setSendingType] = useState<'invitation' | 'rechat' | null>(null);
+
+  // Template Editor Modal State
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [wahaConfig, setWahaConfig] = useState<WahaConfig>(() => getWahaConfig());
 
   // 1 Nomor surat untuk 1 kegiatan (sama untuk seluruh peserta rapat)
   const [letterNumber, setLetterNumber] = useState<string>('421.3/048/SMP.M.1/X/2026');
   const [dispatchDate, setDispatchDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
-  const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || meetings[0];
+  const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || sortedMeetingsList[0] || meetings[0];
 
-  // Sync letter number from existing invitations of this meeting
+  // Sync letter number from current meeting record or existing invitations of this meeting
   useEffect(() => {
     if (!currentMeeting) return;
-    const inv = invitations.find(
-      (i) => i.meeting_id === currentMeeting.id && i.letter_number && i.letter_number !== '-'
-    );
-    if (inv?.letter_number) {
-      setLetterNumber(inv.letter_number);
-      if (inv.dispatch_date) {
-        setDispatchDate(inv.dispatch_date);
+    if (currentMeeting.letter_number && currentMeeting.letter_number !== '-') {
+      setLetterNumber(currentMeeting.letter_number);
+    } else {
+      const inv = invitations.find(
+        (i) => i.meeting_id === currentMeeting.id && i.letter_number && i.letter_number !== '-'
+      );
+      if (inv?.letter_number) {
+        setLetterNumber(inv.letter_number);
+        if (inv.dispatch_date) {
+          setDispatchDate(inv.dispatch_date);
+        }
       }
     }
   }, [currentMeeting, invitations]);
@@ -121,12 +142,19 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     return { total, sentCount, attendingCount, permissionCount, sickCount, unconfirmedCount };
   }, [meetingTeachers, currentMeetingInvitationsMap]);
 
-  // Apply single letter number to all teachers for this meeting
+  // Apply single letter number to all teachers for this meeting and persist in DB
   const handleApplyLetterNumber = async () => {
     if (!currentMeeting || !letterNumber.trim()) return;
     const cleanNum = letterNumber.trim();
-    const toSave: Invitation[] = [];
 
+    // 1. Persist directly in current meeting record (both localStorage and Supabase DB)
+    await saveMeeting({
+      ...currentMeeting,
+      letter_number: cleanNum,
+    });
+
+    // 2. Persist to all invitations for this meeting
+    const toSave: Invitation[] = [];
     meetingTeachers.forEach((teacher) => {
       const existing = currentMeetingInvitationsMap.get(teacher.id);
 
@@ -148,7 +176,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
     await saveBatchInvitations(toSave);
     onRefreshInvitations();
-    showToast(`Nomor surat "${cleanNum}" diterapkan untuk seluruh ${toSave.length} peserta rapat.`);
+    showToast(`Nomor surat "${cleanNum}" berhasil disimpan di database & diterapkan untuk seluruh ${toSave.length} peserta rapat.`);
   };
 
   // Generate personalized WhatsApp message and RSVP URL
@@ -168,78 +196,177 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     });
 
     const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
+    const cfg = getWahaConfig();
+    const template = cfg.message_template_invitation || DEFAULT_WAHA_CONFIG.message_template_invitation || '';
 
-    return `*SURAT UNDANGAN KEDINASAN*
-Nomor: ${activeLetterNum}
-Perihal: Undangan ${currentMeeting.title}
-
-Kepada Yth.
-*${teacher.name}*
-${teacher.role_title}
-di Tempat
-
-Assalamu'alaikum Wr. Wb.
-Mengharap kehadiran Bapak/Ibu pada rapat dinas dengan rincian:
-
-• Agenda: *${currentMeeting.title}*
-• Hari/Tanggal: ${dateFormatted}
-• Waktu: Pukul *${currentMeeting.start_time} - ${currentMeeting.end_time} WIB*
-• Ruangan: ${currentMeeting.room}
-• Pimpinan: ${currentMeeting.leader_name}
-
-Mohon mengisi *Konfirmasi Kehadiran (RSVP)* melalui tautan resmi berikut:
-👉 ${rsvpUrl}
-
-Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.
-Wassalamu'alaikum Wr. Wb.
-
-_Tata Usaha & Kepanitiaan ${schoolProfile.school_name}_
-_Aplikasi dePresent made by Mr Zee_`;
+    return template
+      .replace(/{no_surat}/g, activeLetterNum)
+      .replace(/{agenda}/g, currentMeeting.title)
+      .replace(/{nama}/g, teacher.name)
+      .replace(/{jabatan}/g, teacher.role_title)
+      .replace(/{tanggal}/g, dateFormatted)
+      .replace(/{jam}/g, `${currentMeeting.start_time.slice(0, 5)} - ${currentMeeting.end_time.slice(0, 5)}`)
+      .replace(/{ruang}/g, currentMeeting.room)
+      .replace(/{pimpinan}/g, currentMeeting.leader_name)
+      .replace(/{link_rsvp}/g, rsvpUrl)
+      .replace(/{nama_sekolah}/g, schoolProfile.school_name || 'SMP Muhammadiyah 1 Gombong');
   };
 
-  // Dispatch individual WhatsApp invitation
+  // Generate personalized Re-Chat follow-up message for unconfirmed teachers
+  const getPersonalizedRechatMessage = (teacher: Teacher) => {
+    const rsvpUrl = getPersonalizedUrl(teacher.id);
+    const dateFormatted = new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const cfg = getWahaConfig();
+    const template = cfg.message_template_rechat || DEFAULT_WAHA_CONFIG.message_template_rechat || '';
+
+    return template
+      .replace(/{agenda}/g, currentMeeting.title)
+      .replace(/{nama}/g, teacher.name)
+      .replace(/{jabatan}/g, teacher.role_title)
+      .replace(/{tanggal}/g, dateFormatted)
+      .replace(/{jam}/g, `${currentMeeting.start_time.slice(0, 5)} - ${currentMeeting.end_time.slice(0, 5)}`)
+      .replace(/{ruang}/g, currentMeeting.room)
+      .replace(/{pimpinan}/g, currentMeeting.leader_name)
+      .replace(/{link_rsvp}/g, rsvpUrl)
+      .replace(/{nama_sekolah}/g, schoolProfile.school_name || 'SMP Muhammadiyah 1 Gombong');
+  };
+
+  // Dispatch individual WhatsApp invitation with sending effect
   const handleSendSingleWA = async (teacher: Teacher) => {
     if (!teacher.phone_wa) {
       showToast(`Nomor WhatsApp untuk ${teacher.name} belum terdaftar.`, 'error');
       return;
     }
 
-    const existing = currentMeetingInvitationsMap.get(teacher.id);
-    const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
-    const msg = getPersonalizedMessage(teacher);
+    setSendingTeacherId(teacher.id);
+    setSendingType('invitation');
 
-    const res = await invokeWahaNotification({
-      action: 'invitation_dispatch',
-      recipient: teacher.phone_wa,
-      message: msg,
-      metadata: {
-        meetingId: currentMeeting.id,
-        teacherId: teacher.id,
-        letterNumber: activeLetterNum,
-      },
+    try {
+      const existing = currentMeetingInvitationsMap.get(teacher.id);
+      const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
+      const msg = getPersonalizedMessage(teacher);
+
+      const res = await invokeWahaNotification({
+        action: 'invitation_dispatch',
+        recipient: teacher.phone_wa,
+        message: msg,
+        metadata: {
+          meetingId: currentMeeting.id,
+          teacherId: teacher.id,
+          letterNumber: activeLetterNum,
+        },
+      });
+
+      if (res.success) {
+        const updated: Invitation = {
+          id: existing?.id || Math.random().toString(36).substring(2, 9),
+          meeting_id: currentMeeting.id,
+          teacher_id: teacher.id,
+          letter_number: activeLetterNum,
+          dispatch_date: dispatchDate,
+          dispatch_channel: 'whatsapp',
+          dispatch_status: 'sent',
+          sent_at: new Date().toISOString(),
+          rsvp_status: existing?.rsvp_status || 'unconfirmed',
+          rsvp_notes: existing?.rsvp_notes || '',
+          rsvp_at: existing?.rsvp_at,
+          created_at: existing?.created_at || new Date().toISOString(),
+        };
+        await saveInvitation(updated);
+        onRefreshInvitations();
+        showToast(`Undangan berhasil dikirimkan ke WhatsApp ${teacher.name}`);
+      } else {
+        showToast(`Gagal kirim WA ke ${teacher.name}: ${res.message}`, 'error');
+      }
+    } finally {
+      setSendingTeacherId(null);
+      setSendingType(null);
+    }
+  };
+
+  // Re-chat individual teacher who hasn't confirmed RSVP with sending effect
+  const handleSendRechatSingle = async (teacher: Teacher) => {
+    if (!teacher.phone_wa) {
+      showToast(`Nomor WhatsApp untuk ${teacher.name} belum terdaftar.`, 'error');
+      return;
+    }
+
+    setSendingTeacherId(teacher.id);
+    setSendingType('rechat');
+
+    try {
+      const msg = getPersonalizedRechatMessage(teacher);
+
+      const res = await invokeWahaNotification({
+        action: 'invitation_dispatch',
+        recipient: teacher.phone_wa,
+        message: msg,
+        metadata: {
+          meetingId: currentMeeting.id,
+          teacherId: teacher.id,
+          type: 'rechat_reminder',
+        },
+      });
+
+      if (res.success) {
+        showToast(`Pengingat re-chat RSVP berhasil dikirim ke WhatsApp ${teacher.name}`);
+      } else {
+        showToast(`Gagal kirim re-chat ke ${teacher.name}: ${res.message}`, 'error');
+      }
+    } finally {
+      setSendingTeacherId(null);
+      setSendingType(null);
+    }
+  };
+
+  // Bulk Re-Chat to all unconfirmed teachers
+  const handleSendRechatBulk = async () => {
+    const unconfirmedTeachers = meetingTeachers.filter((t) => {
+      const inv = currentMeetingInvitationsMap.get(t.id);
+      return !inv || inv.rsvp_status === 'unconfirmed';
     });
 
-    if (res.success) {
-      const updated: Invitation = {
-        id: existing?.id || Math.random().toString(36).substring(2, 9),
-        meeting_id: currentMeeting.id,
-        teacher_id: teacher.id,
-        letter_number: activeLetterNum,
-        dispatch_date: dispatchDate,
-        dispatch_channel: 'whatsapp',
-        dispatch_status: 'sent',
-        sent_at: new Date().toISOString(),
-        rsvp_status: existing?.rsvp_status || 'unconfirmed',
-        rsvp_notes: existing?.rsvp_notes || '',
-        rsvp_at: existing?.rsvp_at,
-        created_at: existing?.created_at || new Date().toISOString(),
-      };
-      await saveInvitation(updated);
-      onRefreshInvitations();
-      showToast(`Undangan berhasil dikirimkan ke WhatsApp ${teacher.name}`);
-    } else {
-      showToast(`Gagal kirim WA ke ${teacher.name}: ${res.message}`, 'error');
+    if (unconfirmedTeachers.length === 0) {
+      showToast('Semua guru dalam rapat ini sudah mengisi konfirmasi kehadiran.', 'info');
+      return;
     }
+
+    setIsSendingRechatBulk(true);
+    setRechatProgress({ current: 0, total: unconfirmedTeachers.length });
+
+    let successCount = 0;
+    for (let i = 0; i < unconfirmedTeachers.length; i++) {
+      const teacher = unconfirmedTeachers[i];
+      setRechatProgress({ current: i + 1, total: unconfirmedTeachers.length });
+
+      if (teacher.phone_wa) {
+        const msg = getPersonalizedRechatMessage(teacher);
+        const res = await invokeWahaNotification({
+          action: 'invitation_dispatch',
+          recipient: teacher.phone_wa,
+          message: msg,
+          metadata: {
+            meetingId: currentMeeting.id,
+            teacherId: teacher.id,
+            type: 'bulk_rechat',
+          },
+        });
+        if (res.success) {
+          successCount++;
+        }
+      }
+      await new Promise((r) => setTimeout(r, 600));
+    }
+
+    setIsSendingRechatBulk(false);
+    setRechatProgress(null);
+    showToast(`Re-Chat selesai! Berhasil mengirim pesan pengingat ke ${successCount} dari ${unconfirmedTeachers.length} guru.`);
   };
 
   // Bulk dispatch to all unsent teachers
@@ -356,7 +483,7 @@ _Aplikasi dePresent made by Mr Zee_`;
       ['Agenda Kegiatan', currentMeeting.title],
       ['Nomor Surat', letterNumber.trim() || '-'],
       ['Hari / Tanggal', currentMeeting.meeting_date],
-      ['Waktu Pelaksanaan', `${currentMeeting.start_time} - ${currentMeeting.end_time} WIB`],
+      ['Waktu Pelaksanaan', `${currentMeeting.start_time.slice(0, 5)} - ${currentMeeting.end_time.slice(0, 5)} WIB`],
       ['Ruangan', currentMeeting.room],
       ['Pimpinan Rapat', currentMeeting.leader_name],
       ['Jumlah Penerima', `${meetingTeachers.length} Orang Guru/Pegawai`],
@@ -371,7 +498,7 @@ _Aplikasi dePresent made by Mr Zee_`;
       [],
       [
         'No',
-        'Nama Guru / Pegawai',
+        'Nama Pegawai',
         'NIY',
         'Jabatan / Mapel',
         'Kelompok',
@@ -379,7 +506,7 @@ _Aplikasi dePresent made by Mr Zee_`;
         'Tgl Kirim',
         'Media',
         'Status Kirim',
-        'Konfirmasi WA',
+        'Konfirmasi',
         'Waktu Konfirmasi',
         'Keterangan / Catatan',
       ],
@@ -396,6 +523,10 @@ _Aplikasi dePresent made by Mr Zee_`;
           ? 'Sakit'
           : '-';
 
+      const rsvpTimeStr = inv?.rsvp_at
+        ? `${new Date(inv.rsvp_at).toLocaleDateString('id-ID')} ${new Date(inv.rsvp_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+        : '-';
+
       rows.push([
         idx + 1,
         teacher.name,
@@ -407,7 +538,7 @@ _Aplikasi dePresent made by Mr Zee_`;
         inv?.dispatch_channel === 'whatsapp' ? 'WhatsApp' : 'Fisik/Manual',
         inv?.dispatch_status === 'sent' ? 'Terkirim' : 'Pending',
         rsvpLabel,
-        inv?.rsvp_at ? new Date(inv.rsvp_at).toLocaleString('id-ID') : '-',
+        rsvpTimeStr,
         inv?.rsvp_notes || '-',
       ]);
     });
@@ -498,6 +629,17 @@ _Aplikasi dePresent made by Mr Zee_`;
           {/* Primary Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={() => {
+                setWahaConfig(getWahaConfig());
+                setIsTemplateModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 dark:bg-[#072b2f] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs cursor-pointer"
+            >
+              <Settings2 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              Edit Template Pesan
+            </button>
+
+            <button
               onClick={handlePrint}
               className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 dark:bg-[#072b2f] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs cursor-pointer"
             >
@@ -517,18 +659,19 @@ _Aplikasi dePresent made by Mr Zee_`;
 
         {/* Meeting Selector & Single Letter Numbering Bar */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Select Meeting */}
+          {/* Select Meeting (Sorted with nearest upcoming meeting first) */}
           <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-4 shadow-xs space-y-2">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-teal-300/80">
-              Pilih Agenda Rapat
+              Pilih Agenda Rapat (Terdekat)
             </label>
             <select
               value={selectedMeetingId}
               onChange={(e) => setSelectedMeetingId(e.target.value)}
               className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-2 text-xs font-medium text-slate-900 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
             >
-              {meetings.map((m) => (
+              {sortedMeetingsList.map((m) => (
                 <option key={m.id} value={m.id}>
+                  {m.status === 'active' ? '🟢 [AKTIF] ' : m.status === 'upcoming' ? '⏱️ ' : '✓ '}
                   {m.meeting_date} • {m.title} ({m.category})
                 </option>
               ))}
@@ -536,7 +679,7 @@ _Aplikasi dePresent made by Mr Zee_`;
 
             {currentMeeting && (
               <div className="pt-1 text-[11px] text-slate-500 dark:text-teal-200/70 space-y-0.5">
-                <p>📍 {currentMeeting.room} • ⏰ {currentMeeting.start_time} - {currentMeeting.end_time} WIB</p>
+                <p>📍 {currentMeeting.room} • ⏰ {currentMeeting.start_time.slice(0, 5)} - {currentMeeting.end_time.slice(0, 5)} WIB</p>
                 <p>👤 Pimpinan: <span className="font-semibold text-slate-700 dark:text-teal-200">{currentMeeting.leader_name}</span></p>
               </div>
             )}
@@ -653,12 +796,35 @@ _Aplikasi dePresent made by Mr Zee_`;
             </select>
           </div>
 
-          {/* Bulk WhatsApp Dispatch Button */}
-          <div>
+          {/* Bulk Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Re-Chat Belum Konfirmasi */}
+            <button
+              onClick={handleSendRechatBulk}
+              disabled={isSendingRechatBulk || isSendingBulk || stats.unconfirmedCount === 0}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-700 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-white text-xs font-bold shadow-md shadow-amber-950/30 transition-all disabled:opacity-50 cursor-pointer"
+              title="Kirim pesan pengingat RSVP ke semua guru yang belum konfirmasi"
+            >
+              {isSendingRechatBulk ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>
+                    Re-Chat ({rechatProgress?.current}/{rechatProgress?.total})...
+                  </span>
+                </>
+              ) : (
+                <>
+                  <BellRing className="w-3.5 h-3.5" />
+                  <span>Re-Chat Belum Konfirmasi ({stats.unconfirmedCount})</span>
+                </>
+              )}
+            </button>
+
+            {/* Bulk WhatsApp Dispatch Button */}
             <button
               onClick={handleSendBulkWA}
-              disabled={isSendingBulk || stats.total === 0}
-              className="w-full md:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-700 to-teal-600 hover:from-teal-600 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-teal-950/30 transition-all disabled:opacity-50 cursor-pointer"
+              disabled={isSendingBulk || isSendingRechatBulk || stats.total === 0}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-700 to-teal-600 hover:from-teal-600 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-teal-950/30 transition-all disabled:opacity-50 cursor-pointer"
             >
               {isSendingBulk ? (
                 <>
@@ -684,7 +850,7 @@ _Aplikasi dePresent made by Mr Zee_`;
               <thead className="bg-slate-50 dark:bg-[#031e21] text-slate-600 dark:text-teal-200/90 border-b border-slate-200 dark:border-[#0f4950] uppercase font-semibold text-[10px] tracking-wider">
                 <tr>
                   <th className="py-3 px-3.5 w-12 text-center">No</th>
-                  <th className="py-3 px-3.5">Nama Guru / Pegawai</th>
+                  <th className="py-3 px-3.5">Nama Pegawai</th>
                   <th className="py-3 px-3.5">Jabatan / Kelompok</th>
                   <th className="py-3 px-3.5">No. WhatsApp</th>
                   <th className="py-3 px-3.5">Distribusi</th>
@@ -737,7 +903,7 @@ _Aplikasi dePresent made by Mr Zee_`;
                               </span>
                               {inv?.sent_at && (
                                 <span className="text-[10px] text-slate-400 dark:text-teal-300/60">
-                                  {new Date(inv.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                                  {new Date(inv.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB
                                 </span>
                               )}
                             </div>
@@ -777,14 +943,51 @@ _Aplikasi dePresent made by Mr Zee_`;
                         </td>
                         <td className="py-3 px-3.5 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
-                            {/* Send WA Button */}
+                            {/* Send WA Button with sending effect */}
                             <button
                               onClick={() => handleSendSingleWA(teacher)}
-                              title="Kirim Undangan WhatsApp"
-                              className="p-1.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-300 border border-teal-500/20 transition-colors cursor-pointer"
+                              disabled={sendingTeacherId === teacher.id || isSendingBulk || isSendingRechatBulk}
+                              title={
+                                sendingTeacherId === teacher.id && sendingType === 'invitation'
+                                  ? 'Sedang mengirim pesan...'
+                                  : 'Kirim Undangan WhatsApp'
+                              }
+                              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                                sendingTeacherId === teacher.id && sendingType === 'invitation'
+                                  ? 'bg-teal-500/30 text-teal-300 border-teal-400 animate-pulse'
+                                  : 'bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-300 border-teal-500/20'
+                              } disabled:opacity-60`}
                             >
-                              <MessageSquare className="w-3.5 h-3.5" />
+                              {sendingTeacherId === teacher.id && sendingType === 'invitation' ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-300" />
+                              ) : (
+                                <MessageSquare className="w-3.5 h-3.5" />
+                              )}
                             </button>
+
+                            {/* Re-Chat Belum Konfirmasi button (only for unconfirmed) */}
+                            {rsvp === 'unconfirmed' && (
+                              <button
+                                onClick={() => handleSendRechatSingle(teacher)}
+                                disabled={sendingTeacherId === teacher.id || isSendingBulk || isSendingRechatBulk}
+                                title={
+                                  sendingTeacherId === teacher.id && sendingType === 'rechat'
+                                    ? 'Sedang mengirim re-chat...'
+                                    : 'Kirim Pengingat / Re-Chat Konfirmasi Kehadiran'
+                                }
+                                className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                                  sendingTeacherId === teacher.id && sendingType === 'rechat'
+                                    ? 'bg-amber-500/30 text-amber-300 border-amber-400 animate-pulse'
+                                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-300 border-amber-500/20'
+                                } disabled:opacity-60`}
+                              >
+                                {sendingTeacherId === teacher.id && sendingType === 'rechat' ? (
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                                ) : (
+                                  <BellRing className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
 
                             {/* Copy RSVP Link */}
                             <button
@@ -886,7 +1089,7 @@ _Aplikasi dePresent made by Mr Zee_`;
           </div>
           <div>
             <span className="font-bold inline-block w-28">Waktu Pelaksanaan</span>
-            <span>: {currentMeeting?.start_time} - {currentMeeting?.end_time} WIB</span>
+            <span>: {currentMeeting?.start_time.slice(0, 5)} - {currentMeeting?.end_time.slice(0, 5)} WIB</span>
           </div>
           <div>
             <span className="font-bold inline-block w-28">Jumlah Penerima</span>
@@ -894,15 +1097,15 @@ _Aplikasi dePresent made by Mr Zee_`;
           </div>
         </div>
 
-        {/* Official Expedition Table - Nama & NIY digabung, tanpa NIP, kolom TTD ganti Konfirmasi WA */}
+        {/* Official Expedition Table - Kolom Nama Pegawai, tanpa NIP, kolom Konfirmasi */}
         <table className="w-full text-[10px] border-collapse border border-black mb-6">
           <thead>
             <tr className="bg-gray-100 border-b border-black text-center font-bold">
               <th className="border border-black py-1.5 px-1 w-8">No</th>
-              <th className="border border-black py-1.5 px-2 text-left">Nama Guru & NIY</th>
+              <th className="border border-black py-1.5 px-2 text-left">Nama Pegawai</th>
               <th className="border border-black py-1.5 px-2 text-left w-36">Jabatan / Mapel</th>
               <th className="border border-black py-1.5 px-1 w-24 text-center">Media & Tgl Kirim</th>
-              <th className="border border-black py-1.5 px-2 w-28 text-center">Konfirmasi WA</th>
+              <th className="border border-black py-1.5 px-2 w-28 text-center">Konfirmasi</th>
               <th className="border border-black py-1.5 px-2 w-32 text-left">Keterangan</th>
             </tr>
           </thead>
@@ -981,9 +1184,141 @@ _Aplikasi dePresent made by Mr Zee_`;
         {/* Footer print note */}
         <div className="mt-6 pt-2 border-t border-gray-400 text-[9px] text-gray-500 flex justify-between">
           <span>Dicetak dari Sistem dePresent • {schoolProfile.school_name}</span>
-          <span>Waktu Cetak: {new Date().toLocaleString('id-ID')}</span>
+          <span>Waktu Cetak: {new Date().toLocaleDateString('id-ID')} pukul {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB</span>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* MODAL EDIT TEMPLATE PESAN WHATSAPP (UNDANGAN & RE-CHAT)                  */}
+      {/* ========================================================================= */}
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs">
+          <div className="bg-white dark:bg-[#072b2f] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-[#0f4950]">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-[#0f4950] flex items-center justify-between bg-teal-950 text-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center">
+                  <Settings2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white">Edit Template Pesan WhatsApp</h3>
+                  <p className="text-xs text-teal-200/80">Kustomisasi teks Undangan Resmi & Re-Chat Pengingat RSVP</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="p-1 rounded-lg text-teal-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 overflow-y-auto space-y-5 text-sm flex-1">
+              {/* Template 1: Undangan Resmi */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-teal-100 uppercase tracking-wider">
+                    1. Template Surat Undangan Resmi & RSVP
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWahaConfig({
+                        ...wahaConfig,
+                        message_template_invitation: DEFAULT_WAHA_CONFIG.message_template_invitation,
+                      });
+                    }}
+                    className="text-[11px] text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
+                  >
+                    Reset Default
+                  </button>
+                </div>
+                <textarea
+                  rows={6}
+                  value={wahaConfig.message_template_invitation || DEFAULT_WAHA_CONFIG.message_template_invitation || ''}
+                  onChange={(e) =>
+                    setWahaConfig({ ...wahaConfig, message_template_invitation: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-xl bg-slate-50 dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono leading-relaxed"
+                />
+                <div className="text-[11px] text-slate-500 dark:text-teal-200/70 space-y-1">
+                  <p className="font-semibold text-slate-700 dark:text-teal-200">Placeholder variabel:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {['{no_surat}', '{agenda}', '{nama}', '{jabatan}', '{tanggal}', '{jam}', '{ruang}', '{pimpinan}', '{link_rsvp}', '{nama_sekolah}'].map((item) => (
+                      <span key={item} className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 font-mono text-[10px] border border-teal-500/20">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Template 2: Re-Chat Belum Konfirmasi */}
+              <div className="space-y-2 pt-3 border-t border-slate-200 dark:border-[#0f4950]">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-800 dark:text-teal-100 uppercase tracking-wider">
+                    2. Template Re-Chat Pengingat RSVP
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWahaConfig({
+                        ...wahaConfig,
+                        message_template_rechat: DEFAULT_WAHA_CONFIG.message_template_rechat,
+                      });
+                    }}
+                    className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    Reset Default
+                  </button>
+                </div>
+                <textarea
+                  rows={6}
+                  value={wahaConfig.message_template_rechat || DEFAULT_WAHA_CONFIG.message_template_rechat || ''}
+                  onChange={(e) =>
+                    setWahaConfig({ ...wahaConfig, message_template_rechat: e.target.value })
+                  }
+                  className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-xl bg-slate-50 dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono leading-relaxed"
+                />
+                <div className="text-[11px] text-slate-500 dark:text-teal-200/70 space-y-1">
+                  <p className="font-semibold text-slate-700 dark:text-teal-200">Placeholder variabel:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {['{agenda}', '{nama}', '{jabatan}', '{tanggal}', '{jam}', '{ruang}', '{pimpinan}', '{link_rsvp}', '{nama_sekolah}'].map((item) => (
+                      <span key={item} className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 font-mono text-[10px] border border-amber-500/20">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-slate-200 dark:border-[#0f4950] bg-slate-50 dark:bg-[#031e21] flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  saveWahaConfig(wahaConfig);
+                  setIsTemplateModalOpen(false);
+                  showToast('Template pesan WhatsApp berhasil diperbarui dan disimpan!');
+                }}
+                className="px-4 py-2 text-xs font-semibold text-white bg-teal-800 hover:bg-teal-700 rounded-xl transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Simpan Perubahan Template</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="px-4 py-2 bg-slate-200 dark:bg-[#0b383d] hover:bg-slate-300 dark:hover:bg-[#0f4950] text-slate-700 dark:text-teal-100 text-xs font-medium rounded-xl transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

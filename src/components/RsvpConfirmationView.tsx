@@ -159,7 +159,7 @@ export const RsvpConfirmationView: React.FC<RsvpConfirmationViewProps> = ({
             </div>
             <div className="flex items-center gap-2 text-teal-100">
               <Clock className="w-4 h-4 text-teal-400 shrink-0" />
-              <span>{currentMeeting.start_time} - {currentMeeting.end_time} WIB</span>
+              <span>{currentMeeting.start_time?.slice(0, 5) || currentMeeting.start_time} - {currentMeeting.end_time?.slice(0, 5) || currentMeeting.end_time} WIB</span>
             </div>
             <div className="flex items-center gap-2 text-teal-100">
               <MapPin className="w-4 h-4 text-teal-400 shrink-0" />
@@ -230,15 +230,6 @@ export const RsvpConfirmationView: React.FC<RsvpConfirmationViewProps> = ({
                 <FileEdit className="w-4 h-4 text-teal-400" />
                 Ubah Pilihan Kehadiran
               </button>
-              {onDone && (
-                <button
-                  type="button"
-                  onClick={onDone}
-                  className="py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Selesai
-                </button>
-              )}
             </div>
           </div>
         ) : (

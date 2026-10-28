@@ -186,7 +186,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
           <div className="flex flex-wrap items-center gap-4 text-xs text-teal-100">
             <span className="flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-teal-300" />
-              <span>{meeting.meeting_date} ({meeting.start_time} - {meeting.end_time} WIB)</span>
+              <span>{meeting.meeting_date} ({meeting.start_time?.slice(0, 5) || meeting.start_time} - {meeting.end_time?.slice(0, 5) || meeting.end_time} WIB)</span>
             </span>
             <span className="flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5 text-teal-300" />

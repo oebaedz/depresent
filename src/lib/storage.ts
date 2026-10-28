@@ -456,6 +456,43 @@ export async function bulkImportTeachers(newTeachers: Omit<Teacher, 'id'>[]): Pr
 // ---------------------------------------------------------------------------
 // 3. MEETINGS
 // ---------------------------------------------------------------------------
+
+/**
+ * Mengurutkan rapat berdasarkan yang terdekat yang akan dilaksanakan:
+ * 1. Rapat 'active' (sedang berlangsung) prioritas teratas.
+ * 2. Rapat hari ini / masa depan (upcoming) diurutkan kronologis terdekat lebih dulu (ascending tanggal & waktu).
+ * 3. Rapat masa lalu / telah selesai (completed) diurutkan mundur (descending).
+ */
+export function sortMeetingsClosestFirst(meetings: Meeting[]): Meeting[] {
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  return [...meetings].sort((a, b) => {
+    // 1. Rapat aktif selalu paling atas
+    if (a.status === 'active' && b.status !== 'active') return -1;
+    if (b.status === 'active' && a.status !== 'active') return 1;
+
+    const aDateTime = `${a.meeting_date}T${a.start_time || '00:00'}`;
+    const bDateTime = `${b.meeting_date}T${b.start_time || '00:00'}`;
+
+    const aIsUpcoming = a.status !== 'completed' && (a.meeting_date > todayStr || (a.meeting_date === todayStr && (a.end_time || a.start_time || '23:59') >= currentTimeStr));
+    const bIsUpcoming = b.status !== 'completed' && (b.meeting_date > todayStr || (b.meeting_date === todayStr && (b.end_time || b.start_time || '23:59') >= currentTimeStr));
+
+    // Jika satu rapat mendatang dan satu rapat lewat/selesai
+    if (aIsUpcoming && !bIsUpcoming) return -1;
+    if (!aIsUpcoming && bIsUpcoming) return 1;
+
+    // Jika keduanya mendatang: rapat terdekat yang akan dilaksanakan lebih dulu (ascending)
+    if (aIsUpcoming && bIsUpcoming) {
+      return aDateTime.localeCompare(bDateTime);
+    }
+
+    // Jika keduanya sudah selesai/lampau: urutkan dari yang paling baru selesai (descending)
+    return bDateTime.localeCompare(aDateTime);
+  });
+}
+
 export async function fetchMeetings(): Promise<Meeting[]> {
   initLocalStorage();
   const supabase = getSupabase();
@@ -494,8 +531,8 @@ export async function fetchMeetings(): Promise<Meeting[]> {
               title: row.title,
               category: row.category,
               meeting_date: row.meeting_date,
-              start_time: row.start_time,
-              end_time: row.end_time,
+              start_time: (row.start_time || '08:00').slice(0, 5),
+              end_time: (row.end_time || '11:00').slice(0, 5),
               room: row.room,
               leader_name: row.leader_name,
               leader_niy: row.leader_niy || '',
@@ -505,6 +542,7 @@ export async function fetchMeetings(): Promise<Meeting[]> {
               status: row.status || 'active',
               target_type: row.target_type || (invitedIds && invitedIds.length > 0 ? 'custom' : 'all'),
               invited_teacher_ids: invitedIds,
+              letter_number: row.letter_number || '-',
               notes: cleanNotes,
               created_at: row.created_at,
             };
@@ -518,7 +556,7 @@ export async function fetchMeetings(): Promise<Meeting[]> {
           (async () => {
             try {
               const { error: seedErr } = await supabase.from('smp_meetings').upsert(localMeetings);
-              if (seedErr && (seedErr.message?.includes('invited_teacher_ids') || seedErr.message?.includes('target_type') || seedErr.code === 'PGRST204')) {
+              if (seedErr && (seedErr.message?.includes('invited_teacher_ids') || seedErr.message?.includes('target_type') || seedErr.message?.includes('letter_number') || seedErr.code === 'PGRST204')) {
                 const sanitized = localMeetings.map((m) => {
                   const copy: Record<string, any> = { ...m };
                   if (m.invited_teacher_ids && m.invited_teacher_ids.length > 0) {
@@ -526,6 +564,7 @@ export async function fetchMeetings(): Promise<Meeting[]> {
                   }
                   delete copy.invited_teacher_ids;
                   delete copy.target_type;
+                  delete copy.letter_number;
                   return copy;
                 });
                 await supabase.from('smp_meetings').upsert(sanitized);
@@ -577,8 +616,8 @@ export async function fetchSingleMeeting(meetingId: string): Promise<Meeting | n
           title: data.title,
           category: data.category,
           meeting_date: data.meeting_date,
-          start_time: data.start_time,
-          end_time: data.end_time,
+          start_time: (data.start_time || '08:00').slice(0, 5),
+          end_time: (data.end_time || '11:00').slice(0, 5),
           room: data.room,
           leader_name: data.leader_name,
           leader_niy: data.leader_niy || '',
@@ -588,6 +627,7 @@ export async function fetchSingleMeeting(meetingId: string): Promise<Meeting | n
           status: data.status || 'active',
           target_type: data.target_type || (invitedIds && invitedIds.length > 0 ? 'custom' : 'all'),
           invited_teacher_ids: invitedIds,
+          letter_number: data.letter_number || '-',
           notes: cleanNotes,
           created_at: data.created_at,
         };
@@ -606,6 +646,9 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
   const cleanMeeting: Meeting = {
     ...meeting,
     id: isValidUUID(meeting.id) ? meeting.id : generateUUID(),
+    start_time: (meeting.start_time || '08:00').slice(0, 5),
+    end_time: (meeting.end_time || '11:00').slice(0, 5),
+    letter_number: meeting.letter_number?.trim() || '-',
   };
 
   // Instant local-first update
@@ -625,13 +668,14 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
     try {
       const { error } = await supabase.from('smp_meetings').upsert(cleanMeeting);
       if (error) {
-        // If error indicates column invited_teacher_ids or target_type is missing in schema cache
+        // If error indicates column invited_teacher_ids, target_type or letter_number is missing in schema cache
         if (
           error.message?.includes('invited_teacher_ids') ||
           error.message?.includes('target_type') ||
+          error.message?.includes('letter_number') ||
           error.code === 'PGRST204'
         ) {
-          console.warn('Supabase smp_meetings table lacks invited_teacher_ids column. Saving with compatibility fallback notes...');
+          console.warn('Supabase smp_meetings table lacks new columns. Saving with compatibility fallback...');
           const fallbackPayload: Record<string, any> = { ...cleanMeeting };
           if (cleanMeeting.invited_teacher_ids && cleanMeeting.invited_teacher_ids.length > 0) {
             fallbackPayload.notes = `${cleanMeeting.notes || ''}\n[ATTENDEES_SYNC:${JSON.stringify(cleanMeeting.invited_teacher_ids)}]`.trim();
@@ -639,6 +683,9 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
           delete fallbackPayload.invited_teacher_ids;
           if (error.message?.includes('target_type')) {
             delete fallbackPayload.target_type;
+          }
+          if (error.message?.includes('letter_number')) {
+            delete fallbackPayload.letter_number;
           }
 
           const { error: retryErr } = await supabase.from('smp_meetings').upsert(fallbackPayload);

@@ -407,7 +407,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <thead>
               <tr className="bg-slate-50 dark:bg-[#042024] border-b border-slate-200 dark:border-[#0f4950] text-slate-600 dark:text-teal-200 font-semibold uppercase text-[10px] tracking-wider">
                 <th className="py-2.5 px-4 w-12 text-center">No</th>
-                <th className="py-2.5 px-4">Nama Guru & NIY</th>
+                <th className="py-2.5 px-4">Nama Pegawai</th>
                 <th className="py-2.5 px-4">Jabatan / Status</th>
                 <th className="py-2.5 px-4 text-center">Status</th>
                 <th className="py-2.5 px-4">Waktu Hadir</th>

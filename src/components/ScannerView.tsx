@@ -111,7 +111,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
       teacherId: teacher.id,
       status,
       method,
-      notes: status === 'terlambat' ? `Terlambat (${now.toLocaleTimeString('id-ID')})` : 'Tepat Waktu',
+      notes: status === 'terlambat' ? `Terlambat (${now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })})` : 'Tepat Waktu',
     });
 
     const timeStr = new Date(attendance.check_in_time).toLocaleTimeString('id-ID', {

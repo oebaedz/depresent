@@ -24,6 +24,7 @@ import {
   getMeetingCategories,
   addMeetingCategory,
   deleteMeetingCategory,
+  sortMeetingsClosestFirst,
 } from '../lib/storage';
 import { generateUUID } from '../lib/uuid';
 import {
@@ -82,6 +83,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   const [isCompleting, setIsCompleting] = useState(false);
 
   const sortedTeachers = React.useMemo(() => sortTeachersStructuralFirst(teachers), [teachers]);
+  const sortedMeetings = React.useMemo(() => sortMeetingsClosestFirst(meetings), [meetings]);
 
   // Attendee picker filters
   const [attendeeSearch, setAttendeeSearch] = useState('');
@@ -287,7 +289,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
 
       {/* Meeting Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {meetings.map((m) => {
+        {sortedMeetings.map((m) => {
           const isActive = m.status === 'active';
           const isCompleted = m.status === 'completed';
           const isCustom = m.target_type === 'custom' && Array.isArray(m.invited_teacher_ids) && m.invited_teacher_ids.length > 0;
@@ -332,7 +334,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-teal-400 shrink-0" />
-                    <span className="font-mono">{m.start_time} - {m.end_time} WIB</span>
+                    <span className="font-mono">{m.start_time?.slice(0, 5) || m.start_time} - {m.end_time?.slice(0, 5) || m.end_time} WIB</span>
                     <span className="text-[10px] text-slate-400 dark:text-teal-300/70">({m.tolerance_minutes}m toleransi)</span>
                   </div>
                   <div className="flex items-center gap-2">

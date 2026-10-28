@@ -29,6 +29,7 @@ export interface Meeting {
   status: 'upcoming' | 'active' | 'completed';
   target_type?: 'all' | 'custom'; // 'all' = semua dewan guru, 'custom' = guru tertentu
   invited_teacher_ids?: string[]; // array ID guru yang diundang
+  letter_number?: string; // Nomor Surat Dinas resmi untuk rapat ini
   notes?: string;
   created_at?: string;
 }
@@ -76,6 +77,8 @@ export interface WahaConfig {
   message_template_scan: string;
   message_template_reminder: string;
   message_template_recap: string;
+  message_template_invitation?: string;
+  message_template_rechat?: string;
 }
 
 export interface AttendanceWithTeacher extends Attendance {

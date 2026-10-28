@@ -244,16 +244,18 @@ CREATE TABLE IF NOT EXISTS smp_meetings (
   status TEXT NOT NULL DEFAULT 'active', -- 'upcoming', 'active', 'completed'
   target_type TEXT NOT NULL DEFAULT 'all', -- 'all' atau 'custom'
   invited_teacher_ids JSONB DEFAULT '[]'::jsonb, -- daftar ID guru peserta terpilih
+  letter_number TEXT DEFAULT '-', -- nomor surat dinas resmi kegiatan
   notes TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Pastikan kolom pimpinan, notulis, dan selective attendees ada jika tabel sudah terbuat sebelumnya
+-- Pastikan kolom pimpinan, notulis, letter_number, dan selective attendees ada jika tabel sudah terbuat sebelumnya
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS leader_niy TEXT DEFAULT '';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS secretary_name TEXT DEFAULT '';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS secretary_niy TEXT DEFAULT '';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
 
 -- 4. TABEL REKAM KEHADIRAN (ATTENDANCES)
 CREATE TABLE IF NOT EXISTS smp_attendances (
@@ -325,11 +327,20 @@ CREATE POLICY "Public All smp_invitations" ON smp_invitations FOR ALL USING (tru
 `;
 
 export const SUPABASE_SQL_MIGRATION_V4 = `-- ============================================================
--- SKRIP UPDATE CEPAT KOLOM PESERTA RAPAT (SELECTIVE ATTENDEES)
+-- SKRIP UPDATE CEPAT KOLOM PESERTA RAPAT & NOMOR SURAT
 -- Jalankan skrip ini jika tabel smp_meetings sudah ada di Supabase Anda:
 -- ============================================================
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
+`;
+
+export const SUPABASE_SQL_LETTER_NUMBER = `-- ============================================================
+-- SKEMA & MIGRASI KOLOM NOMOR SURAT KEDINASAN (letter_number)
+-- Jalankan skrip ini di SQL Editor Supabase untuk mendukung penyimpanan nomor surat:
+-- ============================================================
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
+ALTER TABLE smp_invitations ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
 `;
 
 export const SUPABASE_SQL_INVITATIONS = `-- ============================================================

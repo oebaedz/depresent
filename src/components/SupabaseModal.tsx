@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Database, Check, Copy, AlertTriangle, ExternalLink, RefreshCw, Globe, UploadCloud, CheckCircle2, Sparkles } from 'lucide-react';
-import { getSupabaseCredentials, saveSupabaseCredentials, SUPABASE_SQL_SCHEMA, SUPABASE_SQL_MIGRATION_V4, SUPABASE_SQL_INVITATIONS, testSupabaseConnection } from '../lib/supabase';
+import { getSupabaseCredentials, saveSupabaseCredentials, SUPABASE_SQL_SCHEMA, SUPABASE_SQL_MIGRATION_V4, SUPABASE_SQL_INVITATIONS, SUPABASE_SQL_LETTER_NUMBER, testSupabaseConnection } from '../lib/supabase';
 import { syncInitialDataToSupabase } from '../lib/storage';
 
 interface SupabaseModalProps {
@@ -25,6 +25,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
   const [copiedSql, setCopiedSql] = useState(false);
   const [copiedMigration, setCopiedMigration] = useState(false);
   const [copiedInvitationsSql, setCopiedInvitationsSql] = useState(false);
+  const [copiedLetterNumberSql, setCopiedLetterNumberSql] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
@@ -299,11 +300,55 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
               </button>
             </div>
             <p className="text-[11px] text-amber-900 dark:text-amber-200/90 leading-relaxed">
-              Jika tabel <code>smp_meetings</code> Anda sudah ada di Supabase, jalankan 2 baris perintah ini di SQL Editor untuk menambahkan kolom <code>target_type</code> dan <code>invited_teacher_ids</code>:
+              Jika tabel <code>smp_meetings</code> Anda sudah ada di Supabase, jalankan baris perintah ini di SQL Editor untuk menambahkan kolom peserta khusus dan nomor surat:
             </p>
             <div className="rounded-lg bg-amber-950/90 p-2 text-amber-100 font-mono text-[11px] select-all">
               ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';<br />
-              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
+              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;<br />
+              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
+            </div>
+          </div>
+
+          {/* Migration Card for letter_number */}
+          <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 dark:bg-sky-950/40 p-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                <h4 className="text-xs font-bold text-sky-950 dark:text-sky-200 uppercase tracking-wide">
+                  Skema DB Kolom Nomor Surat (letter_number)
+                </h4>
+              </div>
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(SUPABASE_SQL_LETTER_NUMBER);
+                  setCopiedLetterNumberSql(true);
+                  setTimeout(() => setCopiedLetterNumberSql(false), 2500);
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                  copiedLetterNumberSql
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-sky-100 dark:bg-sky-900/60 text-sky-950 dark:text-sky-100 border-sky-300 dark:border-sky-700 hover:bg-sky-200 dark:hover:bg-sky-800'
+                }`}
+              >
+                {copiedLetterNumberSql ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin SQL Nomor Surat</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] text-sky-900 dark:text-sky-200/90 leading-relaxed">
+              Jalankan perintah SQL ini agar nomor surat dinas tersimpan permanen di cloud (tabel <code>smp_meetings</code> & <code>smp_invitations</code>):
+            </p>
+            <div className="rounded-lg bg-sky-950/90 p-2 text-sky-100 font-mono text-[11px] select-all">
+              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';<br />
+              ALTER TABLE smp_invitations ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
             </div>
           </div>
 

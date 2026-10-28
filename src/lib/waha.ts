@@ -10,6 +10,50 @@ export const DEFAULT_WAHA_CONFIG: WahaConfig = {
   message_template_scan: 'Halo Bpk/Ibu *{nama}*, presensi kehadiran kegiatan/rapat *{rapat}* berhasil dicatat pada pukul *{jam} WIB* (Status: *{status}*). Terima kasih.',
   message_template_reminder: 'Pemberitahuan Sekolah:\nRapat/Kegiatan: *{rapat}*\nTanggal: {tanggal} pukul {jam} WIB\nRuang: {ruang}\nPemimpin: {pimpinan}\n\nMohon Bapak/Ibu hadir tepat waktu dan membawa ID Card fisik untuk presensi QR. Terima kasih.',
   message_template_recap: '📋 *REKAPITULASI KEHADIRAN RAPAT*\nAgenda: *{rapat}*\nTanggal: {tanggal} ({waktu} WIB)\nLokasi: {ruang}\n\n• Total Guru: {total} orang\n• Hadir Tepat Waktu: {hadir}\n• Terlambat: {terlambat}\n• Izin / Sakit: {izin}\n• Belum Presensi: {belum}\n\n*Persentase Kehadiran: {persen}%*\n_dePresent SMP_',
+  message_template_invitation: `*SURAT UNDANGAN KEDINASAN*
+Nomor: {no_surat}
+Perihal: Undangan {agenda}
+
+Kepada Yth.
+*{nama}*
+{jabatan}
+di Tempat
+
+Assalamu'alaikum Wr. Wb.
+Mengharap kehadiran Bapak/Ibu pada rapat/kegiatan dengan rincian:
+
+• Agenda: *{agenda}*
+• Hari/Tanggal: {tanggal}
+• Waktu: Pukul *{jam} WIB*
+• Ruangan: {ruang}
+• Pimpinan: {pimpinan}
+
+Mohon mengisi *Konfirmasi Kehadiran (RSVP)* melalui tautan resmi berikut:
+👉 {link_rsvp}
+
+Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.
+Wassalamu'alaikum Wr. Wb.
+
+_{nama_sekolah}_
+_dePresent made by Mr Zee_`,
+  message_template_rechat: `*PENGINGAT KONFIRMASI KEHADIRAN (RSVP)*
+Yth. Bpk/Ibu *{nama}*,
+
+Mengingatkan kembali perihal Undangan *{agenda}* yang akan diselenggarakan pada:
+• Hari/Tanggal: {tanggal}
+• Waktu: *{jam} WIB*
+• Ruangan: {ruang}
+• Pimpinan: {pimpinan}
+
+Berdasarkan catatan buku ekspedisi kami, Bapak/Ibu tercatat *belum mengisi konfirmasi kehadiran (RSVP)*.
+
+Mohon kesediaan Bapak/Ibu untuk mengonfirmasi kehadiran melalui tautan berikut:
+👉 {link_rsvp}
+
+Konfirmasi kehadiran Bapak/Ibu sangat membantu kepanitiaan dalam menyiapkan kebutuhan rapat. Terima kasih.
+
+_{nama_sekolah}_
+_dePresent made by Mr Zee_`,
 };
 
 export const EDGE_FUNCTION_TEMPLATE_CODE = `import { serve } from "https://deno.land/std@0.168.0/http/server.ts"

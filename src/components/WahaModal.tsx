@@ -261,12 +261,38 @@ export const WahaModal: React.FC<WahaModalProps> = ({ isOpen, onClose }) => {
                   3. Template Rekapitulasi ke Grup WA
                 </label>
                 <textarea
-                  rows={5}
+                  rows={4}
                   value={config.message_template_recap}
                   onChange={(e) => setConfig({ ...config, message_template_recap: e.target.value })}
                   className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono"
                 />
                 <p className="text-[11px] text-slate-500 dark:text-teal-200/70 mt-0.5">Placeholder: <code>{'{rapat}'}</code>, <code>{'{total}'}</code>, <code>{'{hadir}'}</code>, <code>{'{terlambat}'}</code>, <code>{'{izin}'}</code>, <code>{'{belum}'}</code>, <code>{'{persen}'}</code></p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-teal-100 mb-1">
+                  4. Template Surat Undangan Resmi & Tautan RSVP
+                </label>
+                <textarea
+                  rows={5}
+                  value={config.message_template_invitation || ''}
+                  onChange={(e) => setConfig({ ...config, message_template_invitation: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-teal-200/70 mt-0.5">Placeholder: <code>{'{no_surat}'}</code>, <code>{'{agenda}'}</code>, <code>{'{nama}'}</code>, <code>{'{jabatan}'}</code>, <code>{'{tanggal}'}</code>, <code>{'{jam}'}</code>, <code>{'{ruang}'}</code>, <code>{'{pimpinan}'}</code>, <code>{'{link_rsvp}'}</code>, <code>{'{nama_sekolah}'}</code></p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-teal-100 mb-1">
+                  5. Template Re-Chat Guru Belum Konfirmasi RSVP
+                </label>
+                <textarea
+                  rows={5}
+                  value={config.message_template_rechat || ''}
+                  onChange={(e) => setConfig({ ...config, message_template_rechat: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-teal-200/70 mt-0.5">Placeholder: <code>{'{agenda}'}</code>, <code>{'{nama}'}</code>, <code>{'{tanggal}'}</code>, <code>{'{jam}'}</code>, <code>{'{ruang}'}</code>, <code>{'{pimpinan}'}</code>, <code>{'{link_rsvp}'}</code>, <code>{'{nama_sekolah}'}</code></p>
               </div>
             </div>
           )}
