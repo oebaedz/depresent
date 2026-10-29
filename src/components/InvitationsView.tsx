@@ -23,11 +23,13 @@ import {
   Settings2,
   X,
   FileEdit,
+  Share2,
 } from 'lucide-react';
 import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher, WahaConfig } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
 import { saveBatchInvitations, saveInvitation, saveMeeting, sortMeetingsClosestFirst } from '../lib/storage';
 import { DEFAULT_WAHA_CONFIG, getWahaConfig, invokeWahaNotification, saveWahaConfig } from '../lib/waha';
+import { UnconfirmedRsvpModal } from './UnconfirmedRsvpModal';
 
 interface InvitationsViewProps {
   meetings: Meeting[];
@@ -61,6 +63,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
   // Template Editor Modal State
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isUnconfirmedModalOpen, setIsUnconfirmedModalOpen] = useState(false);
   const [wahaConfig, setWahaConfig] = useState<WahaConfig>(() => getWahaConfig());
 
   // 1 Nomor surat untuk 1 kegiatan (sama untuk seluruh peserta rapat)
@@ -629,6 +632,15 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
           {/* Primary Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              onClick={() => setIsUnconfirmedModalOpen(true)}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              title="Ekspor infografis gambar & kirim daftar guru belum konfirmasi ke WhatsApp grup"
+            >
+              <Share2 className="w-4 h-4" />
+              Kirim Rekap Belum RSVP ke Grup
+            </button>
+
+            <button
               onClick={() => {
                 setWahaConfig(getWahaConfig());
                 setIsTemplateModalOpen(true);
@@ -761,9 +773,20 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
             <span className="text-2xl font-bold text-sky-600 dark:text-sky-400 font-mono tabular-nums">{stats.sickCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-[#072b2f] border border-slate-300 dark:border-[#0f4950] rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-teal-200/70 block">Belum Konfirmasi</span>
-            <span className="text-2xl font-bold text-slate-500 dark:text-teal-300/80 font-mono tabular-nums">{stats.unconfirmedCount}</span>
+          <div className="bg-white dark:bg-[#072b2f] border border-amber-500/30 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
+            <div>
+              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 block">Belum Konfirmasi</span>
+              <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">{stats.unconfirmedCount}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsUnconfirmedModalOpen(true)}
+              className="mt-2 text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
+              title="Kirim daftar guru belum konfirmasi (gambar infografis & teks) ke grup WA"
+            >
+              <Share2 className="w-3 h-3" />
+              <span>Kirim ke Grup WA</span>
+            </button>
           </div>
         </div>
 
@@ -1318,6 +1341,19 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL KIRIM DAFTAR GURU BELUM KONFIRMASI KE GRUP (INFOGRAFIS GAMBAR + REKAP TEKS) */}
+      {currentMeeting && (
+        <UnconfirmedRsvpModal
+          isOpen={isUnconfirmedModalOpen}
+          onClose={() => setIsUnconfirmedModalOpen(false)}
+          currentMeeting={currentMeeting}
+          teachers={meetingTeachers}
+          invitations={invitations}
+          schoolProfile={schoolProfile}
+          letterNumber={letterNumber}
+        />
       )}
     </div>
   );

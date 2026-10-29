@@ -109,8 +109,9 @@ serve(async (req) => {
   }
 
   try {
-    // AMBIL DATA: target dan message wajib diisi
-    const { target, message } = await req.json()
+    // AMBIL DATA: target dan message wajib diisi, file/image opsional
+    const body = await req.json()
+    const { target, message, file, image, filename } = body
 
     if (!target || !message) {
       return new Response(
@@ -139,20 +140,52 @@ serve(async (req) => {
     // NORMALIZE TARGET
     const chatId = normalizeTarget(target)
 
-    // REQUEST KE WAHA (/api/sendText)
-    const response = await fetch(\`\${WAHA_URL}/api/sendText\`, {
-      method: "POST",
-      headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "X-Api-Key": WAHA_API_KEY,
-      },
-      body: JSON.stringify({
-        session: WAHA_SESSION,
-        chatId: chatId,
-        text: message,
-      }),
-    })
+    const rawFile = file || (image ? {
+      mimetype: "image/png",
+      filename: filename || "infografis-rekap.png",
+      data: image,
+    } : null)
+
+    let response = null
+
+    // Coba kirim via /api/sendImage jika menyertakan file gambar
+    if (rawFile) {
+      try {
+        response = await fetch(\`\${WAHA_URL}/api/sendImage\`, {
+          method: "POST",
+          headers: {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "X-Api-Key": WAHA_API_KEY,
+          },
+          body: JSON.stringify({
+            session: WAHA_SESSION,
+            chatId: chatId,
+            file: rawFile,
+            caption: message,
+          }),
+        })
+      } catch {
+        // Fallback ke sendText jika sendImage tidak tersedia
+      }
+    }
+
+    // Fallback atau kirim text biasa ke WAHA (/api/sendText)
+    if (!response || !response.ok) {
+      response = await fetch(\`\${WAHA_URL}/api/sendText\`, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "X-Api-Key": WAHA_API_KEY,
+        },
+        body: JSON.stringify({
+          session: WAHA_SESSION,
+          chatId: chatId,
+          text: message,
+        }),
+      })
+    }
 
     const result = await response.json()
 
@@ -245,9 +278,11 @@ export function addWahaLog(log: Omit<WahaLog, 'id' | 'timestamp'>) {
  * Payload strictly matches: { target, message }
  */
 export async function invokeWahaNotification(params: {
-  action: 'check_in_confirmation' | 'meeting_reminder' | 'group_recap' | 'invitation_dispatch';
+  action: 'check_in_confirmation' | 'meeting_reminder' | 'group_recap' | 'invitation_dispatch' | 'unconfirmed_rsvp_recap' | 'absent_recap';
   recipient?: string; // target WhatsApp number or group chatId
   message: string;
+  image?: string; // base64 data URL
+  filename?: string;
   metadata?: Record<string, unknown>;
 }): Promise<{ success: boolean; message: string; responseData?: unknown }> {
   const config = getWahaConfig();
@@ -296,10 +331,18 @@ export async function invokeWahaNotification(params: {
   const payload = {
     target: rawTarget,
     message: rawMessage,
-    // Complementary aliases
     chatId: rawTarget,
     phone: rawTarget,
     action: params.action,
+    image: params.image,
+    file: params.image
+      ? {
+          mimetype: 'image/png',
+          filename: params.filename || 'infografis-rekap.png',
+          data: params.image,
+        }
+      : undefined,
+    caption: rawMessage,
     metadata: params.metadata || {},
     timestamp: new Date().toISOString(),
   };

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Printer, Download, FileSpreadsheet, FileText, CheckCircle2, Calendar, MapPin, User, Check, Building2 } from 'lucide-react';
+import { Printer, Download, FileSpreadsheet, FileText, CheckCircle2, Calendar, MapPin, User, Check, Building2, Share2, UserX } from 'lucide-react';
 import { Attendance, Meeting, SchoolProfile, Teacher } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
+import { AbsentTeachersModal } from './AbsentTeachersModal';
 
 interface ReportsViewProps {
   meetings: Meeting[];
@@ -19,6 +20,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 }) => {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>(meetings[0]?.id || '');
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
+  const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
 
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || meetings[0];
 
@@ -186,10 +188,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             ))}
           </select>
 
+          {/* Kirim Rekap Tidak Hadir ke WA Grup Button */}
+          <button
+            onClick={() => setIsAbsentModalOpen(true)}
+            className="px-3.5 py-2 bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
+            title="Ekspor infografis gambar & kirim daftar pegawai tidak hadir ke grup WhatsApp"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Kirim Rekap Tidak Hadir ke Grup WA</span>
+          </button>
+
           {/* Export XLSX Button */}
           <button
             onClick={handleExportXLSX}
-            className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Ekspor File Excel (.xlsx)</span>
@@ -198,7 +210,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           {/* Print PDF Button */}
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-teal-800 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-4 py-2 bg-teal-800 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             <span>Cetak Dokumen Resmi (PDF)</span>
@@ -386,8 +398,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             <div>
               Izin / Sakit: <strong className="font-mono text-blue-800 font-bold">{izin + sakit}</strong> orang
             </div>
-            <div>
-              Tidak Hadir: <strong className="font-mono text-red-700 font-bold">{tidakHadir}</strong> orang
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span>Tidak Hadir: <strong className="font-mono text-red-700 font-bold">{tidakHadir}</strong> orang</span>
+              {tidakHadir > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsAbsentModalOpen(true)}
+                  className="no-print text-[10px] text-rose-700 font-bold underline hover:text-rose-900 cursor-pointer"
+                  title="Kirim daftar pegawai tidak hadir ke grup WhatsApp"
+                >
+                  (Kirim ke Grup WA)
+                </button>
+              )}
             </div>
             <div>
               Persentase: <strong className="font-mono text-slate-900 font-bold">{rate}%</strong>
@@ -437,6 +459,18 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* MODAL KIRIM DAFTAR PEGAWAI TIDAK HADIR KE GRUP WA (INFOGRAFIS GAMBAR + TEKS REKAP) */}
+      {currentMeeting && (
+        <AbsentTeachersModal
+          isOpen={isAbsentModalOpen}
+          onClose={() => setIsAbsentModalOpen(false)}
+          currentMeeting={currentMeeting}
+          teachers={activeTeachers}
+          attendances={meetingAttendances}
+          schoolProfile={schoolProfile}
+        />
+      )}
     </div>
   );
 };

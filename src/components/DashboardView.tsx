@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Users, CheckCircle2, AlertTriangle, FileSpreadsheet, Send, MessageSquare, Clock, Search, Filter, RefreshCw, XCircle } from 'lucide-react';
+import { Users, CheckCircle2, AlertTriangle, FileSpreadsheet, Send, MessageSquare, Clock, Search, Filter, RefreshCw, XCircle, Share2 } from 'lucide-react';
 import { Attendance, AttendanceStatus, Meeting, Teacher, SchoolProfile } from '../types';
 import { recordAttendance, deleteAttendance } from '../lib/storage';
 import { getWahaConfig, invokeWahaNotification } from '../lib/waha';
+import { AbsentTeachersModal } from './AbsentTeachersModal';
 
 interface DashboardViewProps {
   meetings: Meeting[];
@@ -29,6 +30,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | AttendanceStatus | 'belum'>('all');
   const [wahaActionLoading, setWahaActionLoading] = useState<string | null>(null);
   const [wahaFeedback, setWahaFeedback] = useState<string | null>(null);
+  const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
 
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || activeMeeting;
 
@@ -305,6 +307,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <MessageSquare className="w-3 h-3" />
             <span>{wahaActionLoading === 'recap' ? 'Mengirim...' : 'Kirim Rekap ke Grup WA'}</span>
           </button>
+
+          <button
+            onClick={() => setIsAbsentModalOpen(true)}
+            className="px-3.5 py-1.5 bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer"
+            title="Ekspor infografis gambar & kirim daftar pegawai tidak hadir ke grup WA"
+          >
+            <Share2 className="w-3 h-3" />
+            <span>Kirim Rekap Tidak Hadir</span>
+          </button>
         </div>
       </div>
 
@@ -545,6 +556,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Modal Kirim Rekap Tidak Hadir */}
+      {currentMeeting && (
+        <AbsentTeachersModal
+          isOpen={isAbsentModalOpen}
+          onClose={() => setIsAbsentModalOpen(false)}
+          currentMeeting={currentMeeting}
+          teachers={relevantTeachers}
+          attendances={meetingAttendances}
+          schoolProfile={schoolProfile}
+        />
+      )}
     </div>
   );
 };
