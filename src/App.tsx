@@ -10,11 +10,12 @@ import { SchoolProfileView } from './components/SchoolProfileView';
 import { MobileCheckinView } from './components/MobileCheckinView';
 import { InvitationsView } from './components/InvitationsView';
 import { RsvpConfirmationView } from './components/RsvpConfirmationView';
+import { SignatureApprovalView } from './components/SignatureApprovalView';
 import { AdminPinModal } from './components/AdminPinModal';
 import { SupabaseModal } from './components/SupabaseModal';
 import { VercelDeployModal } from './components/VercelDeployModal';
 import { WahaModal } from './components/WahaModal';
-import { Attendance, Invitation, Meeting, SchoolProfile, Teacher } from './types';
+import { Attendance, Invitation, Meeting, SchoolProfile, Teacher, DocumentType, SignerRole } from './types';
 import {
   fetchAttendances,
   fetchInvitations,
@@ -79,6 +80,22 @@ export default function App() {
     return null;
   });
 
+  // Check if current URL is a digital signature approval link (e.g. ?sign=<meetingId>&role=<role>&doc=<doc>)
+  const [signParams] = useState<{ meetingId: string; role?: SignerRole; doc?: DocumentType } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const meetingId = params.get('sign');
+      if (meetingId) {
+        return {
+          meetingId,
+          role: (params.get('role') as SignerRole) || 'secretary',
+          doc: (params.get('doc') as DocumentType) || 'attendance_report',
+        };
+      }
+    }
+    return null;
+  });
+
   // Check if current URL is a teacher mobile checkin link (e.g. ?checkin=<meetingId>)
   const [mobileCheckinMeetingId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -87,6 +104,7 @@ export default function App() {
     }
     return null;
   });
+
 
   // Local-First Synchronous State Initialization (0ms startup latency)
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(() => getCachedProfile());
@@ -328,6 +346,24 @@ export default function App() {
   const targetCheckinMeeting = mobileMeeting || meetings.find((m) => m.id === mobileCheckinMeetingId);
 
   // -------------------------------------------------------------------------
+  // DIGITAL SIGNATURE APPROVAL MODE (Isolated View for Signers via WhatsApp Link)
+  // -------------------------------------------------------------------------
+  if (signParams) {
+    return (
+      <SignatureApprovalView
+        meetingId={signParams.meetingId}
+        roleParam={signParams.role}
+        docParam={signParams.doc}
+        meetings={meetings}
+        teachers={teachers}
+        attendances={attendances}
+        schoolProfile={schoolProfile}
+        onRefresh={loadAllData}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // RSVP CONFIRMATION MODE (Isolated View for Teachers via WhatsApp Link)
   // -------------------------------------------------------------------------
   if (rsvpParams) {
@@ -344,6 +380,7 @@ export default function App() {
       />
     );
   }
+
 
   // -------------------------------------------------------------------------
   // MOBILE CHECKIN MODE (Isolated Sandboxed View for Teachers via QR Scan)

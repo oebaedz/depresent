@@ -1,172 +1,136 @@
-# Fitur Undangan Rapat, Konfirmasi Kehadiran (RSVP) WhatsApp, dan Laporan Ekspedisi Surat Resmi dePresent
+# Rencana Implementasi: Tanda Tangan Digital Berjenjang & Pengesahan Dokumen via WhatsApp
 
-Rencana implementasi untuk menambahkan sistem manajemen Undangan Rapat kedinasan dengan tautan konfirmasi kehadiran mandiri (RSVP) yang dikirimkan via WhatsApp ke masing-masing guru, pencatatan otomatis status kehadiran/izin/sakit, serta Buku/Laporan Ekspedisi Surat resmi ber-Kop Surat cetak dan ekspor Excel (.xlsx).
-
----
-
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> Ringkasan keputusan berdasarkan konfirmasi pengguna:
-> - **Alur Konfirmasi Kehadiran (RSVP)**: Mengirimkan pesan WhatsApp personal ke nomor guru dengan tautan unik mandiri (`?rsvp=<meetingId>&t=<teacherId>`). Saat guru membuka tautan di HP mereka, tampil layar konfirmasi resmi dengan pilihan **Akan Hadir**, **Izin (Disertai Alasan)**, atau **Sakit (Disertai Keterangan)**. Panitia juga dapat mencatat atau memperbarui konfirmasi secara manual di dashboard.
-> - **Format Laporan Ekspedisi Surat**: Menyediakan 2 format laporan ekspedisi yang lengkap:
->   1. **Format Cetak Resmi**: Menggunakan Kop Surat resmi sekolah lengkap dengan Nomor Surat, Perihal, Tabel Tanda Terima Ekspedisi (Nama, NIP/NIY, Nomor Surat, Waktu Kirim/Terima, Status Konfirmasi, dan Kolom Tanda Tangan Fisik), serta blok pengesahan 3 pihak (Kepala Sekolah, Pimpinan Rapat, Petugas Ekspedisi / Tata Usaha).
->   2. **Ekspor Excel (.xlsx)**: File spreadsheet rapi menggunakan SheetJS dengan metadata rapat, rekapitulasi angka pengiriman, dan baris detail ekspedisi.
-> - **Penempatan Menu**: Ditambahkan sebagai menu tersendiri di Sidebar dengan nama **"Surat & Ekspedisi"** (antara Agenda Rapat dan Laporan Resmi).
+Berdasarkan arahan terbaru Anda:
+1. **Penempatan Stempel vs QR Code**:
+   - **Kepala Sekolah (Pengesahan Institusi)**: Memperoleh **Stempel Digital Resmi Kedinasan Sekolah** + **QR Code Verifikasi**.
+   - **Pimpinan Rapat & Notulis Rapat** (serta Petugas TU): Cukup **QR Code Verifikasi Otentisitas** (tanpa stempel instansi, sesuai kaidah tata naskah dinas resmi).
+2. **Database Supabase Diutamakan**: Semua status dan riwayat TTD tersimpan langsung ke PostgreSQL Supabase (`document_signatures`), dengan `localStorage` hanya sebagai cadangan luring.
+3. **Alur Persetujuan Berjenjang (Sequential)**:
+   - **Tahap 1**: Notulis Rapat tanda tangan (QR Code) untuk validasi notula & kehadiran.
+   - **Tahap 2**: Pimpinan Rapat tanda tangan (QR Code) setelah Notulis selesai.
+   - **Tahap 3**: Kepala Sekolah tanda tangan pengesahan final (**Stempel Resmi Sekolah + QR Code**) setelah Pimpinan Rapat selesai.
+4. **Halaman Persetujuan Transparan**: Menampilkan rincian daftar nama guru/pegawai yang **Tidak Hadir** sebelum pejabat menekan tombol persetujuan.
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Skema Database Supabase (`document_signatures`)
 
-- **Apa yang Dibangun**:
-  1. **Manajemen Surat Undangan Rapat**: Panitia dapat memilih agenda rapat, mengisi Nomor Surat Dinas (e.g. `421.3/048/SMP.M.1/X/2026`), Perihal, Tanggal Pengiriman, serta memilih target penerima (semua peserta rapat atau dipilih perorangan/kelompok).
-  2. **Pengiriman WhatsApp & Tautan RSVP Mandiri**: Mengintegrasikan layanan WAHA untuk mengirimkan pesan undangan WhatsApp personal berisikan agenda, tanggal, jam, tempat, dan tautan mandiri RSVP.
-  3. **Layar Konfirmasi Mobile (RSVP Web View)**: Halaman mobile responsif bertema Dark Teal yang bersih dan ramah HP tanpa perlu login rumit. Guru langsung melihat ringkasan agenda, memilih status RSVP (*Akan Hadir*, *Izin*, *Sakit*), memasukkan catatan jika berhalangan, dan menekan konfirmasi dengan umpan balik instan.
-  4. **Buku Ekspedisi Surat (Expedition Book)**: Tabel pembukuan ekspedisi surat keluar yang mencatat No, Nomor Surat, Nama Penerima, Jabatan/Kelompok, Tanggal & Jam Pengiriman, Kanal Distribusi (WhatsApp / Fisik), Status RSVP, Waktu Konfirmasi, Catatan, dan Tanda Tangan.
-  5. **Cetak Kop Surat & Ekspor Excel**: Cetak siap pakai berstandar kedinasan (`print-color-adjust: exact`, `@media print`) dan tombol ekspor spreadsheet `.xlsx`.
+### SQL Tabel:
+```sql
+CREATE TABLE IF NOT EXISTS document_signatures (
+  id TEXT PRIMARY KEY,
+  meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+  document_type TEXT NOT NULL, -- 'attendance_report' | 'expedition_book'
+  signer_role TEXT NOT NULL,   -- 'secretary' (Tahap 1) | 'leader' (Tahap 2) | 'headmaster' (Tahap 3) | 'expedition_officer'
+  step_order INTEGER NOT NULL, -- 1 = Notulis, 2 = Pimpinan, 3 = Kepala Sekolah
+  signer_name TEXT NOT NULL,
+  signer_niy TEXT,
+  signer_phone TEXT,
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'signed' | 'rejected'
+  signed_at TIMESTAMPTZ,
+  verification_code TEXT,      -- Kode verifikasi unik (contoh: DEP-2026-X8F9A)
+  rejection_notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-- **Target Pengguna**: Petugas Tata Usaha (TU), Sekretaris/Panitia Rapat, Kepala Sekolah, dan Dewan Guru penerima undangan.
-
----
-
-## 2. User Experience & Visual Design
-
-### A. Alur Pengguna (User Flows)
-
-1. **Pembuatan & Penyiapan Undangan (Panitia di Dashboard)**:
-   - Panitia membuka menu **"Surat & Ekspedisi"** di Sidebar.
-   - Memilih agenda rapat dari dropdown agenda yang tersedia.
-   - Memasukkan format Nomor Pokok Surat (misal: `421.3/{no}/SMP.M.1/X/2026`) atau nomor surat otomatis berurutan.
-   - Sistem menampilkan daftar peserta yang diundang beserta status pengiriman dan status RSVP saat ini.
-2. **Pengiriman Undangan (Broadcast / Individual WAHA)**:
-   - Panitia menekan tombol *"Kirim Undangan WhatsApp (Semua)"* atau tombol kirim per guru.
-   - Sistem menyusun pesan personal dengan format rapi (Nama Guru, Agenda, Hari/Tanggal, Waktu, Lokasi, Pimpinan) serta menyematkan URL konfirmasi:
-     `https://app-url/?rsvp=<meetingId>&t=<teacherId>`
-   - Status pengiriman surat otomatis berubah menjadi *Terkirim (WA)* dengan tanggal & jam pengiriman tercatat di buku ekspedisi.
-3. **Konfirmasi Kehadiran oleh Guru di Smartphone**:
-   - Guru mengklik tautan RSVP dari pesan WhatsApp.
-   - Aplikasi memuat **Layar Konfirmasi Kehadiran dePresent** yang dioptimalkan untuk layar ponsel:
-     - Kartu ringkasan agenda dinas (Judul, Tanggal, Jam, Ruangan, Pimpinan).
-     - Identitas penerima surat (Nama, NIP/NIY, Jabatan).
-     - 3 Pilihan Status:
-       - **Akan Hadir** (Aksen Emerald / Hijau)
-       - **Izin Dinas / Keperluan** (Aksen Amber / Kuning) + formulir catatan alasan
-       - **Sakit** (Aksen Sky / Biru) + formulir keterangan
-     - Tombol konfirmasi dengan status tersimpan seketika.
-     - Guru menerima pesan terima kasih dan kartu bukti konfirmasi digital.
-4. **Pencetakan Buku Ekspedisi Surat**:
-   - Panitia menekan tombol *"Cetak Laporan Ekspedisi"*.
-   - Dialog cetak browser terbuka menampilkan format lembar kedinasan:
-     - Kop Surat resmi sekolah (Logo, Nama Yayasan, Nama Sekolah, Alamat, NPSN, Kontak).
-     - Judul: **BUKU EKSPEDISI DAN TANDA TERIMA SURAT UNDANGAN**.
-     - Rincian agenda: Nomor Surat Pokok, Perihal, Hari/Tanggal, Waktu, Tempat.
-     - Tabel ekspedisi bergaris tegas: No, Nama Pegawai / Guru, Jabatan, Tanggal Kirim, Media Kirim, Status Konfirmasi Kehadiran, Tanda Tangan / Bukti Terima.
-     - Titimangsa dan 3 kolom pengesahan: Kepala Sekolah, Pimpinan Rapat, dan Petugas Ekspedisi / Pengadministrasi Persuratan.
-5. **Ekspor File Excel (.xlsx)**:
-   - Panitia menekan tombol *"Ekspor Excel (.xlsx)"*.
-   - File tersimpan dengan nama rapi: `Buku_Ekspedisi_Undangan_<Nama_Rapat>_<Tanggal>.xlsx`.
-
-### B. Visual Identity & Theme
-- Mengikuti palet **Deep Oceanic Teal** (`teal-950`, `teal-900`, `teal-800`, `teal-600`) dengan mode terang (*Light*) dan gelap (*Dark*) yang konsisten.
-- Kartu ringkasan metrik ekspedisi menggunakan kartu ringkas bergaris tipis (`border border-teal-800/30`):
-  - Total Penerima Undangan
-  - Undangan Terkirim via WA
-  - Konfirmasi Akan Hadir
-  - Konfirmasi Izin / Sakit
-  - Belum Konfirmasi
-- Layar cetak (@media print) memiliki margin A4 standar, tabel bergaris hitam solid 1px kedinasan, teks 11pt–12pt, dan tanpa elemen tombol antarmuka layar (`no-print`).
-
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Alur RSVP Mandiri Berbasis URL Query Param (`?rsvp=...`)**:
-  - *Keputusan*: Menggunakan query parameter `?rsvp=<meetingId>&t=<teacherId>` yang langsung memicu view mandiri tanpa login password yang membebani guru.
-  - *Alasan*: Guru dapat langsung mengonfirmasi dalam 3 detik setelah menerima pesan WhatsApp. ID guru dan ID rapat sudah terverifikasi di parameter URL.
-- **Penyimpanan Lokal-Pertama dengan Sinkronisasi Supabase**:
-  - *Keputusan*: Model data `Invitation` disimpan di `localStorage` (`smp_invitations_v1`) dan disiapkan untuk tabel Supabase `smp_invitations`.
-  - *Alasan*: Memastikan aplikasi bekerja 100% instan secara offline / lokal tanpa jeda jaringan, serta tetap sinkron ketika database Supabase terhubung.
-- **Dukungan Konfirmasi Manual oleh Panitia**:
-  - *Keputusan*: Selain konfirmasi online dari HP guru, tabel ekspedisi di dashboard admin memiliki tombol cepat untuk menandai status RSVP jika ada guru yang konfirmasi secara lisan/telepon.
-  - *Alasan*: Menghindari kebuntuan jika ada guru senior yang kesulitan membuka browser di ponselnya.
-
----
-
-## 4. Technical Architecture & Data Strategy
-
-### Diagram Arsitektur & Alur Data
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│              Sistem Undangan & Ekspedisi Surat dePresent               │
-├────────────────────────────────────────────────────────────────────────┤
-│                                                                        │
-│  [ Agenda Rapat ] ───> [ Pilih Penerima (Semua / Tertentu) ]           │
-│                              │                                         │
-│                              ▼                                         │
-│                 [ Surat & Ekspedisi View ]                             │
-│                  - Input No. Surat & Tanggal Kirim                     │
-│                  - Preview Format Pesan WA & Link                      │
-│                  - Generate / Sync Data 'Invitation'                   │
-│                              │                                         │
-│             ┌────────────────┴────────────────┐                        │
-│             ▼                                 ▼                        │
-│   [ Kirim WhatsApp WAHA ]           [ Input Manual Panitia ]           │
-│    Payload: { target, message }      (Ubah status RSVP langsung)       │
-│    Link: ?rsvp=meeting&t=teacher              │                        │
-│             │                                 │                        │
-│             ▼                                 │                        │
-│   [ Guru Terima Pesan WA ]                    │                        │
-│             │                                 │                        │
-│             ▼                                 │                        │
-│   [ Layar Konfirmasi Mobile ]                 │                        │
-│    - Pilih Hadir / Izin / Sakit               │                        │
-│    - Catatan tambahan (opsional)              │                        │
-│             │                                 │                        │
-│             └────────────────┬────────────────┘                        │
-│                              │                                         │
-│                              ▼                                         │
-│                   [ Buku Ekspedisi Surat ]                             │
-│                              │                                         │
-│             ┌────────────────┴────────────────┐                        │
-│             ▼                                 ▼                        │
-│   [ Cetak Kop Surat Resmi ]          [ Ekspor Excel .xlsx ]            │
-│   - Format Dinas bergaris            - SheetJS Workbook                │
-│   - 3 Kolom Tanda Tangan             - Tabel Data & Rekap              │
-│                                                                        │
-└────────────────────────────────────────────────────────────────────────┘
+CREATE INDEX IF NOT EXISTS idx_signatures_meeting ON document_signatures(meeting_id);
 ```
 
-### Rincian Model Data & State:
-1. **Model Data `Invitation` (di `src/types/index.ts`)**:
-   ```typescript
-   export type RsvpStatus = 'unconfirmed' | 'attending' | 'permission' | 'sick';
-   export type DispatchChannel = 'whatsapp' | 'manual' | 'printed';
-   export type DispatchStatus = 'pending' | 'sent' | 'failed';
+### TypeScript Data Model (`src/types/index.ts`):
+```typescript
+export type DocumentType = 'attendance_report' | 'expedition_book';
+export type SignerRole = 'secretary' | 'leader' | 'headmaster' | 'expedition_officer';
+export type SignatureStatus = 'pending' | 'signed' | 'rejected';
 
-   export interface Invitation {
-     id: string;
-     meeting_id: string;
-     teacher_id: string;
-     letter_number: string; // e.g. "421.3/048/SMP.M.1/X/2026"
-     dispatch_date: string; // YYYY-MM-DD
-     dispatch_channel: DispatchChannel;
-     dispatch_status: DispatchStatus;
-     sent_at?: string; // ISO string
-     rsvp_status: RsvpStatus;
-     rsvp_notes?: string;
-     rsvp_at?: string; // ISO string
-     created_at?: string;
-   }
-   ```
-2. **Helpers Penyimpanan (di `src/lib/storage.ts`)**:
-   - `getCachedInvitations()`: Mengambil daftar undangan dari cache `localStorage`.
-   - `saveInvitation(invitation)`: Menambah atau memperbarui rekaman ekspedisi undangan.
-   - `saveBatchInvitations(invitations)`: Menyimpan sekaligus daftar undangan saat broadcast atau pembuatan nomor surat massal.
-   - `submitRsvpConfirmation(meetingId, teacherId, status, notes)`: Fungsi aman untuk mencatat konfirmasi kehadiran guru dari halaman mobile.
-3. **Komponen Baru**:
-   - `src/components/InvitationsView.tsx`: Halaman utama Surat & Ekspedisi dengan filter rapat, ringkasan KPI ekspedisi, broadcast WAHA, tabel ekspedisi, cetak Kop Surat resmi, dan ekspor XLSX.
-   - `src/components/RsvpConfirmationView.tsx`: Tampilan responsif mobile saat URL berparameter `?rsvp=...` diakses guru dari WhatsApp.
-4. **Pembaruan Navigasi & Tampilan**:
-   - `src/components/Sidebar.tsx`: Menambahkan opsi navigasi `'invitations'` dengan label **"Surat & Ekspedisi"** dan ikon surat dinas (`ScrollText` atau `FileSpreadsheet`).
-   - `src/App.tsx`: Menangani deteksi URL query parameter `?rsvp=...`, menghubungkan tab navigasi ke `InvitationsView`, dan menyediakan state undangan yang reaktif.
+export interface DocumentSignature {
+  id: string;
+  meeting_id: string;
+  document_type: DocumentType;
+  signer_role: SignerRole;
+  step_order: number;
+  signer_name: string;
+  signer_niy: string;
+  signer_phone?: string;
+  status: SignatureStatus;
+  signed_at?: string; // Format ISO string, tampilan dengan detik HH:mm:ss
+  verification_code?: string;
+  rejection_notes?: string;
+  created_at: string;
+}
+```
+
+---
+
+## 2. Penyimpanan & Sinkronisasi (`src/lib/storage.ts`)
+
+- `fetchDocumentSignatures(meetingId: string)`: Membaca langsung dari tabel Supabase `document_signatures` secara realtime.
+- `saveDocumentSignature(sig: DocumentSignature)`: Melakukan upsert langsung ke database Supabase.
+- Otomatis membuat 3 slot penandatangan terurut saat inisialisasi:
+  1. **Notulis Rapat** (`step_order: 1`, `signer_role: 'secretary'`)
+  2. **Pimpinan Rapat** (`step_order: 2`, `signer_role: 'leader'`)
+  3. **Kepala Sekolah** (`step_order: 3`, `signer_role: 'headmaster'`)
+
+---
+
+## 3. Alur Berjenjang (Sequential) & Estafet WhatsApp
+
+1. **Notulis Rapat (Tahap 1)**: Menerima WhatsApp pertama kali saat panitia memulai alur pengesahan atau rapat selesai.
+2. **Pimpinan Rapat (Tahap 2)**: 
+   - Notifikasi WhatsApp otomatis terkirim begitu Notulis klik Setujui.
+   - Jika Pimpinan membuka tautan sebelum Notulis selesai, sistem menampilkan banner: *"Menunggu pengesahan Notulis Rapat terlebih dahulu"*.
+3. **Kepala Sekolah (Tahap 3 - Final)**:
+   - Notifikasi WhatsApp pengesahan akhir otomatis terkirim begitu Pimpinan Rapat klik Setujui.
+   - Begitu Kepala Sekolah menyetujui, berkas dinyatakan **Sah & Lengkap**.
+
+---
+
+## 4. Halaman Persetujuan Mandiri (`src/components/SignatureApprovalView.tsx`)
+
+Parameter URL: `?sign=<meetingId>&doc=<attendance_report|expedition_book>&role=<role>`
+- **Stepper 3 Tahap**: Menampilkan posisi alur saat ini.
+- **Ringkasan Agenda Rapat**: Nama rapat, tanggal, jam, ruangan, dan persentase kehadiran.
+- **Tabel Daftar Guru TIDAK HADIR**: Menampilkan nama guru, NIY, mapel/jabatan, dan alasan tidak hadir agar pimpinan & kepala sekolah melihat rincian riil sebelum menandatangani.
+- **Tombol Pengesahan**: Sekali klik untuk menerbitkan tanda tangan elektronik resmi beserta kode otentikasi.
+
+---
+
+## 5. Visualisasi Hasil Kolom TTD pada Dokumen Cetak SPJ & Ekspedisi
+
+### Aturan Visual:
+| Pejabat | Elemen Tanda Tangan Digital |
+| :--- | :--- |
+| **Notulis Rapat** (Tahap 1) | **QR Code Verifikasi** (60x60px) + Kode Otentikasi + Waktu Pengesahan (dengan detik) |
+| **Pimpinan Rapat** (Tahap 2) | **QR Code Verifikasi** (60x60px) + Kode Otentikasi + Waktu Pengesahan (dengan detik) |
+| **Kepala Sekolah** (Tahap 3) | **Stempel Kedinasan Biru Resmi Sekolah** + **QR Code Verifikasi** + Waktu Pengesahan (dengan detik) |
+
+### Contoh Tata Letak Kolom Tanda Tangan:
+
+```
++---------------------------+  +---------------------------+  +---------------------------+
+|      NOTULIS RAPAT,       |  |      PIMPINAN RAPAT,      |  |        MENGETAHUI,        |
+|                           |  |                           |  |      KEPALA SEKOLAH,      |
+|                           |  |                           |  |                           |
+|       [ QR CODE ]         |  |       [ QR CODE ]         |  |   [ STEMPEL ] [ QR CODE ] |
+|      +-----------+        |  |      +-----------+        |  |   +---------+ +---------+ |
+|      | █▀▀▀█ ▄ █ |        |  |      | █▀▀▀█ ▄ █ |        |  |  /  SMP MUH \ | █▀▀▀█ █ | |
+|      | ▀▀▀▀▀ ▀ ▀ |        |  |      | ▀▀▀▀▀ ▀ ▀ |        |  | |  TERSAH- | | ▀▀▀▀▀ ▀ | |
+|      +-----------+        |  |      +-----------+        |  |  \   IKAN  / +---------+ |
+|      DEP-SEC-4A12B        |  |      DEP-LDR-7C89F        |  |   +-------+ DEP-HDS-9E21D |
+|                           |  |                           |  |                           |
+|      NAMA NOTULIS         |  |    NAMA PIMPINAN RAPAT    |  |     NAMA KEPALA SEKOLAH   |
+|   NIY. 19850314...        |  |    NIY. 19780211...       |  |     NIY. 19740512...      |
+|  [TTD Elektronik Sah]     |  |   [TTD Elektronik Sah]    |  |  [Tersertifikasi Resmi]   |
++---------------------------+  +---------------------------+  +---------------------------+
+```
+
+---
+
+## 6. Langkah-Langkah Pengerjaan
+1. **Model Data**: Definisikan `DocumentSignature` dan enum terkait di `src/types/index.ts`.
+2. **Database Supabase**: Implementasikan fungsi baca/tulis langsung ke Supabase `document_signatures` di `src/lib/storage.ts`.
+3. **Komponen Visual TTD (`DigitalSignatureBadge.tsx`)**: Menampilkan QR Code (semua pejabat) dan Stempel Kedinasan Biru (khusus Kepala Sekolah).
+4. **Halaman Publik Persetujuan (`SignatureApprovalView.tsx`)**: Lengkap dengan stepper urutan penandatanganan dan tabel pegawai yang tidak hadir.
+5. **Panel Kontrol di Laporan & Ekspedisi**: Bilah kontrol pengiriman tautan WhatsApp WAHA dan pemantauan status TTD real-time.
+6. **Routing & Integrasi Cetak**: Menghubungkan parameter URL `?sign=...` di `src/App.tsx` dan memasang stempel/QR di `ReportsView.tsx` dan `InvitationsView.tsx`.
+7. **Pengujian**: Verifikasi alur berjenjang dan kompilasi build `compile_applet`.

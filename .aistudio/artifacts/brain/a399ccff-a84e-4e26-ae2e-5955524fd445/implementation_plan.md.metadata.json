@@ -1,6 +1,6 @@
 {
-  "summary":  "Rencana komprehensif implementasi Fitur Undangan Rapat dengan Konfirmasi Kehadiran (RSVP) via WhatsApp, Buku/Laporan Ekspedisi Surat Resmi ber-Kop Surat dan Tanda Tangan, serta Ekspor Excel (.xlsx). Memuat alur tautan responsif ke HP guru (?rsvp=...), integrasi WAHA WhatsApp API, tabel ekspedisi dengan pencatatan nomor surat, dan menu baru 'Surat & Ekspedisi' di Sidebar dePresent.",
-  "updatedAt":  "2026-10-26T10:34:26.962704953Z",
+  "summary":  "Pembaruan aturan visual tanda tangan dokumen: Stempel kedinasan sekolah HANYA dibubuhkan pada kolom Kepala Sekolah (sebagai pengesahan tertinggi instansi), sedangkan Pimpinan Rapat, Notulis Rapat, dan Petugas TU cukup menggunakan QR Code verifikasi otentisitas digital.",
+  "updatedAt":  "2026-10-29T18:39:28.916105938Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

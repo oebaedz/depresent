@@ -1,4 +1,4 @@
-import { Attendance, AttendanceMethod, AttendanceStatus, Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher } from '../types';
+import { Attendance, AttendanceMethod, AttendanceStatus, DocumentSignature, DocumentType, Invitation, Meeting, RsvpStatus, SchoolProfile, SignerRole, Teacher } from '../types';
 import { INITIAL_ATTENDANCES, INITIAL_MEETINGS, INITIAL_SCHOOL_PROFILE, INITIAL_TEACHERS } from './demoData';
 import { getSupabase } from './supabase';
 import { generateUUID, isValidUUID } from './uuid';
@@ -9,6 +9,7 @@ const KEY_TEACHERS = 'smp_teachers_v3';
 const KEY_MEETINGS = 'smp_meetings_v3';
 const KEY_ATTENDANCES = 'smp_attendances_v3';
 const KEY_INVITATIONS = 'smp_invitations_v1';
+const KEY_SIGNATURES = 'smp_document_signatures_v1';
 
 // Helper to ensure all IDs in an array of records are valid UUIDs
 function ensureValidUUIDs<T extends { id: string }>(records: T[]): T[] {
@@ -1185,5 +1186,290 @@ export async function submitRsvpConfirmation(
     success: true,
     invitation: existing,
     message: `Konfirmasi kehadiran Anda (${statusLabel}) berhasil dicatat. Terima kasih!`,
+  };
+}
+
+// ============================================================================
+// DOCUMENT SIGNATURES (PERSISTENCE DIRECT TO SUPABASE + SEQUENTIAL WORKFLOW)
+// ============================================================================
+
+export function getCachedDocumentSignatures(meetingId?: string): DocumentSignature[] {
+  if (typeof window === 'undefined') return [];
+  const stored = localStorage.getItem(KEY_SIGNATURES);
+  if (!stored) return [];
+  try {
+    const list: DocumentSignature[] = JSON.parse(stored);
+    if (meetingId) {
+      return list.filter((s) => s.meeting_id === meetingId);
+    }
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+
+/**
+ * Mengambil seluruh tanda tangan dokumen untuk suatu rapat secara langsung dari Supabase Database.
+ * Memprioritaskan database PostgreSQL dan memperbarui cache lokal.
+ */
+export async function fetchDocumentSignatures(meetingId: string): Promise<DocumentSignature[]> {
+  const cachedAll = getCachedDocumentSignatures();
+  const cachedForMeeting = cachedAll.filter((s) => s.meeting_id === meetingId);
+
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      // 1. Coba baca dari tabel smp_document_signatures
+      const { data, error } = await supabase
+        .from('smp_document_signatures')
+        .select('*')
+        .eq('meeting_id', meetingId)
+        .order('step_order', { ascending: true });
+
+      if (!error && data && Array.isArray(data)) {
+        // Sync ke cache lokal
+        const otherMeetingsSigs = cachedAll.filter((s) => s.meeting_id !== meetingId);
+        const merged = [...otherMeetingsSigs, ...data];
+        localStorage.setItem(KEY_SIGNATURES, JSON.stringify(merged));
+        return data as DocumentSignature[];
+      } else if (error && error.code === '42P01') {
+        // Table doesn't exist yet, try creating table or fallback
+        console.warn('Tabel smp_document_signatures belum ada di Supabase, menggunakan cache lokal.');
+      }
+    } catch (e) {
+      console.warn('Error fetching signatures from Supabase:', e);
+    }
+  }
+
+  return cachedForMeeting;
+}
+
+/**
+ * Menyimpan data tanda tangan digital langsung ke database Supabase dan cache lokal.
+ */
+export async function saveDocumentSignature(sig: DocumentSignature): Promise<DocumentSignature> {
+  const nowIso = new Date().toISOString();
+  const cleanSig: DocumentSignature = {
+    ...sig,
+    id: sig.id || generateUUID(),
+    created_at: sig.created_at || nowIso,
+  };
+
+  // 1. Simpan ke local cache segera
+  const cached = getCachedDocumentSignatures();
+  const idx = cached.findIndex((s) => s.id === cleanSig.id || (s.meeting_id === cleanSig.meeting_id && s.document_type === cleanSig.document_type && s.signer_role === cleanSig.signer_role));
+  let updatedList: DocumentSignature[];
+  if (idx >= 0) {
+    updatedList = [...cached];
+    updatedList[idx] = cleanSig;
+  } else {
+    updatedList = [...cached, cleanSig];
+  }
+  localStorage.setItem(KEY_SIGNATURES, JSON.stringify(updatedList));
+
+  // 2. Simpan langsung ke Supabase PostgreSQL database
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('smp_document_signatures').upsert(cleanSig);
+      if (error) {
+        console.warn('Gagal upsert ke smp_document_signatures di Supabase:', error.message);
+      }
+    } catch (err) {
+      console.warn('Koneksi Supabase error saat menyimpan tanda tangan:', err);
+    }
+  }
+
+  return cleanSig;
+}
+
+/**
+ * Memastikan slot penandatangan terurut tersedia untuk suatu rapat.
+ * Jika belum ada di DB / cache, otomatis dibuatkan:
+ * 1. Laporan Daftar Hadir:
+ *    - Tahap 1: Notulis Rapat
+ *    - Tahap 2: Pimpinan Rapat
+ *    - Tahap 3: Kepala Sekolah (Pengesahan Final dengan Stempel Kedinasan)
+ * 2. Buku Ekspedisi:
+ *    - Tahap 1: Petugas Ekspedisi / TU
+ *    - Tahap 2: Kepala Sekolah (Pengesahan Final dengan Stempel Kedinasan)
+ */
+export async function ensureMeetingSignatures(
+  meeting: Meeting,
+  profile: SchoolProfile,
+  teachers: Teacher[]
+): Promise<DocumentSignature[]> {
+  const existing = await fetchDocumentSignatures(meeting.id);
+
+  const needed: Omit<DocumentSignature, 'id' | 'created_at'>[] = [];
+
+  // Pimpinan Rapat info
+  const leaderTeacher = teachers.find((t) => t.name === meeting.leader_name);
+  const leaderPhone = leaderTeacher?.phone_wa || '';
+  const leaderNiy = meeting.leader_niy || leaderTeacher?.niy || leaderTeacher?.nip || '-';
+
+  // Notulis info
+  const secretaryTeacher = meeting.secretary_name ? teachers.find((t) => t.name === meeting.secretary_name) : undefined;
+  const secretaryName = meeting.secretary_name || 'Notulis Rapat';
+  const secretaryNiy = meeting.secretary_niy || secretaryTeacher?.niy || secretaryTeacher?.nip || '-';
+  const secretaryPhone = secretaryTeacher?.phone_wa || '';
+
+  // Kepala Sekolah info
+  const headmasterName = profile.headmaster_name || 'Kepala Sekolah';
+  const headmasterNiy = profile.headmaster_niy || profile.headmaster_nip || '-';
+  const headmasterPhone = profile.phone || '';
+
+  // 1. Slot TTD Laporan Daftar Hadir (3 Tahap Terurut)
+  // Step 1: Notulis
+  if (!existing.some((s) => s.document_type === 'attendance_report' && s.signer_role === 'secretary')) {
+    needed.push({
+      meeting_id: meeting.id,
+      document_type: 'attendance_report',
+      signer_role: 'secretary',
+      step_order: 1,
+      signer_name: secretaryName,
+      signer_niy: secretaryNiy,
+      signer_phone: secretaryPhone,
+      status: 'pending',
+    });
+  }
+
+  // Step 2: Pimpinan Rapat
+  if (!existing.some((s) => s.document_type === 'attendance_report' && s.signer_role === 'leader')) {
+    needed.push({
+      meeting_id: meeting.id,
+      document_type: 'attendance_report',
+      signer_role: 'leader',
+      step_order: 2,
+      signer_name: meeting.leader_name,
+      signer_niy: leaderNiy,
+      signer_phone: leaderPhone,
+      status: 'pending',
+    });
+  }
+
+  // Step 3: Kepala Sekolah
+  if (!existing.some((s) => s.document_type === 'attendance_report' && s.signer_role === 'headmaster')) {
+    needed.push({
+      meeting_id: meeting.id,
+      document_type: 'attendance_report',
+      signer_role: 'headmaster',
+      step_order: 3,
+      signer_name: headmasterName,
+      signer_niy: headmasterNiy,
+      signer_phone: headmasterPhone,
+      status: 'pending',
+    });
+  }
+
+  // 2. Slot TTD Buku Ekspedisi (2 Tahap)
+  // Step 1: Petugas Ekspedisi / TU
+  if (!existing.some((s) => s.document_type === 'expedition_book' && s.signer_role === 'expedition_officer')) {
+    needed.push({
+      meeting_id: meeting.id,
+      document_type: 'expedition_book',
+      signer_role: 'expedition_officer',
+      step_order: 1,
+      signer_name: 'Petugas Ekspedisi / TU',
+      signer_niy: '-',
+      signer_phone: '',
+      status: 'pending',
+    });
+  }
+
+  // Step 2: Kepala Sekolah
+  if (!existing.some((s) => s.document_type === 'expedition_book' && s.signer_role === 'headmaster')) {
+    needed.push({
+      meeting_id: meeting.id,
+      document_type: 'expedition_book',
+      signer_role: 'headmaster',
+      step_order: 2,
+      signer_name: headmasterName,
+      signer_niy: headmasterNiy,
+      signer_phone: headmasterPhone,
+      status: 'pending',
+    });
+  }
+
+  if (needed.length > 0) {
+    const toSave: DocumentSignature[] = needed.map((item) => ({
+      ...item,
+      id: generateUUID(),
+      created_at: new Date().toISOString(),
+    }));
+
+    for (const sig of toSave) {
+      await saveDocumentSignature(sig);
+    }
+
+    return await fetchDocumentSignatures(meeting.id);
+  }
+
+  return existing;
+}
+
+/**
+ * Melakukan proses penandatanganan berjenjang (sequential approval)
+ * Memvalidasi apakah tahap sebelumnya telah disetujui.
+ */
+export async function signDocumentStep(
+  meetingId: string,
+  docType: DocumentType,
+  role: SignerRole,
+  notes?: string
+): Promise<{ success: boolean; signature?: DocumentSignature; message: string; nextSignerRole?: SignerRole }> {
+  const sigs = await fetchDocumentSignatures(meetingId);
+  const target = sigs.find((s) => s.document_type === docType && s.signer_role === role);
+
+  if (!target) {
+    return { success: false, message: 'Slot penandatangan tidak ditemukan.' };
+  }
+
+  // Aturan Berjenjang: Cek apakah penandatangan pada step_order sebelumnya sudah signed
+  if (target.step_order > 1) {
+    const previousSigner = sigs.find(
+      (s) => s.document_type === docType && s.step_order === target.step_order - 1
+    );
+    if (!previousSigner || previousSigner.status !== 'signed') {
+      const prevRoleName =
+        previousSigner?.signer_role === 'secretary'
+          ? 'Notulis Rapat'
+          : previousSigner?.signer_role === 'leader'
+          ? 'Pimpinan Rapat'
+          : 'Petugas Ekspedisi';
+      return {
+        success: false,
+        message: `Pengesahan belum dapat dilakukan. Menunggu tanda tangan dari ${prevRoleName} terlebih dahulu.`,
+      };
+    }
+  }
+
+  // Buat kode verifikasi unik bersertifikasi (misal: DEP-2026-X8F9A)
+  const roleCode = role.substring(0, 3).toUpperCase();
+  const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const year = new Date().getFullYear();
+  const verificationCode = `DEP-${year}-${roleCode}${randomSuffix}`;
+
+  const updated: DocumentSignature = {
+    ...target,
+    status: 'signed',
+    signed_at: new Date().toISOString(),
+    verification_code: verificationCode,
+    rejection_notes: notes || undefined,
+  };
+
+  await saveDocumentSignature(updated);
+
+  // Cari siapa penandatangan berikutnya dalam alur
+  const nextSigner = sigs.find(
+    (s) => s.document_type === docType && s.step_order === target.step_order + 1
+  );
+
+  return {
+    success: true,
+    signature: updated,
+    nextSignerRole: nextSigner?.signer_role,
+    message: `Dokumen berhasil disetujui dan disahkan secara elektronik. Kode Verifikasi: ${verificationCode}.`,
   };
 }

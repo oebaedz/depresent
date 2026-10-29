@@ -107,3 +107,23 @@ export interface Invitation {
 export interface InvitationWithTeacher extends Invitation {
   teacher: Teacher;
 }
+
+export type DocumentType = 'attendance_report' | 'expedition_book';
+export type SignerRole = 'secretary' | 'leader' | 'headmaster' | 'expedition_officer';
+export type SignatureStatus = 'pending' | 'signed' | 'rejected';
+
+export interface DocumentSignature {
+  id: string;
+  meeting_id: string;
+  document_type: DocumentType;
+  signer_role: SignerRole;
+  step_order: number; // 1 = Notulis, 2 = Pimpinan, 3 = Kepala Sekolah
+  signer_name: string;
+  signer_niy: string;
+  signer_phone?: string;
+  status: SignatureStatus;
+  signed_at?: string; // ISO string with timestamp (including seconds)
+  verification_code?: string; // e.g. "DEP-2026-X8F9A"
+  rejection_notes?: string;
+  created_at: string;
+}

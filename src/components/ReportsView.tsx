@@ -1,9 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
-import { Printer, Download, FileSpreadsheet, FileText, CheckCircle2, Calendar, MapPin, User, Check, Building2, Share2, UserX } from 'lucide-react';
-import { Attendance, Meeting, SchoolProfile, Teacher } from '../types';
+import {
+  Printer,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  CheckCircle2,
+  Calendar,
+  MapPin,
+  User,
+  Check,
+  Building2,
+  Share2,
+  UserX,
+  ShieldCheck,
+  Send,
+  Copy,
+  ExternalLink,
+  Lock,
+  ArrowRight,
+  Clock,
+} from 'lucide-react';
+import { Attendance, Meeting, SchoolProfile, Teacher, DocumentSignature, SignerRole } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
 import { AbsentTeachersModal } from './AbsentTeachersModal';
+import { DigitalSignatureBadge } from './DigitalSignatureBadge';
+import { ensureMeetingSignatures, fetchDocumentSignatures, getCachedDocumentSignatures } from '../lib/storage';
+import { invokeWahaNotification } from '../lib/waha';
+
 
 interface ReportsViewProps {
   meetings: Meeting[];
@@ -31,6 +55,35 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const attendanceMap = new Map<string, Attendance>();
   meetingAttendances.forEach((a) => attendanceMap.set(a.teacher_id, a));
 
+  // Digital Signatures state for this meeting
+  const [signatures, setSignatures] = useState<DocumentSignature[]>(() => {
+    return currentMeeting ? getCachedDocumentSignatures(currentMeeting.id) : [];
+  });
+  const [isLoadingSignatures, setIsLoadingSignatures] = useState(false);
+  const [signatureFeedback, setSignatureFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentMeeting) return;
+    let isMounted = true;
+    setIsLoadingSignatures(true);
+    ensureMeetingSignatures(currentMeeting, schoolProfile, activeTeachers)
+      .then((data) => {
+        if (isMounted) {
+          setSignatures(data);
+          setIsLoadingSignatures(false);
+        }
+      })
+      .catch((err) => {
+        console.warn('Failed to ensure meeting signatures:', err);
+        if (isMounted) setIsLoadingSignatures(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentMeeting?.id, schoolProfile.headmaster_name]);
+
+
   // Filter active teachers according to current meeting's target_type & invited_teacher_ids, sorted structural-first
   const isCustomMeeting =
     currentMeeting &&
@@ -52,10 +105,101 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const tidakHadir = Math.max(0, total - (hadir + terlambat + izin + sakit));
   const rate = total > 0 ? Math.round(((hadir + terlambat) / total) * 100) : 0;
 
+  const secretarySig = signatures.find(
+    (s) => s.document_type === 'attendance_report' && s.signer_role === 'secretary'
+  );
+  const leaderSig = signatures.find(
+    (s) => s.document_type === 'attendance_report' && s.signer_role === 'leader'
+  );
+  const headmasterSig = signatures.find(
+    (s) => s.document_type === 'attendance_report' && s.signer_role === 'headmaster'
+  );
+
+  const isSecretarySigned = secretarySig?.status === 'signed';
+  const isLeaderSigned = leaderSig?.status === 'signed';
+  const isHeadmasterSigned = headmasterSig?.status === 'signed';
+
+  // Find phone numbers
+  const secretaryTeacher = teachers.find(
+    (t) => t.name.toLowerCase() === currentMeeting?.secretary_name?.toLowerCase() || (t.niy && t.niy === currentMeeting?.secretary_niy)
+  );
+  const leaderTeacher = teachers.find(
+    (t) => t.name.toLowerCase() === currentMeeting?.leader_name?.toLowerCase() || (t.niy && t.niy === currentMeeting?.leader_niy)
+  );
+
+  const secretaryPhone = secretaryTeacher?.phone_wa || secretarySig?.signer_phone || '';
+  const leaderPhone = leaderTeacher?.phone_wa || leaderSig?.signer_phone || '';
+  const headmasterPhone = schoolProfile.phone || headmasterSig?.signer_phone || '';
+
+  const getSignUrl = (role: SignerRole) => {
+    if (typeof window === 'undefined' || !currentMeeting) return '';
+    return `${window.location.origin}${window.location.pathname}?sign=${currentMeeting.id}&role=${role}&doc=attendance_report`;
+  };
+
+  const handleCopySignUrl = (role: SignerRole, label: string) => {
+    const url = getSignUrl(role);
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setSignatureFeedback(`Tautan persetujuan & TTD digital untuk ${label} berhasil disalin!`);
+    setTimeout(() => setSignatureFeedback(null), 4000);
+  };
+
+  const handleSendSignWa = async (role: SignerRole, label: string, targetName: string, targetPhone?: string) => {
+    if (!currentMeeting) return;
+    const url = getSignUrl(role);
+    const textMsg = `*PERMOHONAN PENGESAHAN & TANDA TANGAN ELEKTRONIK*\n` +
+      `Yth. Bapak/Ibu *${targetName}* (${label})\n` +
+      `${schoolProfile.school_name || 'SMP Muhammadiyah 1 Gombong'}\n\n` +
+      `Sehubungan dengan selesainya agenda rapat kedinasan:\n` +
+      `📌 *${currentMeeting.title}*\n` +
+      `📅 Hari/Tanggal: ${currentMeeting.meeting_date}\n` +
+      `⏰ Waktu: ${currentMeeting.start_time.slice(0, 5)} - ${currentMeeting.end_time.slice(0, 5)} WIB\n` +
+      `🏛️ Tempat: ${currentMeeting.room}\n\n` +
+      `📊 *Rekapitulasi Kehadiran Peserta:*\n` +
+      `- Total Pegawai: ${total} orang\n` +
+      `- Hadir: ${hadir + terlambat} orang (${rate}%)\n` +
+      `- Izin / Sakit: ${izin + sakit} orang\n` +
+      `- Tidak Hadir: ${tidakHadir} orang\n\n` +
+      `Mohon kesediaan Bapak/Ibu untuk memeriksa berkas daftar hadir dan membubuhkan Tanda Tangan Elektronik resmi melalui tautan di bawah ini:\n` +
+      `👉 *Buka Lembar Pengesahan:*\n${url}\n\n` +
+      `_Pesan otomatis dikirim melalui Sistem Presensi Resmi dePresent._`;
+
+    if (targetPhone) {
+      try {
+        const res = await invokeWahaNotification({
+          action: 'invitation_dispatch',
+          recipient: targetPhone,
+          message: textMsg,
+          metadata: {
+            meetingId: currentMeeting.id,
+            role,
+            type: 'signature_request',
+          },
+        });
+        if (res.success) {
+          setSignatureFeedback(`Permohonan TTD via WhatsApp berhasil dikirim ke ${targetName} (${targetPhone})!`);
+          setTimeout(() => setSignatureFeedback(null), 4000);
+          return;
+        }
+      } catch (e) {
+        console.warn('Waha notification failed, opening wa.me fallback:', e);
+      }
+    }
+
+    const cleanPhone = (targetPhone || '').replace(/\D/g, '');
+    const waUrl = cleanPhone
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMsg)}`
+      : `https://wa.me/?text=${encodeURIComponent(textMsg)}`;
+    window.open(waUrl, '_blank');
+    setSignatureFeedback(`Membuka WhatsApp untuk mengirim permohonan TTD ke ${targetName}.`);
+    setTimeout(() => setSignatureFeedback(null), 4000);
+  };
+
   // Print Handler
   const handlePrint = () => {
     window.print();
   };
+
 
   // Export to Excel XLSX using SheetJS
   const handleExportXLSX = () => {
@@ -224,6 +368,298 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           <span>{exportSuccess}</span>
         </div>
       )}
+
+      {signatureFeedback && (
+        <div className="p-3 bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200 rounded-lg text-xs font-medium flex items-center gap-2 no-print shadow-xs animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
+          <span>{signatureFeedback}</span>
+        </div>
+      )}
+
+      {/* PANEL KONTROL ALUR TANDA TANGAN DIGITAL BERJENJANG (WHATSAPP & SUPABASE DB) */}
+      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs no-print space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-[#0f4950] pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+              <ShieldCheck className="w-5 h-5" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                Alur Persetujuan & Tanda Tangan Digital (WhatsApp)
+                {isHeadmasterSigned ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
+                    Lengkap (3/3 Sah)
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+                    Progres: {(isSecretarySigned ? 1 : 0) + (isLeaderSigned ? 1 : 0)} / 3 Tahap
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-teal-200/70">
+                Alur berjenjang: Notulis memverifikasi presensi ➔ Pimpinan menyetujui jalannya rapat ➔ Kepala Sekolah mengesahkan dengan stempel resmi kedinasan.
+              </p>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-500 dark:text-teal-300/80 bg-slate-50 dark:bg-[#031e21] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#0f4950] shrink-0">
+            Penyimpanan: <span className="font-semibold text-teal-700 dark:text-teal-300">Supabase DB</span>
+          </div>
+        </div>
+
+        {/* 3 Sequential Steps Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+          {/* TAHAP 1: NOTULIS RAPAT */}
+          <div className={`p-4 rounded-xl border transition-all ${
+            isSecretarySigned
+              ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/80'
+              : 'bg-slate-50 dark:bg-[#031e21] border-slate-200 dark:border-[#0f4950]'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 dark:bg-[#0f4950] text-slate-700 dark:text-teal-200">
+                Tahap 1 • Validasi
+              </span>
+              {isSecretarySigned ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Disahkan
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                  <Clock className="w-3.5 h-3.5" /> Menunggu TTD
+                </span>
+              )}
+            </div>
+
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+              Notulis Rapat
+            </h4>
+            <p className="text-xs font-semibold text-teal-700 dark:text-teal-300 truncate">
+              {currentMeeting?.secretary_name || 'Belum Ditentukan'}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-teal-300/70 font-mono mb-3">
+              {currentMeeting?.secretary_niy ? `NIY. ${currentMeeting.secretary_niy}` : 'NIY: -'}
+            </p>
+
+            {isSecretarySigned ? (
+              <div className="text-[10px] bg-white dark:bg-[#072b2f] p-2 rounded-lg border border-emerald-200 dark:border-emerald-800 space-y-0.5 mb-2">
+                <div className="font-mono text-emerald-800 dark:text-emerald-300 font-bold truncate">
+                  {secretarySig?.verification_code}
+                </div>
+                <div className="text-slate-500 dark:text-teal-300/70">
+                  Disahkan pukul {secretarySig?.signed_at ? new Date(secretarySig.signed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'} WIB
+                </div>
+              </div>
+            ) : (
+              <div className="text-[10px] text-slate-500 dark:text-teal-300/60 mb-2">
+                Tanda tangan QR verifikasi notula & daftar hadir.
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 pt-2 border-t border-slate-200 dark:border-[#0f4950]">
+              <button
+                type="button"
+                onClick={() => handleSendSignWa('secretary', 'Notulis Rapat', currentMeeting?.secretary_name || 'Notulis', secretaryPhone)}
+                className="flex-1 py-1.5 px-2 bg-teal-700 hover:bg-teal-600 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                title="Kirim tautan persetujuan TTD ke WhatsApp Notulis"
+              >
+                <Send className="w-3 h-3" />
+                <span>Kirim WA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCopySignUrl('secretary', 'Notulis')}
+                className="p-1.5 bg-white dark:bg-[#072b2f] hover:bg-slate-100 dark:hover:bg-[#0b383d] text-slate-700 dark:text-teal-200 border border-slate-300 dark:border-[#0f4950] rounded-lg text-[11px] cursor-pointer"
+                title="Salin tautan TTD Notulis"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+
+              <a
+                href={getSignUrl('secretary')}
+                target="_blank"
+                rel="noreferrer"
+                className="p-1.5 bg-white dark:bg-[#072b2f] hover:bg-slate-100 dark:hover:bg-[#0b383d] text-slate-700 dark:text-teal-200 border border-slate-300 dark:border-[#0f4950] rounded-lg text-[11px] flex items-center justify-center cursor-pointer"
+                title="Buka form TTD Notulis"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* TAHAP 2: PIMPINAN RAPAT */}
+          <div className={`p-4 rounded-xl border transition-all ${
+            isLeaderSigned
+              ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/80'
+              : !isSecretarySigned
+              ? 'bg-slate-100/60 dark:bg-[#031e21]/40 border-slate-200 dark:border-[#0f4950]/60 opacity-80'
+              : 'bg-slate-50 dark:bg-[#031e21] border-slate-200 dark:border-[#0f4950]'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-200 dark:bg-[#0f4950] text-slate-700 dark:text-teal-200">
+                Tahap 2 • Persetujuan
+              </span>
+              {isLeaderSigned ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Disahkan
+                </span>
+              ) : !isSecretarySigned ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-teal-400/60">
+                  <Lock className="w-3.5 h-3.5" /> Menunggu Notulis
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                  <Clock className="w-3.5 h-3.5" /> Siap Ditandatangani
+                </span>
+              )}
+            </div>
+
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+              Pimpinan Rapat
+            </h4>
+            <p className="text-xs font-semibold text-teal-700 dark:text-teal-300 truncate">
+              {currentMeeting?.leader_name || 'Belum Ditentukan'}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-teal-300/70 font-mono mb-3">
+              {currentMeeting?.leader_niy ? `NIY. ${currentMeeting.leader_niy}` : 'NIY: -'}
+            </p>
+
+            {isLeaderSigned ? (
+              <div className="text-[10px] bg-white dark:bg-[#072b2f] p-2 rounded-lg border border-emerald-200 dark:border-emerald-800 space-y-0.5 mb-2">
+                <div className="font-mono text-emerald-800 dark:text-emerald-300 font-bold truncate">
+                  {leaderSig?.verification_code}
+                </div>
+                <div className="text-slate-500 dark:text-teal-300/70">
+                  Disahkan pukul {leaderSig?.signed_at ? new Date(leaderSig.signed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'} WIB
+                </div>
+              </div>
+            ) : (
+              <div className="text-[10px] text-slate-500 dark:text-teal-300/60 mb-2">
+                {!isSecretarySigned
+                  ? 'Alur berjenjang: Notulis harus TTD terlebih dahulu.'
+                  : 'Siap ditandatangani oleh pimpinan rapat (QR Code).'}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 pt-2 border-t border-slate-200 dark:border-[#0f4950]">
+              <button
+                type="button"
+                onClick={() => handleSendSignWa('leader', 'Pimpinan Rapat', currentMeeting?.leader_name || 'Pimpinan', leaderPhone)}
+                className="flex-1 py-1.5 px-2 bg-teal-700 hover:bg-teal-600 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                title="Kirim tautan persetujuan TTD ke WhatsApp Pimpinan Rapat"
+              >
+                <Send className="w-3 h-3" />
+                <span>Kirim WA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCopySignUrl('leader', 'Pimpinan Rapat')}
+                className="p-1.5 bg-white dark:bg-[#072b2f] hover:bg-slate-100 dark:hover:bg-[#0b383d] text-slate-700 dark:text-teal-200 border border-slate-300 dark:border-[#0f4950] rounded-lg text-[11px] cursor-pointer"
+                title="Salin tautan TTD Pimpinan"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+
+              <a
+                href={getSignUrl('leader')}
+                target="_blank"
+                rel="noreferrer"
+                className="p-1.5 bg-white dark:bg-[#072b2f] hover:bg-slate-100 dark:hover:bg-[#0b383d] text-slate-700 dark:text-teal-200 border border-slate-300 dark:border-[#0f4950] rounded-lg text-[11px] flex items-center justify-center cursor-pointer"
+                title="Buka form TTD Pimpinan"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* TAHAP 3: KEPALA SEKOLAH */}
+          <div className={`p-4 rounded-xl border transition-all ${
+            isHeadmasterSigned
+              ? 'bg-blue-50/60 dark:bg-blue-950/20 border-blue-300 dark:border-blue-800/80'
+              : !isLeaderSigned
+              ? 'bg-slate-100/60 dark:bg-[#031e21]/40 border-slate-200 dark:border-[#0f4950]/60 opacity-80'
+              : 'bg-slate-50 dark:bg-[#031e21] border-slate-200 dark:border-[#0f4950]'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                Tahap 3 • Pengesahan & Stempel
+              </span>
+              {isHeadmasterSigned ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 dark:text-blue-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Sah & Berstempel
+                </span>
+              ) : !isLeaderSigned ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-teal-400/60">
+                  <Lock className="w-3.5 h-3.5" /> Menunggu Pimpinan
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                  <Clock className="w-3.5 h-3.5" /> Siap Disahkan
+                </span>
+              )}
+            </div>
+
+            <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+              Kepala Sekolah
+            </h4>
+            <p className="text-xs font-semibold text-teal-700 dark:text-teal-300 truncate">
+              {schoolProfile.headmaster_name || 'Kepala Sekolah'}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-teal-300/70 font-mono mb-3">
+              {schoolProfile.headmaster_niy ? `NIY. ${schoolProfile.headmaster_niy}` : 'NIY: -'}
+            </p>
+
+            {isHeadmasterSigned ? (
+              <div className="text-[10px] bg-white dark:bg-[#072b2f] p-2 rounded-lg border border-blue-200 dark:border-blue-800 space-y-0.5 mb-2">
+                <div className="font-mono text-blue-900 dark:text-blue-300 font-bold truncate">
+                  {headmasterSig?.verification_code}
+                </div>
+                <div className="text-slate-500 dark:text-teal-300/70">
+                  Disahkan pukul {headmasterSig?.signed_at ? new Date(headmasterSig.signed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'} WIB (Stempel Sah)
+                </div>
+              </div>
+            ) : (
+              <div className="text-[10px] text-slate-500 dark:text-teal-300/60 mb-2">
+                {!isLeaderSigned
+                  ? 'Alur berjenjang: Pimpinan Rapat harus TTD terlebih dahulu.'
+                  : 'Menerbitkan Stempel Resmi Sekolah + QR Verifikasi.'}
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 pt-2 border-t border-slate-200 dark:border-[#0f4950]">
+              <button
+                type="button"
+                onClick={() => handleSendSignWa('headmaster', 'Kepala Sekolah', schoolProfile.headmaster_name || 'Kepala Sekolah', headmasterPhone)}
+                className="flex-1 py-1.5 px-2 bg-blue-800 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                title="Kirim tautan pengesahan TTD ke WhatsApp Kepala Sekolah"
+              >
+                <Send className="w-3 h-3" />
+                <span>Kirim WA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCopySignUrl('headmaster', 'Kepala Sekolah')}
+                className="p-1.5 bg-white dark:bg-[#072b2f] hover:bg-slate-100 dark:hover:bg-[#0b383d] text-slate-700 dark:text-teal-200 border border-slate-300 dark:border-[#0f4950] rounded-lg text-[11px] cursor-pointer"
+                title="Salin tautan TTD Kepala Sekolah"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+
+              <a
+                href={getSignUrl('headmaster')}
+                target="_blank"
+                rel="noreferrer"
+                className="p-1.5 bg-white dark:bg-[#072b2f] hover:bg-slate-100 dark:hover:bg-[#0b383d] text-slate-700 dark:text-teal-200 border border-slate-300 dark:border-[#0f4950] rounded-lg text-[11px] flex items-center justify-center cursor-pointer"
+                title="Buka form TTD Kepala Sekolah"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Official Printable Report Document */}
       <div className="bg-white text-slate-900 p-8 md:p-12 rounded-xl border border-slate-300 shadow-sm max-w-4xl mx-auto report-printable-area print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none">
@@ -417,42 +853,53 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </div>
         </div>
 
-        {/* 6. Formal Closing Signatures (Headmaster, Meeting Leader, and Meeting Secretary) */}
+        {/* 6. Formal Closing Signatures with Digital Signatures (Headmaster with Official Seal, Leader & Secretary with QR) */}
         <div className="pt-6 w-full signature-block page-break-inside-avoid break-inside-avoid">
           <table className="w-full text-center text-xs font-sans border-none signature-table">
             <tbody>
               <tr>
-                {/* Kepala Sekolah */}
+                {/* Kepala Sekolah (Official Seal + QR Code) */}
                 <td className="w-1/3 align-top px-2">
-                  <p className="text-slate-700">Mengetahui,</p>
-                  <p className="font-bold text-slate-900">Kepala Sekolah</p>
-                  <div className="h-16" />
-                  <p className="font-bold underline text-slate-900">{schoolProfile.headmaster_name}</p>
-                  <p className="text-slate-700 font-mono text-[11px]">NIY. {schoolProfile.headmaster_niy}</p>
+                  <p className="text-slate-700 font-semibold mb-1">Mengetahui,</p>
+                  <DigitalSignatureBadge
+                    signature={headmasterSig}
+                    role="headmaster"
+                    roleTitle="Kepala Sekolah"
+                    signerName={schoolProfile.headmaster_name || 'Kepala Sekolah'}
+                    signerNiy={schoolProfile.headmaster_niy}
+                    schoolProfile={schoolProfile}
+                    isPrintView={true}
+                  />
                 </td>
 
-                {/* Pimpinan Rapat Tertentu */}
+                {/* Pimpinan Rapat (QR Code Only) */}
                 <td className="w-1/3 align-top px-2">
-                  <p className="text-slate-700">&nbsp;</p>
-                  <p className="font-bold text-slate-900">Pimpinan Rapat</p>
-                  <div className="h-16" />
-                  <p className="font-bold underline text-slate-900">{currentMeeting?.leader_name}</p>
-                  <p className="text-slate-700 font-mono text-[11px]">
-                    {currentMeeting?.leader_niy ? `NIY. ${currentMeeting.leader_niy}` : 'Pimpinan Agenda'}
-                  </p>
+                  <p className="text-slate-700 font-semibold mb-1">&nbsp;</p>
+                  <DigitalSignatureBadge
+                    signature={leaderSig}
+                    role="leader"
+                    roleTitle="Pimpinan Rapat"
+                    signerName={currentMeeting?.leader_name || 'Pimpinan Rapat'}
+                    signerNiy={currentMeeting?.leader_niy}
+                    schoolProfile={schoolProfile}
+                    isPrintView={true}
+                  />
                 </td>
 
-                {/* Notulis Rapat Tertentu */}
+                {/* Notulis Rapat (QR Code Only) */}
                 <td className="w-1/3 align-top px-2">
-                  <p className="text-slate-700">
+                  <p className="text-slate-700 font-semibold mb-1">
                     {schoolProfile.city || 'Kota'}, {currentMeeting?.meeting_date ? new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('id-ID')}
                   </p>
-                  <p className="font-bold text-slate-900">Notulis Rapat</p>
-                  <div className="h-16" />
-                  <p className="font-bold underline text-slate-900">{currentMeeting?.secretary_name || '-'}</p>
-                  <p className="text-slate-700 font-mono text-[11px]">
-                    {currentMeeting?.secretary_niy ? `NIY. ${currentMeeting.secretary_niy}` : 'Notulis'}
-                  </p>
+                  <DigitalSignatureBadge
+                    signature={secretarySig}
+                    role="secretary"
+                    roleTitle="Notulis Rapat"
+                    signerName={currentMeeting?.secretary_name || 'Notulis Rapat'}
+                    signerNiy={currentMeeting?.secretary_niy}
+                    schoolProfile={schoolProfile}
+                    isPrintView={true}
+                  />
                 </td>
               </tr>
             </tbody>

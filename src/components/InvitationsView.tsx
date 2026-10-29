@@ -24,12 +24,15 @@ import {
   X,
   FileEdit,
   Share2,
+  ShieldCheck,
 } from 'lucide-react';
-import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher, WahaConfig } from '../types';
+import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher, WahaConfig, DocumentSignature, SignerRole } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
-import { saveBatchInvitations, saveInvitation, saveMeeting, sortMeetingsClosestFirst } from '../lib/storage';
+import { ensureMeetingSignatures, getCachedDocumentSignatures, saveBatchInvitations, saveInvitation, saveMeeting, sortMeetingsClosestFirst } from '../lib/storage';
 import { DEFAULT_WAHA_CONFIG, getWahaConfig, invokeWahaNotification, saveWahaConfig } from '../lib/waha';
 import { UnconfirmedRsvpModal } from './UnconfirmedRsvpModal';
+import { DigitalSignatureBadge } from './DigitalSignatureBadge';
+
 
 interface InvitationsViewProps {
   meetings: Meeting[];
@@ -106,6 +109,25 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
     return sortTeachersStructuralFirst(filtered);
   }, [currentMeeting, teachers]);
+
+  // Digital Signatures state for expedition book
+  const [signatures, setSignatures] = useState<DocumentSignature[]>(() => {
+    return currentMeeting ? getCachedDocumentSignatures(currentMeeting.id) : [];
+  });
+
+  useEffect(() => {
+    if (!currentMeeting) return;
+    let isMounted = true;
+    ensureMeetingSignatures(currentMeeting, schoolProfile, meetingTeachers)
+      .then((data) => {
+        if (isMounted) setSignatures(data);
+      })
+      .catch((err) => console.warn(err));
+    return () => {
+      isMounted = false;
+    };
+  }, [currentMeeting?.id, schoolProfile.headmaster_name]);
+
 
   // Invitations map for current meeting: teacher_id -> Invitation
   const currentMeetingInvitationsMap = useMemo(() => {
@@ -573,8 +595,67 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     showToast('File Excel Buku Ekspedisi berhasil diunduh.');
   };
 
+  const expeditionHeadmasterSig = signatures.find(
+    (s) => s.document_type === 'expedition_book' && s.signer_role === 'headmaster'
+  );
+  const isExpeditionHeadmasterSigned = expeditionHeadmasterSig?.status === 'signed';
+
+  const handleSendExpeditionSignWa = async () => {
+    if (!currentMeeting) return;
+    const signUrl = `${window.location.origin}${window.location.pathname}?sign=${currentMeeting.id}&role=headmaster&doc=expedition_book`;
+    const targetName = schoolProfile.headmaster_name || 'Kepala Sekolah';
+    const textMsg = `*PERMOHONAN PENGESAHAN BUKU EKSPEDISI RESMI*\n` +
+      `Yth. Bapak/Ibu *${targetName}* (Kepala Sekolah)\n` +
+      `${schoolProfile.school_name || 'SMP Muhammadiyah 1 Gombong'}\n\n` +
+      `Sehubungan dengan penerbitan dan pengiriman surat undangan agenda rapat kedinasan:\n` +
+      `📌 *${currentMeeting.title}*\n` +
+      `📄 Nomor Surat: ${letterNumber.trim() || '-'}\n` +
+      `📅 Hari/Tanggal: ${currentMeeting.meeting_date}\n` +
+      `⏰ Waktu: ${currentMeeting.start_time.slice(0, 5)} - ${currentMeeting.end_time.slice(0, 5)} WIB\n\n` +
+      `📊 *Rekapitulasi Ekspedisi Undangan:*\n` +
+      `- Total Penerima: ${stats.total} orang\n` +
+      `- Terkirim WA: ${stats.sentCount} orang\n` +
+      `- Konfirmasi Hadir: ${stats.attendingCount} orang\n` +
+      `- Konfirmasi Izin/Sakit: ${stats.permissionCount + stats.sickCount} orang\n` +
+      `- Belum Konfirmasi: ${stats.unconfirmedCount} orang\n\n` +
+      `Mohon kesediaan Bapak Kepala Sekolah untuk memeriksa buku ekspedisi dan membubuhkan Tanda Tangan & Stempel Resmi Elektronik melalui tautan di bawah ini:\n` +
+      `👉 *Buka Lembar Pengesahan Ekspedisi:*\n${signUrl}\n\n` +
+      `_Pesan otomatis dikirim melalui Sistem Presensi Resmi dePresent._`;
+
+    const targetPhone = schoolProfile.phone || '';
+    if (targetPhone) {
+      try {
+        const res = await invokeWahaNotification({
+          action: 'invitation_dispatch',
+          recipient: targetPhone,
+          message: textMsg,
+          metadata: {
+            meetingId: currentMeeting.id,
+            role: 'headmaster',
+            doc: 'expedition_book',
+            type: 'expedition_signature_request',
+          },
+        });
+        if (res.success) {
+          showToast(`Permohonan TTD Buku Ekspedisi berhasil dikirim ke WhatsApp Kepala Sekolah (${targetPhone})!`);
+          return;
+        }
+      } catch (e) {
+        console.warn('Waha notification failed, opening wa.me fallback:', e);
+      }
+    }
+
+    const cleanPhone = targetPhone.replace(/\D/g, '');
+    const waUrl = cleanPhone
+      ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMsg)}`
+      : `https://wa.me/?text=${encodeURIComponent(textMsg)}`;
+    window.open(waUrl, '_blank');
+    showToast('Membuka WhatsApp untuk permohonan TTD Buku Ekspedisi Kepala Sekolah.');
+  };
+
   // Filtered teachers for dashboard display
   const displayedTeachers = useMemo(() => {
+
     return meetingTeachers.filter((t) => {
       const matchSearch =
         t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -657,6 +738,19 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
             >
               <Printer className="w-4 h-4 text-teal-600 dark:text-teal-400" />
               Cetak Laporan Ekspedisi
+            </button>
+
+            <button
+              onClick={handleSendExpeditionSignWa}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
+                isExpeditionHeadmasterSigned
+                  ? 'bg-blue-900/90 hover:bg-blue-800 text-white border border-blue-500'
+                  : 'bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white'
+              }`}
+              title="Kirim tautan persetujuan TTD & Stempel Ekspedisi ke WhatsApp Kepala Sekolah"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>{isExpeditionHeadmasterSigned ? '✓ Ekspedisi Disahkan' : 'Kirim TTD Ekspedisi (WA)'}</span>
             </button>
 
             <button
@@ -1173,34 +1267,36 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
           </tbody>
         </table>
 
-        {/* 2-Column Official Signature Block (Tanpa TTD Pimpinan Rapat, Tanpa NIP, Nama Tidak All Caps) */}
+        {/* 2-Column Official Signature Block with Digital Signature Badges */}
         <div className="break-inside-avoid mt-8 grid grid-cols-2 text-center text-xs px-8">
-          {/* Petugas Ekspedisi */}
-          <div className="flex flex-col justify-between h-28">
-            <p>
-              Petugas Ekspedisi / TU,
-            </p>
-            <div>
-              <p className="font-bold underline">( ............................................ )</p>
-              <p className="text-[10px] text-gray-700">NIY: -</p>
-            </div>
+          {/* Petugas Ekspedisi (QR Code Verifikasi) */}
+          <div className="px-3">
+            <DigitalSignatureBadge
+              signature={signatures.find((s) => s.document_type === 'expedition_book' && s.signer_role === 'expedition_officer')}
+              role="expedition_officer"
+              roleTitle="Petugas Ekspedisi / TU"
+              signerName="Petugas Ekspedisi / TU"
+              signerNiy="-"
+              schoolProfile={schoolProfile}
+              isPrintView={true}
+            />
           </div>
 
-          {/* Kepala Sekolah */}
-          <div className="flex flex-col justify-between h-28">
-            <div>
-              <p>{schoolProfile.city || 'Gombong'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              <p>Mengetahui,</p>
-              <p>Kepala Sekolah,</p>
-            </div>
-            <div>
-              <p className="font-bold underline">
-                {schoolProfile.headmaster_name || '( ............................................ )'}
-              </p>
-              <p className="text-[10px] text-gray-700">
-                NIY: {schoolProfile.headmaster_niy || '-'}
-              </p>
-            </div>
+          {/* Kepala Sekolah (Stempel Resmi Kedinasan + QR Code) */}
+          <div className="px-3">
+            <p className="text-gray-700 text-xs mb-1">
+              {schoolProfile.city || 'Gombong'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+            <p className="text-gray-700 text-xs mb-1">Mengetahui,</p>
+            <DigitalSignatureBadge
+              signature={signatures.find((s) => s.document_type === 'expedition_book' && s.signer_role === 'headmaster')}
+              role="headmaster"
+              roleTitle="Kepala Sekolah"
+              signerName={schoolProfile.headmaster_name || 'Kepala Sekolah'}
+              signerNiy={schoolProfile.headmaster_niy}
+              schoolProfile={schoolProfile}
+              isPrintView={true}
+            />
           </div>
         </div>
 
