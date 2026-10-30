@@ -123,6 +123,35 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
     );
   }
 
+  if (meeting.is_locked) {
+    return (
+      <div className="min-h-screen bg-slate-100 dark:bg-[#031e21] flex items-center justify-center p-6 text-center">
+        <div className="bg-white dark:bg-[#072b2f] p-7 rounded-2xl border border-amber-300 dark:border-amber-700 shadow-md max-w-sm w-full space-y-4">
+          <div className="w-14 h-14 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto border border-amber-300 dark:border-amber-700 shadow-xs">
+            <Lock className="w-7 h-7" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+              Dokumen Telah Disahkan
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">{meeting.title}</h3>
+            <p className="text-xs text-slate-600 dark:text-teal-200/90 leading-relaxed">
+              Presensi mandiri telah ditutup secara resmi karena agenda rapat ini telah disahkan dan terkunci dengan QR Code verifikasi resmi.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              onClick={() => (window.location.href = window.location.pathname)}
+              className="w-full py-2.5 px-4 bg-teal-800 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
+            >
+              <span>Kembali ke Beranda</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   let activeTeachers = teachers.filter((t) => t.is_active);
   const isCustomMeeting =
     meeting.target_type === 'custom' &&

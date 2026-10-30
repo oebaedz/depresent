@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { Camera, RefreshCw, CheckCircle2, Clock, UserCheck, AlertCircle, Volume2, Search, Smartphone, ShieldCheck, Zap } from 'lucide-react';
+import { Camera, RefreshCw, CheckCircle2, Clock, UserCheck, AlertCircle, Volume2, Search, Smartphone, ShieldCheck, Zap, Lock } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { AttendanceStatus, Meeting, Teacher } from '../types';
 import { recordAttendance } from '../lib/storage';
@@ -75,6 +75,15 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
   const processAttendance = useCallback(async (teacher: Teacher, method: 'card_scan' | 'manual') => {
     if (!selectedMeeting) return;
     setIsRecording(true);
+
+    // Verify if meeting is locked
+    if (selectedMeeting.is_locked) {
+      sound.playWarning();
+      setCameraError(`Agenda rapat "${selectedMeeting.title}" telah disahkan secara resmi dan terkunci. Presensi baru ditutup.`);
+      setTimeout(() => setCameraError(null), 5000);
+      setIsRecording(false);
+      return;
+    }
 
     // Verify attendee invitation if target_type is custom
     if (selectedMeeting.target_type === 'custom' && selectedMeeting.invited_teacher_ids && selectedMeeting.invited_teacher_ids.length > 0) {
@@ -279,12 +288,25 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
           >
             {meetings.map((m) => (
               <option key={m.id} value={m.id} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
-                {m.title} ({m.meeting_date}) [{m.status === 'active' ? 'AKTIF' : m.status}] {m.target_type === 'custom' ? `(${m.invited_teacher_ids?.length || 0} Undangan)` : ''}
+                {m.title} ({m.meeting_date}){m.is_locked ? ' 🔒' : ''} [{m.status === 'active' ? 'AKTIF' : m.status}] {m.target_type === 'custom' ? `(${m.invited_teacher_ids?.length || 0} Undangan)` : ''}
               </option>
             ))}
           </select>
         </div>
       </div>
+
+      {/* Warning / Status Banner for Locked Meeting */}
+      {selectedMeeting?.is_locked && (
+        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs font-semibold flex items-center gap-2.5 shadow-xs">
+          <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <div>
+            <span className="font-bold block">Agenda Rapat Telah Disahkan Secara Elektronik & Terkunci Resmi</span>
+            <span className="text-[11px] font-normal text-amber-800 dark:text-amber-300/90 block mt-0.5">
+              Presensi baru ditutup secara otomatis untuk melindungi keabsahan dan integritas hukum dokumen kedinasan.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid: Camera Scanner (Left) & Live Confirmation Card / Manual Search (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

@@ -18,6 +18,7 @@ import {
   Copy,
   ExternalLink,
   Lock,
+  Unlock,
   ArrowRight,
   Clock,
 } from 'lucide-react';
@@ -25,7 +26,7 @@ import { Attendance, Meeting, SchoolProfile, Teacher, DocumentSignature, SignerR
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
 import { AbsentTeachersModal } from './AbsentTeachersModal';
 import { DigitalSignatureBadge } from './DigitalSignatureBadge';
-import { ensureMeetingSignatures, fetchDocumentSignatures, getCachedDocumentSignatures } from '../lib/storage';
+import { ensureMeetingSignatures, fetchDocumentSignatures, getCachedDocumentSignatures, toggleLockMeeting } from '../lib/storage';
 import { invokeWahaNotification } from '../lib/waha';
 
 
@@ -55,35 +56,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const attendanceMap = new Map<string, Attendance>();
   meetingAttendances.forEach((a) => attendanceMap.set(a.teacher_id, a));
 
-  // Digital Signatures state for this meeting
-  const [signatures, setSignatures] = useState<DocumentSignature[]>(() => {
-    return currentMeeting ? getCachedDocumentSignatures(currentMeeting.id) : [];
-  });
-  const [isLoadingSignatures, setIsLoadingSignatures] = useState(false);
-  const [signatureFeedback, setSignatureFeedback] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!currentMeeting) return;
-    let isMounted = true;
-    setIsLoadingSignatures(true);
-    ensureMeetingSignatures(currentMeeting, schoolProfile, activeTeachers)
-      .then((data) => {
-        if (isMounted) {
-          setSignatures(data);
-          setIsLoadingSignatures(false);
-        }
-      })
-      .catch((err) => {
-        console.warn('Failed to ensure meeting signatures:', err);
-        if (isMounted) setIsLoadingSignatures(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentMeeting?.id, schoolProfile.headmaster_name]);
-
-
   // Filter active teachers according to current meeting's target_type & invited_teacher_ids, sorted structural-first
   const isCustomMeeting =
     currentMeeting &&
@@ -96,6 +68,30 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       .filter((t) => t.is_active)
       .filter((t) => !isCustomMeeting || currentMeeting.invited_teacher_ids!.includes(t.id))
   );
+
+  // Digital Signatures state for this meeting
+  const [signatures, setSignatures] = useState<DocumentSignature[]>(() => {
+    return currentMeeting ? getCachedDocumentSignatures(currentMeeting.id) : [];
+  });
+  const [isLoadingSignatures, setIsLoadingSignatures] = useState(false);
+  const [signatureFeedback, setSignatureFeedback] = useState<string | null>(null);
+
+  const loadSignatures = async () => {
+    if (!currentMeeting) return;
+    setIsLoadingSignatures(true);
+    try {
+      const data = await ensureMeetingSignatures(currentMeeting, schoolProfile, activeTeachers);
+      setSignatures(data);
+    } catch (err) {
+      console.warn('Failed to ensure meeting signatures:', err);
+    } finally {
+      setIsLoadingSignatures(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSignatures();
+  }, [currentMeeting?.id, schoolProfile.headmaster_name]);
 
   const total = activeTeachers.length;
   const hadir = meetingAttendances.filter((a) => a.status === 'hadir').length;
@@ -300,13 +296,50 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setTimeout(() => setExportSuccess(null), 4000);
   };
 
+  const handleToggleLock = async () => {
+    if (!currentMeeting) return;
+    const nextLocked = !currentMeeting.is_locked;
+    if (nextLocked) {
+      if (
+        !window.confirm(
+          `Kunci agenda rapat "${currentMeeting.title}"?\n\nSetelah dikunci, seluruh hasil pengesahan dan presensi berstatus resmi terkunci (data kehadiran dilindungi dari perubahan).`
+        )
+      ) {
+        return;
+      }
+    } else {
+      if (
+        !window.confirm(
+          `Buka kunci agenda rapat "${currentMeeting.title}"?\n\nPeringatan: Membuka kunci rapat memungkinkan perubahan data pada dokumen yang telah disahkan.`
+        )
+      ) {
+        return;
+      }
+    }
+    await toggleLockMeeting(currentMeeting.id, nextLocked);
+    currentMeeting.is_locked = nextLocked;
+    setSignatureFeedback(
+      nextLocked
+        ? `Rapat "${currentMeeting.title}" berhasil dikunci resmi (Status Disahkan & Dilindungi).`
+        : `Kunci rapat "${currentMeeting.title}" berhasil dibuka.`
+    );
+    setTimeout(() => setSignatureFeedback(null), 4000);
+    loadSignatures();
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header & Actions */}
       <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Laporan Resmi & Berkas Presensi Kedinasan</h2>
+            {currentMeeting?.is_locked && (
+              <span className="text-[10px] font-bold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                <span>Terkunci Resmi</span>
+              </span>
+            )}
             {isCustomMeeting && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-100 dark:bg-[#031e21] text-teal-900 dark:text-teal-200 border border-teal-200 dark:border-teal-800">
                 Rapat Khusus ({total} Peserta)
@@ -327,10 +360,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           >
             {meetings.map((m) => (
               <option key={m.id} value={m.id} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
-                {m.title} ({m.meeting_date}){m.target_type === 'custom' ? ' [Khusus]' : ''}
+                {m.title} ({m.meeting_date}){m.is_locked ? ' 🔒' : ''}{m.target_type === 'custom' ? ' [Khusus]' : ''}
               </option>
             ))}
           </select>
+
+          {/* Lock / Unlock Meeting Button */}
+          <button
+            onClick={handleToggleLock}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
+              currentMeeting?.is_locked
+                ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                : 'bg-slate-700 hover:bg-slate-600 text-white'
+            }`}
+            title={currentMeeting?.is_locked ? 'Buka Kunci Rapat' : 'Kunci Dokumen & Rapat Ini'}
+          >
+            {currentMeeting?.is_locked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+            <span>{currentMeeting?.is_locked ? 'Buka Kunci' : 'Kunci Rapat'}</span>
+          </button>
 
           {/* Kirim Rekap Tidak Hadir ke WA Grup Button */}
           <button
@@ -361,6 +408,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Warning / Status Banner for Locked Meeting */}
+      {currentMeeting?.is_locked && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 rounded-lg text-xs font-semibold flex items-center justify-between gap-2 no-print shadow-xs">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>
+              Agenda rapat ini telah <strong>Disahkan & Terkunci Resmi</strong>. Data presensi dan penandatanganan dilindungi demi integritas hukum dokumen.
+            </span>
+          </div>
+          <button
+            onClick={handleToggleLock}
+            className="text-[11px] underline font-bold hover:text-amber-950 dark:hover:text-amber-100 cursor-pointer shrink-0"
+          >
+            Buka Kunci
+          </button>
+        </div>
+      )}
 
       {exportSuccess && (
         <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-lg text-xs font-medium flex items-center gap-2 no-print">

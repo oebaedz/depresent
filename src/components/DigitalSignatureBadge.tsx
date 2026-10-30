@@ -74,8 +74,8 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
   // Cukup QR Code verifikasi otentik untuk semua penandatangan (Stempel ditiadakan)
   if (isSigned) {
     return (
-      <div className="flex flex-col items-center justify-between text-center select-none py-1">
-        <p className="text-xs font-bold text-slate-800 dark:text-teal-100 print:text-black mb-1">
+      <div className="flex flex-col items-center justify-between text-center select-none py-1 text-slate-900">
+        <p className="text-xs font-bold text-slate-900 print:text-black mb-1">
           {roleTitle}
         </p>
 
@@ -93,18 +93,18 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
                 <img
                   src={qrDataUrl}
                   alt="QR Verifikasi TTD"
-                  className="w-18 h-18 object-contain border border-slate-300 dark:border-teal-700/60 p-1 bg-white rounded-md shadow-xs"
+                  className="w-18 h-18 object-contain border border-slate-300 p-1 bg-white rounded-md shadow-xs"
                 />
-                <span className="no-print opacity-0 group-hover:opacity-100 absolute inset-0 bg-teal-900/70 text-white rounded-md text-[8px] font-bold flex items-center justify-center gap-0.5 transition-opacity">
+                <span className="no-print opacity-0 group-hover:opacity-100 absolute inset-0 bg-slate-900/80 text-white rounded-md text-[8.5px] font-bold flex items-center justify-center gap-0.5 transition-opacity">
                   <ExternalLink className="w-2.5 h-2.5" /> Verifikasi
                 </span>
               </div>
             ) : (
-              <div className="w-18 h-18 border border-slate-300 dark:border-teal-700/60 rounded-md flex items-center justify-center bg-white">
+              <div className="w-18 h-18 border border-slate-300 rounded-md flex items-center justify-center bg-white">
                 <CheckCircle2 className="w-8 h-8 text-emerald-600" />
               </div>
             )}
-            <span className="text-[8.5px] font-mono font-bold text-slate-800 dark:text-teal-200 print:text-black mt-1 tracking-tight">
+            <span className="text-[9px] font-mono font-bold text-slate-800 print:text-black mt-1 tracking-tight">
               {signature?.verification_code || 'DEP-VERIFIED'}
             </span>
           </a>
@@ -112,17 +112,17 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
 
         {/* NAMA PEJABAT & NIY */}
         <div className="mt-1">
-          <p className="font-bold underline text-xs text-slate-900 dark:text-white print:text-black">
+          <p className="font-bold underline text-xs text-slate-950 print:text-black">
             {signerName}
           </p>
-          <p className="text-[10px] text-slate-700 dark:text-teal-200 font-mono print:text-black">
+          <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
             NIY. {signerNiy || '-'}
           </p>
-          <p className="text-[8px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1 mt-0.5">
-            <ShieldCheck className="w-2.5 h-2.5 inline" />
+          <p className="text-[8.5px] text-emerald-800 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1 mt-0.5">
+            <ShieldCheck className="w-2.5 h-2.5 inline text-emerald-700" />
             <span>Tanda Tangan Elektronik Sah</span>
           </p>
-          <p className="text-[7.5px] text-slate-500 dark:text-teal-300/70 font-mono print:text-slate-600 mt-0.5">
+          <p className="text-[8px] text-slate-600 font-mono print:text-slate-600 mt-0.5">
             {signedDateStr} {signedTimeStr} WIB
           </p>
         </div>
@@ -132,21 +132,21 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
 
   // JIKA BELUM TTD (PENDING / DOKUMEN CETAK BELUM DISAHKAN):
   return (
-    <div className="flex flex-col justify-between h-36 text-center text-xs py-1">
-      <p className="font-semibold text-slate-800 dark:text-teal-100 print:text-black">
+    <div className="flex flex-col justify-between h-36 text-center text-xs py-1 text-slate-900">
+      <p className="font-bold text-slate-900 print:text-black">
         {roleTitle}
       </p>
 
       {/* Kolom kosong untuk tanda tangan basah konvensional */}
-      <div className="h-20 flex items-center justify-center text-slate-400 dark:text-teal-300/40 text-[10px] italic print:hidden">
+      <div className="h-20 flex items-center justify-center text-slate-400 text-[10px] italic print:hidden">
         (Menunggu Persetujuan & Pengesahan)
       </div>
 
       <div className="mt-auto">
-        <p className="font-bold underline text-slate-900 dark:text-white print:text-black">
+        <p className="font-bold underline text-slate-950 print:text-black">
           {signerName ? signerName : '( ............................................ )'}
         </p>
-        <p className="text-[10px] text-slate-700 dark:text-teal-300/80 font-mono print:text-black">
+        <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
           NIY. {signerNiy || '-'}
         </p>
       </div>

@@ -15,6 +15,8 @@ import {
   Tag,
   AlertCircle,
   Check,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { Meeting, Teacher } from '../types';
 import {
@@ -25,6 +27,7 @@ import {
   addMeetingCategory,
   deleteMeetingCategory,
   sortMeetingsClosestFirst,
+  toggleLockMeeting,
 } from '../lib/storage';
 import { generateUUID } from '../lib/uuid';
 import {
@@ -177,6 +180,30 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     onRefresh();
   };
 
+  const handleToggleLock = async (m: Meeting) => {
+    const nextLocked = !m.is_locked;
+    if (nextLocked) {
+      const confirmLock = window.confirm(
+        `Kunci agenda rapat "${m.title}"?\n\nSetelah dikunci, rapat disahkan secara resmi dan presensi baru ditutup demi integritas data dokumen kedinasan.`
+      );
+      if (!confirmLock) return;
+    } else {
+      const confirmUnlock = window.confirm(
+        `Buka kunci agenda rapat "${m.title}"?\n\nPeringatan: Membuka kunci rapat yang sudah disahkan memungkinkan perubahan data kehadiran.`
+      );
+      if (!confirmUnlock) return;
+    }
+
+    await toggleLockMeeting(m.id, nextLocked);
+    setActionSuccessMsg(
+      nextLocked
+        ? `Rapat "${m.title}" berhasil dikunci resmi (Status Disahkan & Dilindungi).`
+        : `Kunci rapat "${m.title}" berhasil dibuka.`
+    );
+    setTimeout(() => setActionSuccessMsg(null), 4000);
+    onRefresh();
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -306,10 +333,18 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
               }`}
             >
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-teal-900 dark:text-teal-200 bg-teal-50 dark:bg-[#031e21] border border-teal-200 dark:border-teal-800/80 px-2 py-0.5 rounded">
-                    {m.category}
-                  </span>
+                <div className="flex items-center justify-between gap-1 flex-wrap">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] font-bold text-teal-900 dark:text-teal-200 bg-teal-50 dark:bg-[#031e21] border border-teal-200 dark:border-teal-800/80 px-2 py-0.5 rounded">
+                      {m.category}
+                    </span>
+                    {m.is_locked && (
+                      <span className="text-[10px] font-bold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded flex items-center gap-1 shadow-2xs">
+                        <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                        <span>Terkunci (Disahkan)</span>
+                      </span>
+                    )}
+                  </div>
                   <span
                     className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       m.status === 'active'
@@ -417,17 +452,48 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1">
+                  {/* Lock / Unlock Toggle Button */}
                   <button
-                    onClick={() => handleOpenEdit(m)}
+                    onClick={() => handleToggleLock(m)}
+                    className={`p-1.5 rounded transition-colors ${
+                      m.is_locked
+                        ? 'text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-950/60'
+                        : 'text-slate-400 hover:text-slate-700 dark:hover:text-teal-200 hover:bg-slate-100 dark:hover:bg-[#0b383d]'
+                    }`}
+                    title={m.is_locked ? 'Buka Kunci Rapat' : 'Kunci Rapat (Lindungi Integritas Pengesahan)'}
+                  >
+                    {m.is_locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (m.is_locked) {
+                        if (!window.confirm(`Rapat "${m.title}" telah disahkan & terkunci resmi. Tetap ingin mengedit agenda ini?`)) {
+                          return;
+                        }
+                      }
+                      handleOpenEdit(m);
+                    }}
                     className="p-1.5 text-slate-500 dark:text-teal-300 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#0b383d] rounded"
-                    title="Edit Rapat"
+                    title={m.is_locked ? 'Edit Rapat (Terkunci)' : 'Edit Rapat'}
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
+
                   <button
-                    onClick={() => setDeleteTargetMeeting(m)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded"
-                    title="Hapus Rapat"
+                    onClick={() => {
+                      if (m.is_locked) {
+                        alert(`Rapat "${m.title}" telah disahkan secara resmi dan terkunci. Buka kunci terlebih dahulu jika ingin menghapusnya.`);
+                        return;
+                      }
+                      setDeleteTargetMeeting(m);
+                    }}
+                    className={`p-1.5 rounded ${
+                      m.is_locked
+                        ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-60'
+                        : 'text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'
+                    }`}
+                    title={m.is_locked ? 'Tidak dapat dihapus (Rapat Terkunci)' : 'Hapus Rapat'}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

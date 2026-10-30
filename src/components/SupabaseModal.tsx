@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Database, Check, Copy, AlertTriangle, ExternalLink, RefreshCw, Globe, UploadCloud, CheckCircle2, Sparkles } from 'lucide-react';
-import { getSupabaseCredentials, saveSupabaseCredentials, SUPABASE_SQL_SCHEMA, SUPABASE_SQL_MIGRATION_V4, SUPABASE_SQL_INVITATIONS, SUPABASE_SQL_LETTER_NUMBER, testSupabaseConnection } from '../lib/supabase';
+import { getSupabaseCredentials, saveSupabaseCredentials, SUPABASE_SQL_SCHEMA, SUPABASE_SQL_MIGRATION_V4, SUPABASE_SQL_INVITATIONS, SUPABASE_SQL_LETTER_NUMBER, SUPABASE_SQL_SIGNATURES, testSupabaseConnection } from '../lib/supabase';
 import { syncInitialDataToSupabase } from '../lib/storage';
 
 interface SupabaseModalProps {
@@ -26,6 +26,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
   const [copiedMigration, setCopiedMigration] = useState(false);
   const [copiedInvitationsSql, setCopiedInvitationsSql] = useState(false);
   const [copiedLetterNumberSql, setCopiedLetterNumberSql] = useState(false);
+  const [copiedSignaturesSql, setCopiedSignaturesSql] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
@@ -305,7 +306,9 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
             <div className="rounded-lg bg-amber-950/90 p-2 text-amber-100 font-mono text-[11px] select-all">
               ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';<br />
               ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;<br />
-              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
+              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';<br />
+              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;<br />
+              ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ;
             </div>
           </div>
 
@@ -393,6 +396,49 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
               <pre>{SUPABASE_SQL_INVITATIONS}</pre>
             </div>
           </div>
+
+          {/* Migration Card for smp_document_signatures */}
+          <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 dark:bg-indigo-950/40 p-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <h4 className="text-xs font-bold text-indigo-950 dark:text-indigo-200 uppercase tracking-wide">
+                  Tabel Tanda Tangan & QR Pengesahan (smp_document_signatures)
+                </h4>
+              </div>
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(SUPABASE_SQL_SIGNATURES);
+                  setCopiedSignaturesSql(true);
+                  setTimeout(() => setCopiedSignaturesSql(false), 2500);
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                  copiedSignaturesSql
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-950 dark:text-indigo-100 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-200 dark:hover:bg-indigo-800'
+                }`}
+              >
+                {copiedSignaturesSql ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin SQL Tabel Tanda Tangan</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] text-indigo-900 dark:text-indigo-200/90 leading-relaxed">
+              Jalankan skrip ini untuk membuat tabel <code>smp_document_signatures</code> agar persetujuan berjenjang dan QR verifikasi tersimpan langsung di database:
+            </p>
+            <div className="rounded-lg bg-indigo-950/90 p-2 text-indigo-100 font-mono text-[11px] select-all overflow-x-auto max-h-24">
+              <pre>{SUPABASE_SQL_SIGNATURES}</pre>
+            </div>
+          </div>
+
 
           {/* SQL Generator Section */}
           <div className="pt-2 border-t border-slate-200 dark:border-[#0f4950]">

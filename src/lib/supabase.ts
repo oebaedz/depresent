@@ -246,16 +246,20 @@ CREATE TABLE IF NOT EXISTS smp_meetings (
   invited_teacher_ids JSONB DEFAULT '[]'::jsonb, -- daftar ID guru peserta terpilih
   letter_number TEXT DEFAULT '-', -- nomor surat dinas resmi kegiatan
   notes TEXT DEFAULT '',
+  is_locked BOOLEAN NOT NULL DEFAULT false, -- rapat terkunci setelah disahkan
+  locked_at TIMESTAMPTZ, -- waktu rapat dikunci
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Pastikan kolom pimpinan, notulis, letter_number, dan selective attendees ada jika tabel sudah terbuat sebelumnya
+-- Pastikan kolom pimpinan, notulis, letter_number, locked, dan selective attendees ada jika tabel sudah terbuat sebelumnya
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS leader_niy TEXT DEFAULT '';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS secretary_name TEXT DEFAULT '';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS secretary_niy TEXT DEFAULT '';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ;
 
 -- 4. TABEL REKAM KEHADIRAN (ATTENDANCES)
 CREATE TABLE IF NOT EXISTS smp_attendances (
@@ -295,12 +299,36 @@ CREATE INDEX IF NOT EXISTS idx_smp_invitations_meeting ON smp_invitations (meeti
 CREATE INDEX IF NOT EXISTS idx_smp_invitations_teacher ON smp_invitations (teacher_id);
 CREATE INDEX IF NOT EXISTS idx_smp_invitations_rsvp ON smp_invitations (rsvp_status);
 
+-- 6. TABEL TANDA TANGAN & PENGESAHAN DOKUMEN DIGITAL (DOCUMENT SIGNATURES)
+CREATE TABLE IF NOT EXISTS smp_document_signatures (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  meeting_id UUID NOT NULL REFERENCES smp_meetings(id) ON DELETE CASCADE,
+  document_type TEXT NOT NULL DEFAULT 'attendance_report', -- 'attendance_report', 'expedition_book'
+  signer_role TEXT NOT NULL, -- 'secretary', 'leader', 'headmaster', 'expedition_officer'
+  step_order INT NOT NULL DEFAULT 1, -- 1: Notulis, 2: Pimpinan, 3: Kepala Sekolah
+  signer_name TEXT NOT NULL,
+  signer_niy TEXT DEFAULT '-',
+  signer_phone TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'signed', 'rejected'
+  signed_at TIMESTAMPTZ,
+  verification_code TEXT, -- e.g. "DEP-2026-X8F9A"
+  rejection_notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  CONSTRAINT unique_signature_per_role UNIQUE(meeting_id, document_type, signer_role)
+);
+
+CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_meeting ON smp_document_signatures (meeting_id);
+CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_verify ON smp_document_signatures (verification_code);
+CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_status ON smp_document_signatures (status);
+
 -- AKTIFKAN ROW LEVEL SECURITY (RLS) & BERIKAN IZIN AKSES ANONYMOUS LENGKAP
 ALTER TABLE smp_school_profile ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_teachers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_meetings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_attendances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE smp_document_signatures ENABLE ROW LEVEL SECURITY;
 
 -- Berikan izin akses penuh ke schema public untuk peranan anon & authenticated
 GRANT ALL ON TABLE smp_school_profile TO anon, authenticated;
@@ -308,6 +336,7 @@ GRANT ALL ON TABLE smp_teachers TO anon, authenticated;
 GRANT ALL ON TABLE smp_meetings TO anon, authenticated;
 GRANT ALL ON TABLE smp_attendances TO anon, authenticated;
 GRANT ALL ON TABLE smp_invitations TO anon, authenticated;
+GRANT ALL ON TABLE smp_document_signatures TO anon, authenticated;
 
 -- Kebijakan RLS Akses Penuh (Supabase Client Applet)
 DROP POLICY IF EXISTS "Public All smp_school_profile" ON smp_school_profile;
@@ -324,15 +353,21 @@ CREATE POLICY "Public All smp_attendances" ON smp_attendances FOR ALL USING (tru
 
 DROP POLICY IF EXISTS "Public All smp_invitations" ON smp_invitations;
 CREATE POLICY "Public All smp_invitations" ON smp_invitations FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public All smp_document_signatures" ON smp_document_signatures;
+CREATE POLICY "Public All smp_document_signatures" ON smp_document_signatures FOR ALL USING (true) WITH CHECK (true);
 `;
 
+
 export const SUPABASE_SQL_MIGRATION_V4 = `-- ============================================================
--- SKRIP UPDATE CEPAT KOLOM PESERTA RAPAT & NOMOR SURAT
+-- SKRIP UPDATE CEPAT KOLOM PESERTA RAPAT, NOMOR SURAT & FITUR KUNCI (LOCK)
 -- Jalankan skrip ini jika tabel smp_meetings sudah ada di Supabase Anda:
 -- ============================================================
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS target_type TEXT DEFAULT 'all';
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS invited_teacher_ids JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS letter_number TEXT DEFAULT '-';
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS is_locked BOOLEAN DEFAULT false;
+ALTER TABLE smp_meetings ADD COLUMN IF NOT EXISTS locked_at TIMESTAMPTZ;
 `;
 
 export const SUPABASE_SQL_LETTER_NUMBER = `-- ============================================================
@@ -374,3 +409,38 @@ GRANT ALL ON TABLE smp_invitations TO anon, authenticated;
 DROP POLICY IF EXISTS "Public All smp_invitations" ON smp_invitations;
 CREATE POLICY "Public All smp_invitations" ON smp_invitations FOR ALL USING (true) WITH CHECK (true);
 `;
+
+export const SUPABASE_SQL_SIGNATURES = `-- ============================================================
+-- TABEL TANDA TANGAN & PENGESAHAN DOKUMEN DIGITAL (smp_document_signatures)
+-- Jalankan skrip ini di SQL Editor Supabase untuk mengaktifkan
+-- sinkronisasi cloud persetujuan berjenjang & verifikasi QR code:
+-- ============================================================
+CREATE TABLE IF NOT EXISTS smp_document_signatures (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  meeting_id UUID NOT NULL REFERENCES smp_meetings(id) ON DELETE CASCADE,
+  document_type TEXT NOT NULL DEFAULT 'attendance_report', -- 'attendance_report', 'expedition_book'
+  signer_role TEXT NOT NULL, -- 'secretary', 'leader', 'headmaster', 'expedition_officer'
+  step_order INT NOT NULL DEFAULT 1, -- 1: Notulis, 2: Pimpinan, 3: Kepala Sekolah
+  signer_name TEXT NOT NULL,
+  signer_niy TEXT DEFAULT '-',
+  signer_phone TEXT DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'signed', 'rejected'
+  signed_at TIMESTAMPTZ,
+  verification_code TEXT, -- e.g. "DEP-2026-X8F9A"
+  rejection_notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+  CONSTRAINT unique_signature_per_role UNIQUE(meeting_id, document_type, signer_role)
+);
+
+CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_meeting ON smp_document_signatures (meeting_id);
+CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_verify ON smp_document_signatures (verification_code);
+CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_status ON smp_document_signatures (status);
+
+ALTER TABLE smp_document_signatures ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON TABLE smp_document_signatures TO anon, authenticated;
+
+DROP POLICY IF EXISTS "Public All smp_document_signatures" ON smp_document_signatures;
+CREATE POLICY "Public All smp_document_signatures" ON smp_document_signatures FOR ALL USING (true) WITH CHECK (true);
+`;
+

@@ -545,6 +545,8 @@ export async function fetchMeetings(): Promise<Meeting[]> {
               invited_teacher_ids: invitedIds,
               letter_number: row.letter_number || '-',
               notes: cleanNotes,
+              is_locked: Boolean(row.is_locked),
+              locked_at: row.locked_at || undefined,
               created_at: row.created_at,
             };
           });
@@ -630,6 +632,8 @@ export async function fetchSingleMeeting(meetingId: string): Promise<Meeting | n
           invited_teacher_ids: invitedIds,
           letter_number: data.letter_number || '-',
           notes: cleanNotes,
+          is_locked: Boolean(data.is_locked),
+          locked_at: data.locked_at || undefined,
           created_at: data.created_at,
         };
         const current = getCachedMeetings();
@@ -650,6 +654,8 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
     start_time: (meeting.start_time || '08:00').slice(0, 5),
     end_time: (meeting.end_time || '11:00').slice(0, 5),
     letter_number: meeting.letter_number?.trim() || '-',
+    is_locked: Boolean(meeting.is_locked),
+    locked_at: meeting.locked_at || undefined,
   };
 
   // Instant local-first update
@@ -669,11 +675,13 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
     try {
       const { error } = await supabase.from('smp_meetings').upsert(cleanMeeting);
       if (error) {
-        // If error indicates column invited_teacher_ids, target_type or letter_number is missing in schema cache
+        // If error indicates column invited_teacher_ids, target_type, letter_number, is_locked, or locked_at is missing in schema cache
         if (
           error.message?.includes('invited_teacher_ids') ||
           error.message?.includes('target_type') ||
           error.message?.includes('letter_number') ||
+          error.message?.includes('is_locked') ||
+          error.message?.includes('locked_at') ||
           error.code === 'PGRST204'
         ) {
           console.warn('Supabase smp_meetings table lacks new columns. Saving with compatibility fallback...');
@@ -687,6 +695,12 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
           }
           if (error.message?.includes('letter_number')) {
             delete fallbackPayload.letter_number;
+          }
+          if (error.message?.includes('is_locked')) {
+            delete fallbackPayload.is_locked;
+          }
+          if (error.message?.includes('locked_at')) {
+            delete fallbackPayload.locked_at;
           }
 
           const { error: retryErr } = await supabase.from('smp_meetings').upsert(fallbackPayload);
@@ -704,6 +718,20 @@ export async function saveMeeting(meeting: Meeting): Promise<Meeting> {
     }
   }
   return cleanMeeting;
+}
+
+export async function toggleLockMeeting(meetingId: string, isLocked: boolean): Promise<Meeting | null> {
+  const meetings = getCachedMeetings();
+  const meeting = meetings.find((m) => m.id === meetingId);
+  if (!meeting) return null;
+
+  const updated: Meeting = {
+    ...meeting,
+    is_locked: isLocked,
+    locked_at: isLocked ? new Date().toISOString() : undefined,
+  };
+
+  return await saveMeeting(updated);
 }
 
 export async function deleteMeeting(id: string): Promise<void> {
@@ -1466,10 +1494,27 @@ export async function signDocumentStep(
     (s) => s.document_type === docType && s.step_order === target.step_order + 1
   );
 
+  // Jika ini adalah tahap pengesahan akhir (Kepala Sekolah atau tahap penutup alur tanda tangan):
+  // Otomatis kunci rapat (is_locked = true) dan selesaikan agenda agar data kehadiran & pengesahan berintegritas hukum
+  if (!nextSigner && (docType === 'attendance_report' || target.signer_role === 'headmaster')) {
+    const meetings = getCachedMeetings();
+    const currentM = meetings.find((m) => m.id === meetingId);
+    if (currentM) {
+      await saveMeeting({
+        ...currentM,
+        status: 'completed',
+        is_locked: true,
+        locked_at: new Date().toISOString(),
+      });
+    }
+  }
+
   return {
     success: true,
     signature: updated,
     nextSignerRole: nextSigner?.signer_role,
-    message: `Dokumen berhasil disetujui dan disahkan secara elektronik. Kode Verifikasi: ${verificationCode}.`,
+    message: `Dokumen berhasil disetujui dan disahkan secara elektronik. Kode Verifikasi: ${verificationCode}.${
+      !nextSigner ? ' Seluruh alur pengesahan telah selesai dan rapat otomatis terkunci resmi.' : ''
+    }`,
   };
 }

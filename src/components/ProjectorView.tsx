@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import QRCode from 'qrcode';
-import { Maximize2, Minimize2, Tv, Users, CheckCircle2, Clock, Calendar, MapPin, User, ExternalLink, Smartphone, Copy, Check, RotateCw, ShieldCheck } from 'lucide-react';
+import { Maximize2, Minimize2, Tv, Users, CheckCircle2, Clock, Calendar, MapPin, User, ExternalLink, Smartphone, Copy, Check, RotateCw, ShieldCheck, Lock } from 'lucide-react';
 import { Attendance, Meeting, Teacher, SchoolProfile } from '../types';
 import { recordAttendance } from '../lib/storage';
 import { sound } from '../lib/audio';
@@ -134,6 +134,10 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
   // Direct checkin fallback from projector view
   const handleDirectSelfCheckin = async (teacherId: string) => {
     if (!meeting || !teacherId) return;
+    if (meeting.is_locked) {
+      sound.playWarning();
+      return;
+    }
     const teacher = relevantTeachers.find((t) => t.id === teacherId);
     if (!teacher) return;
 
@@ -174,11 +178,17 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
         isFullscreen ? 'bg-[#072b2f] border-[#0f4950] text-white' : 'bg-teal-950 dark:bg-[#072b2f] border-teal-900 dark:border-[#0f4950] text-white'
       }`}>
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs font-bold tracking-wider text-teal-200">
               <span className="uppercase">{schoolProfile.school_name || 'SMP MUHAMMADIYAH 1 KUDUS'}</span> · <span className="font-extrabold normal-case text-white">dePresent</span> MODE PROYEKTOR
             </span>
+            {meeting.is_locked && (
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 flex items-center gap-1 shadow-xs ml-1">
+                <Lock className="w-3 h-3" />
+                <span>Rapat Terkunci Resmi</span>
+              </span>
+            )}
           </div>
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white line-clamp-2">
             {meeting.title}
@@ -231,17 +241,27 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
             <div className="flex items-center justify-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-[#042024] px-2.5 py-1 rounded-md flex items-center gap-1.5 border border-teal-200/60 dark:border-[#0f4950]">
                 <ShieldCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-                <span>QR Dinamis (Berganti Tiap 15s)</span>
+                <span>{meeting.is_locked ? 'Status Rapat Terkunci' : 'QR Dinamis (Berganti Tiap 15s)'}</span>
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-teal-200/70">
-              Arahkan kamera HP Anda langsung ke proyektor di ruangan ini.
+              {meeting.is_locked ? 'Presensi mandiri telah ditutup resmi.' : 'Arahkan kamera HP Anda langsung ke proyektor di ruangan ini.'}
             </p>
           </div>
 
           {/* QR Code Container with 15-Second Countdown Ring */}
           <div className="relative p-4 bg-white rounded-2xl shadow-md border-2 border-teal-800/20 dark:border-teal-500/30 flex items-center justify-center">
-            {qrDataUrl ? (
+            {meeting.is_locked ? (
+              <div className="w-60 h-60 flex flex-col items-center justify-center p-4 bg-amber-50 border border-amber-300 rounded-xl text-center space-y-2">
+                <Lock className="w-12 h-12 text-amber-600 mx-auto" />
+                <span className="text-xs font-bold text-amber-950 uppercase tracking-wide">
+                  Presensi Ditutup
+                </span>
+                <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
+                  Agenda rapat ini telah disahkan dan terkunci resmi dengan tanda tangan digital kedinasan.
+                </p>
+              </div>
+            ) : qrDataUrl ? (
               <img
                 src={qrDataUrl}
                 alt="QR Code Presensi Rapat"

@@ -31,6 +31,8 @@ export interface Meeting {
   invited_teacher_ids?: string[]; // array ID guru yang diundang
   letter_number?: string; // Nomor Surat Dinas resmi untuk rapat ini
   notes?: string;
+  is_locked?: boolean; // Rapat terkunci setelah disahkan secara resmi
+  locked_at?: string; // Waktu ISO ketika rapat dikunci
   created_at?: string;
 }
 
