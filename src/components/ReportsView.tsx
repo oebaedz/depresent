@@ -970,6 +970,26 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* Official Document Print Footer */}
+        <div className="mt-8 pt-3 border-t-2 border-slate-400 text-[9px] text-slate-800 flex justify-between items-center print-doc-footer page-break-inside-avoid break-inside-avoid">
+          <div className="space-y-0.5">
+            <div className="font-bold uppercase tracking-wider text-slate-900">
+              dePresent — Sistem Manajemen Presensi & Berita Acara Rapat Kedinasan
+            </div>
+            <div className="text-[8px] text-slate-600">
+              {schoolProfile.school_name || 'SMP Muhammadiyah 1 Gombong'} • NPSN: {schoolProfile.npsn || '-'} • Dokumen Terverifikasi Sah
+            </div>
+          </div>
+          <div className="text-right space-y-0.5">
+            <div>
+              Waktu Cetak: <span className="font-mono font-bold text-slate-900">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} pukul {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB</span>
+            </div>
+            <div className="text-[8px] font-mono text-slate-600">
+              Kode Dokumen: DEP-SPJ-{currentMeeting?.id?.slice(0, 8)?.toUpperCase()} • Dicetak Asli
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* MODAL KIRIM DAFTAR PEGAWAI TIDAK HADIR KE GRUP WA (INFOGRAFIS GAMBAR + TEKS REKAP) */}

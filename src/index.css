@@ -189,6 +189,20 @@
     padding: 8px !important;
   }
 
+  .print-doc-footer {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-top: 24px !important;
+    padding-top: 8px !important;
+    border-top: 1.5px solid #64748b !important;
+    font-size: 9px !important;
+    color: #1e293b !important;
+    background: transparent !important;
+  }
+
   /* Modal unroll for printing ID cards */
   .id-card-modal-backdrop {
     position: static !important;

@@ -29,7 +29,8 @@ import {
 import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher, WahaConfig, DocumentSignature, SignerRole } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
 import { ensureMeetingSignatures, getCachedDocumentSignatures, saveBatchInvitations, saveInvitation, saveMeeting, sortMeetingsClosestFirst } from '../lib/storage';
-import { DEFAULT_WAHA_CONFIG, getWahaConfig, invokeWahaNotification, saveWahaConfig } from '../lib/waha';
+import { DEFAULT_WAHA_CONFIG, getWahaConfig, invokeWahaNotification, saveWahaConfig, fetchMessageTemplatesFromDb } from '../lib/waha';
+import { generateUUID, isValidUUID } from '../lib/uuid';
 import { UnconfirmedRsvpModal } from './UnconfirmedRsvpModal';
 import { DigitalSignatureBadge } from './DigitalSignatureBadge';
 
@@ -68,6 +69,13 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isUnconfirmedModalOpen, setIsUnconfirmedModalOpen] = useState(false);
   const [wahaConfig, setWahaConfig] = useState<WahaConfig>(() => getWahaConfig());
+
+  // Sinkronkan template pesan dari database Supabase saat dimuat
+  useEffect(() => {
+    fetchMessageTemplatesFromDb()
+      .then((cfg) => setWahaConfig(cfg))
+      .catch((err) => console.warn('Could not load DB templates:', err));
+  }, []);
 
   // 1 Nomor surat untuk 1 kegiatan (sama untuk seluruh peserta rapat)
   const [letterNumber, setLetterNumber] = useState<string>('421.3/048/SMP.M.1/X/2026');
@@ -184,7 +192,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       const existing = currentMeetingInvitationsMap.get(teacher.id);
 
       toSave.push({
-        id: existing?.id || Math.random().toString(36).substring(2, 9),
+        id: isValidUUID(existing?.id || '') ? existing!.id : generateUUID(),
         meeting_id: currentMeeting.id,
         teacher_id: teacher.id,
         letter_number: cleanNum,
@@ -290,7 +298,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
       if (res.success) {
         const updated: Invitation = {
-          id: existing?.id || Math.random().toString(36).substring(2, 9),
+          id: isValidUUID(existing?.id || '') ? existing!.id : generateUUID(),
           meeting_id: currentMeeting.id,
           teacher_id: teacher.id,
           letter_number: activeLetterNum,
@@ -430,7 +438,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
         if (res.success) {
           successCount++;
           toSave.push({
-            id: existing?.id || Math.random().toString(36).substring(2, 9),
+            id: isValidUUID(existing?.id || '') ? existing!.id : generateUUID(),
             meeting_id: currentMeeting.id,
             teacher_id: teacher.id,
             letter_number: activeLetterNum,
@@ -465,7 +473,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     const activeLetterNum = letterNumber.trim() || existing?.letter_number || '421.3/048/SMP.M.1/X/2026';
 
     const updated: Invitation = {
-      id: existing?.id || Math.random().toString(36).substring(2, 9),
+      id: isValidUUID(existing?.id || '') ? existing!.id : generateUUID(),
       meeting_id: currentMeeting.id,
       teacher_id: teacher.id,
       letter_number: activeLetterNum,
@@ -1300,10 +1308,24 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
           </div>
         </div>
 
-        {/* Footer print note */}
-        <div className="mt-6 pt-2 border-t border-gray-400 text-[9px] text-gray-500 flex justify-between">
-          <span>Dicetak dari Sistem dePresent • {schoolProfile.school_name}</span>
-          <span>Waktu Cetak: {new Date().toLocaleDateString('id-ID')} pukul {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB</span>
+        {/* Official Document Print Footer */}
+        <div className="mt-8 pt-3 border-t-2 border-black text-[9px] text-black flex justify-between items-center print-doc-footer break-inside-avoid">
+          <div className="space-y-0.5">
+            <div className="font-bold uppercase tracking-wider text-black">
+              dePresent — Sistem Administrasi Rapat & Ekspedisi Kedinasan
+            </div>
+            <div className="text-[8px] text-gray-700">
+              {schoolProfile.school_name || 'SMP Muhammadiyah 1 Gombong'} • NPSN: {schoolProfile.npsn || '-'} • Dokumen Terverifikasi Sah
+            </div>
+          </div>
+          <div className="text-right space-y-0.5">
+            <div>
+              Waktu Cetak: <span className="font-mono font-bold text-black">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })} pukul {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB</span>
+            </div>
+            <div className="text-[8px] font-mono text-gray-700">
+              Kode Ekspedisi: DEP-EXP-{currentMeeting?.id?.slice(0, 8)?.toUpperCase()} • Dicetak Asli
+            </div>
+          </div>
         </div>
       </div>
 

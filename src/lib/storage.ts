@@ -1100,46 +1100,66 @@ export async function fetchInvitations(): Promise<Invitation[]> {
 }
 
 export async function saveInvitation(invitation: Invitation): Promise<void> {
+  const cleanInvitation: Invitation = {
+    ...invitation,
+    id: isValidUUID(invitation.id) ? invitation.id : generateUUID(),
+  };
+
   const list = getCachedInvitations();
-  const index = list.findIndex((inv) => inv.id === invitation.id);
+  const index = list.findIndex(
+    (inv) => inv.id === cleanInvitation.id || (inv.meeting_id === cleanInvitation.meeting_id && inv.teacher_id === cleanInvitation.teacher_id)
+  );
   const updated = [...list];
   if (index >= 0) {
-    updated[index] = invitation;
+    updated[index] = cleanInvitation;
   } else {
-    updated.unshift(invitation);
+    updated.unshift(cleanInvitation);
   }
   localStorage.setItem(KEY_INVITATIONS, JSON.stringify(updated));
 
   const supabase = getSupabase();
   if (supabase) {
-    (async () => {
-      try {
-        await supabase.from('smp_invitations').upsert(invitation);
-      } catch (e) {
-        // graceful ignore if table not present
+    try {
+      const { error } = await supabase
+        .from('smp_invitations')
+        .upsert(cleanInvitation, { onConflict: 'meeting_id,teacher_id' });
+      if (error) {
+        console.warn('Upsert smp_invitations failed in Supabase:', error.message);
       }
-    })();
+    } catch (e) {
+      console.warn('Could not sync invitation to Supabase:', e);
+    }
   }
 }
 
 export async function saveBatchInvitations(invitations: Invitation[]): Promise<void> {
+  if (invitations.length === 0) return;
+
+  const sanitized = invitations.map((inv) => ({
+    ...inv,
+    id: isValidUUID(inv.id) ? inv.id : generateUUID(),
+  }));
+
   const list = getCachedInvitations();
   const map = new Map<string, Invitation>();
-  list.forEach((item) => map.set(item.id, item));
-  invitations.forEach((item) => map.set(item.id, item));
+  list.forEach((item) => map.set(`${item.meeting_id}_${item.teacher_id}`, item));
+  sanitized.forEach((item) => map.set(`${item.meeting_id}_${item.teacher_id}`, item));
 
   const updated = Array.from(map.values());
   localStorage.setItem(KEY_INVITATIONS, JSON.stringify(updated));
 
   const supabase = getSupabase();
-  if (supabase && invitations.length > 0) {
-    (async () => {
-      try {
-        await supabase.from('smp_invitations').upsert(invitations);
-      } catch (e) {
-        // graceful ignore if table not present
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('smp_invitations')
+        .upsert(sanitized, { onConflict: 'meeting_id,teacher_id' });
+      if (error) {
+        console.warn('Batch upsert smp_invitations failed in Supabase:', error.message);
       }
-    })();
+    } catch (e) {
+      console.warn('Could not sync batch invitations to Supabase:', e);
+    }
   }
 }
 

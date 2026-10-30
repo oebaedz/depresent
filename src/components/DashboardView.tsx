@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, CheckCircle2, AlertTriangle, FileSpreadsheet, Send, MessageSquare, Clock, Search, Filter, RefreshCw, XCircle, Share2 } from 'lucide-react';
+import { Users, CheckCircle2, AlertTriangle, AlertCircle, HeartPulse, FileSpreadsheet, Send, MessageSquare, Clock, Search, Filter, RefreshCw, XCircle, Share2 } from 'lucide-react';
 import { Attendance, AttendanceStatus, Meeting, Teacher, SchoolProfile } from '../types';
 import { recordAttendance, deleteAttendance } from '../lib/storage';
 import { getWahaConfig, invokeWahaNotification } from '../lib/waha';
@@ -466,30 +466,59 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <div className="text-[11px] text-slate-400 dark:text-teal-300/70">{teacher.rank_group}</div>
                       </td>
 
-                      {/* Status */}
-                      <td className="py-3 px-4 text-center">
+                      {/* Status Kehadiran (Propercase & Icon Cohesive with RSVP) */}
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
                         {att ? (
                           <span
-                            className={`inline-block font-semibold text-[11px] px-2 py-0.5 rounded ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                               att.status === 'hadir'
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
                                 : att.status === 'terlambat'
-                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                                ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
                                 : att.status === 'izin'
-                                ? 'bg-teal-100 text-teal-800 dark:bg-teal-950/80 dark:text-teal-300 border border-teal-200 dark:border-teal-800'
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30'
                                 : att.status === 'sakit'
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
-                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                                ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30'
+                                : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30'
                             }`}
                           >
-                            {att.status === 'alpa' ? 'TIDAK HADIR' : att.status.toUpperCase()}
+                            {att.status === 'hadir' ? (
+                              <>
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span>Hadir</span>
+                              </>
+                            ) : att.status === 'terlambat' ? (
+                              <>
+                                <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span>Terlambat</span>
+                              </>
+                            ) : att.status === 'izin' ? (
+                              <>
+                                <AlertCircle className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span>Izin</span>
+                              </>
+                            ) : att.status === 'sakit' ? (
+                              <>
+                                <HeartPulse className="w-3 h-3 text-sky-600 dark:text-sky-400 shrink-0" />
+                                <span>Sakit</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" />
+                                <span>Tidak Hadir</span>
+                              </>
+                            )}
                           </span>
                         ) : currentMeeting?.status === 'completed' ? (
-                          <span className="inline-block font-semibold text-[11px] px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                            TIDAK HADIR
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                            <XCircle className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" />
+                            <span>Tidak Hadir</span>
                           </span>
                         ) : (
-                          <span className="text-[11px] text-slate-400 dark:text-teal-400/80 font-medium">Belum Hadir</span>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-500/10 text-slate-500 dark:text-teal-300/70 border border-slate-300/40 dark:border-teal-700/40">
+                            <Clock className="w-3 h-3 text-slate-400 dark:text-teal-400 shrink-0" />
+                            <span>Belum Hadir</span>
+                          </span>
                         )}
                       </td>
 

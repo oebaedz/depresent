@@ -322,6 +322,15 @@ CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_meeting ON smp_document_signatures (
 CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_verify ON smp_document_signatures (verification_code);
 CREATE INDEX IF NOT EXISTS idx_smp_doc_sigs_status ON smp_document_signatures (status);
 
+-- 7. TABEL TEMPLATE PESAN WHATSAPP (smp_message_templates)
+CREATE TABLE IF NOT EXISTS smp_message_templates (
+  id TEXT PRIMARY KEY, -- 'invitation', 'rechat', 'reminder', 'recap', 'scan'
+  title TEXT NOT NULL,
+  template_content TEXT NOT NULL,
+  variables JSONB DEFAULT '[]'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- AKTIFKAN ROW LEVEL SECURITY (RLS) & BERIKAN IZIN AKSES ANONYMOUS LENGKAP
 ALTER TABLE smp_school_profile ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_teachers ENABLE ROW LEVEL SECURITY;
@@ -329,6 +338,7 @@ ALTER TABLE smp_meetings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_attendances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smp_document_signatures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE smp_message_templates ENABLE ROW LEVEL SECURITY;
 
 -- Berikan izin akses penuh ke schema public untuk peranan anon & authenticated
 GRANT ALL ON TABLE smp_school_profile TO anon, authenticated;
@@ -337,6 +347,7 @@ GRANT ALL ON TABLE smp_meetings TO anon, authenticated;
 GRANT ALL ON TABLE smp_attendances TO anon, authenticated;
 GRANT ALL ON TABLE smp_invitations TO anon, authenticated;
 GRANT ALL ON TABLE smp_document_signatures TO anon, authenticated;
+GRANT ALL ON TABLE smp_message_templates TO anon, authenticated;
 
 -- Kebijakan RLS Akses Penuh (Supabase Client Applet)
 DROP POLICY IF EXISTS "Public All smp_school_profile" ON smp_school_profile;
@@ -356,6 +367,9 @@ CREATE POLICY "Public All smp_invitations" ON smp_invitations FOR ALL USING (tru
 
 DROP POLICY IF EXISTS "Public All smp_document_signatures" ON smp_document_signatures;
 CREATE POLICY "Public All smp_document_signatures" ON smp_document_signatures FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public All smp_message_templates" ON smp_message_templates;
+CREATE POLICY "Public All smp_message_templates" ON smp_message_templates FOR ALL USING (true) WITH CHECK (true);
 `;
 
 
@@ -443,4 +457,25 @@ GRANT ALL ON TABLE smp_document_signatures TO anon, authenticated;
 DROP POLICY IF EXISTS "Public All smp_document_signatures" ON smp_document_signatures;
 CREATE POLICY "Public All smp_document_signatures" ON smp_document_signatures FOR ALL USING (true) WITH CHECK (true);
 `;
+
+export const SUPABASE_SQL_MESSAGE_TEMPLATES = `-- ============================================================
+-- TABEL TEMPLATE PESAN WHATSAPP (smp_message_templates)
+-- Jalankan skrip ini di SQL Editor Supabase untuk menyimpan
+-- kustomisasi template pesan undangan, re-chat, dan rekap di database:
+-- ============================================================
+CREATE TABLE IF NOT EXISTS smp_message_templates (
+  id TEXT PRIMARY KEY, -- 'invitation', 'rechat', 'reminder', 'recap', 'scan'
+  title TEXT NOT NULL,
+  template_content TEXT NOT NULL,
+  variables JSONB DEFAULT '[]'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE smp_message_templates ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON TABLE smp_message_templates TO anon, authenticated;
+
+DROP POLICY IF EXISTS "Public All smp_message_templates" ON smp_message_templates;
+CREATE POLICY "Public All smp_message_templates" ON smp_message_templates FOR ALL USING (true) WITH CHECK (true);
+`;
+
 

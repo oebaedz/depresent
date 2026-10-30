@@ -232,10 +232,106 @@ export function getWahaConfig(): WahaConfig {
   }
 }
 
+/**
+ * Menyimpan konfigurasi WAHA dan melakukan sinkronisasi template pesan langsung ke tabel Supabase `smp_message_templates`
+ */
 export function saveWahaConfig(config: WahaConfig) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_WAHA, JSON.stringify(config));
   }
+  // Lakukan sinkronisasi langsung ke database Supabase
+  saveMessageTemplatesToDb(config).catch((err) => {
+    console.warn('Sync message templates to Supabase failed:', err);
+  });
+}
+
+/**
+ * Menyimpan seluruh template pesan secara langsung ke tabel `smp_message_templates` di Supabase
+ */
+export async function saveMessageTemplatesToDb(config: WahaConfig): Promise<{ success: boolean; message: string }> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client belum terhubung' };
+  }
+
+  try {
+    const rows = [
+      {
+        id: 'invitation',
+        title: 'Template Surat Undangan Kedinasan',
+        template_content: config.message_template_invitation || DEFAULT_WAHA_CONFIG.message_template_invitation,
+        variables: ['{no_surat}', '{agenda}', '{nama}', '{jabatan}', '{tanggal}', '{jam}', '{ruang}', '{pimpinan}', '{link_rsvp}', '{nama_sekolah}'],
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'rechat',
+        title: 'Template Re-Chat Pengingat RSVP',
+        template_content: config.message_template_rechat || DEFAULT_WAHA_CONFIG.message_template_rechat,
+        variables: ['{agenda}', '{nama}', '{jabatan}', '{tanggal}', '{jam}', '{ruang}', '{pimpinan}', '{link_rsvp}', '{nama_sekolah}'],
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'reminder',
+        title: 'Template Pengingat Rapat',
+        template_content: config.message_template_reminder || DEFAULT_WAHA_CONFIG.message_template_reminder,
+        variables: ['{rapat}', '{tanggal}', '{jam}', '{ruang}', '{pimpinan}'],
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'recap',
+        title: 'Template Rekapitulasi Rapat',
+        template_content: config.message_template_recap || DEFAULT_WAHA_CONFIG.message_template_recap,
+        variables: ['{rapat}', '{tanggal}', '{waktu}', '{ruang}', '{total}', '{hadir}', '{terlambat}', '{izin}', '{belum}', '{persen}'],
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'scan',
+        title: 'Template Konfirmasi Presensi Hadir',
+        template_content: config.message_template_scan || DEFAULT_WAHA_CONFIG.message_template_scan,
+        variables: ['{nama}', '{rapat}', '{jam}', '{status}'],
+        updated_at: new Date().toISOString(),
+      },
+    ];
+
+    const { error } = await supabase.from('smp_message_templates').upsert(rows);
+    if (error) {
+      console.warn('Upsert smp_message_templates failed:', error.message);
+      return { success: false, message: error.message };
+    }
+    return { success: true, message: 'Template pesan berhasil disimpan di database Supabase.' };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('Error saving message templates to DB:', msg);
+    return { success: false, message: msg };
+  }
+}
+
+/**
+ * Mengambil template pesan dari database Supabase dan memperbarui cache lokal
+ */
+export async function fetchMessageTemplatesFromDb(): Promise<WahaConfig> {
+  const current = getWahaConfig();
+  const supabase = getSupabase();
+  if (!supabase) return current;
+
+  try {
+    const { data, error } = await supabase.from('smp_message_templates').select('*');
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const updatedConfig = { ...current };
+      data.forEach((row: any) => {
+        if (row.id === 'invitation' && row.template_content) updatedConfig.message_template_invitation = row.template_content;
+        if (row.id === 'rechat' && row.template_content) updatedConfig.message_template_rechat = row.template_content;
+        if (row.id === 'reminder' && row.template_content) updatedConfig.message_template_reminder = row.template_content;
+        if (row.id === 'recap' && row.template_content) updatedConfig.message_template_recap = row.template_content;
+        if (row.id === 'scan' && row.template_content) updatedConfig.message_template_scan = row.template_content;
+      });
+      localStorage.setItem(STORAGE_KEY_WAHA, JSON.stringify(updatedConfig));
+      return updatedConfig;
+    }
+  } catch (err) {
+    console.warn('Could not fetch message templates from Supabase:', err);
+  }
+  return current;
 }
 
 export interface WahaLog {

@@ -134,71 +134,118 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
 
   const recapText = generateWhatsAppMessage();
 
-  // Export card as high-res PNG
-  const generateImage = async (): Promise<string | null> => {
+  // Helper to capture card node as high-res Canvas
+  const getCanvas = async (): Promise<HTMLCanvasElement | null> => {
     if (!cardRef.current) return null;
+    return await html2canvas(cardRef.current, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+  };
+
+  // Export card as high-res PNG data URL
+  const generateImage = async (): Promise<string | null> => {
+    if (imageDataUrl) return imageDataUrl;
     setIsExportingImage(true);
     try {
-      const canvas = await html2canvas(cardRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      });
+      const canvas = await getCanvas();
+      if (!canvas) return null;
       const dataUrl = canvas.toDataURL('image/png');
       setImageDataUrl(dataUrl);
-      setIsExportingImage(false);
       return dataUrl;
     } catch (err) {
       console.error('Failed to generate image:', err);
-      setIsExportingImage(false);
       return null;
+    } finally {
+      setIsExportingImage(false);
     }
   };
 
-  // Download image directly
+  // Download image directly as PNG file
   const handleDownloadImage = async () => {
-    let url = imageDataUrl;
-    if (!url) {
-      url = await generateImage();
-    }
-    if (!url) {
-      setStatusMessage({ text: 'Gagal membuat gambar infografis.', type: 'error' });
-      return;
-    }
+    setIsExportingImage(true);
+    try {
+      const canvas = await getCanvas();
+      if (!canvas) throw new Error('Canvas element not found');
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rekap-belum-rsvp-${currentMeeting.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setStatusMessage({ text: 'Gambar infografis berhasil diunduh!', type: 'success' });
-    setTimeout(() => setStatusMessage(null), 3500);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Blob creation failed');
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `rekap-belum-rsvp-${currentMeeting.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setStatusMessage({ text: 'Gambar infografis berhasil diunduh!', type: 'success' });
+      setTimeout(() => setStatusMessage(null), 3500);
+    } catch (err) {
+      console.error('Failed to download image:', err);
+      setStatusMessage({ text: 'Gagal membuat file gambar untuk diunduh.', type: 'error' });
+      setTimeout(() => setStatusMessage(null), 4000);
+    } finally {
+      setIsExportingImage(false);
+    }
   };
 
-  // Copy image to clipboard
+  // Copy image to clipboard with seamless fallback
   const handleCopyImage = async () => {
-    let url = imageDataUrl;
-    if (!url) {
-      url = await generateImage();
-    }
-    if (!url) return;
-
+    setIsExportingImage(true);
     try {
-      const res = await fetch(url);
-      const blob = await res.blob();
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob }),
-      ]);
-      setCopiedImage(true);
-      setStatusMessage({ text: 'Gambar berhasil disalin ke clipboard! Silakan paste (Ctrl+V) langsung di WhatsApp Web.', type: 'success' });
-      setTimeout(() => setCopiedImage(false), 3000);
-      setTimeout(() => setStatusMessage(null), 4000);
+      const canvas = await getCanvas();
+      if (!canvas) throw new Error('Canvas element not found');
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Blob creation failed');
+
+      let copiedToClipboard = false;
+      if (navigator.clipboard && typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          copiedToClipboard = true;
+          setCopiedImage(true);
+          setStatusMessage({
+            text: 'Gambar berhasil disalin ke clipboard! Silakan tempel (Ctrl+V) langsung di WhatsApp Web.',
+            type: 'success',
+          });
+          setTimeout(() => setCopiedImage(false), 3000);
+          setTimeout(() => setStatusMessage(null), 4000);
+        } catch (clipErr) {
+          console.warn('Browser blocked direct image clipboard write:', clipErr);
+        }
+      }
+
+      if (!copiedToClipboard) {
+        // Fallback: Copy text and auto-download file
+        navigator.clipboard.writeText(recapText);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `rekap-belum-rsvp-${currentMeeting.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        setStatusMessage({
+          text: 'Teks rekap otomatis disalin & file gambar telah diunduh untuk dilampirkan ke WhatsApp!',
+          type: 'info',
+        });
+        setTimeout(() => setStatusMessage(null), 5000);
+      }
     } catch (err) {
-      console.warn('Clipboard image write failed:', err);
-      setStatusMessage({ text: 'Browser tidak mengizinkan salin gambar langsung. Silakan gunakan tombol Unduh Gambar.', type: 'info' });
+      console.error('Failed to copy image:', err);
+      navigator.clipboard.writeText(recapText);
+      setStatusMessage({ text: 'Teks rekap berhasil disalin ke clipboard.', type: 'info' });
       setTimeout(() => setStatusMessage(null), 4000);
+    } finally {
+      setIsExportingImage(false);
     }
   };
 
