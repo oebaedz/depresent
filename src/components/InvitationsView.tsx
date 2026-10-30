@@ -618,7 +618,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       `- Konfirmasi Hadir: ${stats.attendingCount} orang\n` +
       `- Konfirmasi Izin/Sakit: ${stats.permissionCount + stats.sickCount} orang\n` +
       `- Belum Konfirmasi: ${stats.unconfirmedCount} orang\n\n` +
-      `Mohon kesediaan Bapak Kepala Sekolah untuk memeriksa buku ekspedisi dan membubuhkan Tanda Tangan & Stempel Resmi Elektronik melalui tautan di bawah ini:\n` +
+      `Mohon kesediaan Bapak Kepala Sekolah untuk memeriksa buku ekspedisi dan membubuhkan Tanda Tangan Elektronik Resmi (QR Verifikasi) melalui tautan di bawah ini:\n` +
       `👉 *Buka Lembar Pengesahan Ekspedisi:*\n${signUrl}\n\n` +
       `_Pesan otomatis dikirim melalui Sistem Presensi Resmi dePresent._`;
 
@@ -747,7 +747,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                   ? 'bg-blue-900/90 hover:bg-blue-800 text-white border border-blue-500'
                   : 'bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white'
               }`}
-              title="Kirim tautan persetujuan TTD & Stempel Ekspedisi ke WhatsApp Kepala Sekolah"
+              title="Kirim tautan persetujuan TTD Ekspedisi (QR Verifikasi) ke WhatsApp Kepala Sekolah"
             >
               <ShieldCheck className="w-4 h-4" />
               <span>{isExpeditionHeadmasterSigned ? '✓ Ekspedisi Disahkan' : 'Kirim TTD Ekspedisi (WA)'}</span>
@@ -1282,7 +1282,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
             />
           </div>
 
-          {/* Kepala Sekolah (Stempel Resmi Kedinasan + QR Code) */}
+          {/* Kepala Sekolah (QR Code Verifikasi Resmi) */}
           <div className="px-3">
             <p className="text-gray-700 text-xs mb-1">
               {schoolProfile.city || 'Gombong'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}

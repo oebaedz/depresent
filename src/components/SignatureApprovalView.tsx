@@ -16,6 +16,9 @@ import {
   Check,
   XCircle,
   ExternalLink,
+  Sun,
+  Moon,
+  ChevronDown,
 } from 'lucide-react';
 import {
   DocumentSignature,
@@ -60,8 +63,29 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [activeRole, setActiveRole] = useState<SignerRole>(roleParam);
-  const [rejectionNotes, setRejectionNotes] = useState('');
-  const [showRejectionForm, setShowRejectionForm] = useState(false);
+
+  // Theme support for maximum readability and contrast
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('smp_theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
+  });
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    if (typeof document !== 'undefined') {
+      if (next === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      localStorage.setItem('smp_theme', next);
+    }
+  };
 
   const currentMeeting = useMemo(() => {
     return meetings.find((m) => m.id === meetingId) || meetings[0];
@@ -115,6 +139,7 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
   const terlambat = meetingAttendances.filter((a) => a.status === 'terlambat').length;
   const izin = meetingAttendances.filter((a) => a.status === 'izin').length;
   const sakit = meetingAttendances.filter((a) => a.status === 'sakit').length;
+  const tidakHadir = Math.max(0, total - (hadir + terlambat + izin + sakit));
 
   // Filter absent teachers
   const absentTeachers = useMemo(() => {
@@ -165,8 +190,13 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
     setFeedback(null);
 
     try {
-      const res = await signDocumentStep(currentMeeting.id, docParam, activeRole);
-      if (res.success) {
+      const res = await signDocumentStep(
+        currentMeeting.id,
+        docParam,
+        activeRole
+      );
+
+      if (res.success && res.signature) {
         setFeedback({ text: res.message, type: 'success' });
         await loadSignatures();
         if (onRefresh) onRefresh();
@@ -194,7 +224,6 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
               `👉 ${approvalUrl}\n\n` +
               `_${schoolProfile.school_name}_\n_dePresent made by Mr Zee_`;
 
-            // Fire and forget WA notification via WAHA
             invokeWahaNotification({
               action: 'meeting_reminder',
               recipient: nextSig.signer_phone,
@@ -227,34 +256,52 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
     : '';
 
   return (
-    <div className="min-h-screen bg-radial from-[#052b30] via-[#031e21] to-[#011214] text-slate-100 flex flex-col items-center justify-center p-3 sm:p-6 selection:bg-teal-500 selection:text-white relative overflow-hidden">
-      {/* Decorative ambient glowing orbs */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-64 bg-gradient-to-r from-teal-500/15 via-indigo-500/15 to-purple-500/15 blur-3xl pointer-events-none rounded-full" />
-      <div className="fixed bottom-0 right-1/4 w-80 h-80 bg-gradient-to-tl from-amber-500/10 via-emerald-500/10 to-teal-500/10 blur-3xl pointer-events-none rounded-full" />
+    <div className="min-h-screen bg-slate-100 dark:bg-[#031e21] text-slate-900 dark:text-teal-50 selection:bg-teal-600 selection:text-white transition-colors duration-150 py-4 sm:py-8 px-3 sm:px-6">
+      {/* Top Floating Control Bar */}
+      <div className="max-w-2xl mx-auto flex items-center justify-between mb-4 no-print">
+        <a
+          href={window.location.pathname}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-teal-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+        >
+          <span>← Kembali ke Aplikasi</span>
+        </a>
 
-      <main className="w-full max-w-2xl space-y-5 relative z-10 my-4 sm:my-8">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded-xl bg-white dark:bg-[#072b2f] border border-slate-300 dark:border-[#0f4950] text-slate-700 dark:text-teal-200 hover:bg-slate-50 dark:hover:bg-[#0b383d] shadow-2xs transition-colors cursor-pointer"
+            title="Ganti Tema (Light / Dark)"
+            aria-label="Toggle theme"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
+          </button>
+        </div>
+      </div>
+
+      <main className="w-full max-w-2xl mx-auto space-y-4 sm:space-y-5">
         {/* Header Branding */}
-        <header className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-teal-500/15 via-indigo-500/15 to-purple-500/15 border border-indigo-400/30 text-indigo-200 text-xs font-semibold uppercase tracking-wider shadow-xs">
-            <School className="w-3.5 h-3.5 text-indigo-300" />
-            {schoolProfile.school_name || 'SMP MUHAMMADIYAH 1 GOMBONG'}
+        <header className="text-center space-y-1.5 px-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-100 dark:bg-[#0b383d] border border-teal-300 dark:border-teal-700/60 text-teal-900 dark:text-teal-200 text-[11px] font-bold uppercase tracking-wider shadow-2xs">
+            <School className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+            <span>{schoolProfile.school_name || 'SMP MUHAMMADIYAH 1 GOMBONG'}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-xs">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
             Persetujuan & Pengesahan Dokumen
           </h1>
-          <p className="text-xs text-slate-300 font-medium">
-            Layanan Pengesahan Elektronik Resmi Tanda Tangan Berjenjang (UU ITE)
+          <p className="text-xs text-slate-600 dark:text-teal-200/80 font-medium">
+            Pengesahan Elektronik Resmi Berjenjang dengan QR Verifikasi Otentik
           </p>
         </header>
 
-        {/* 3-Step Sequential Progress Stepper */}
-        <section aria-labelledby="stepper-heading" className="bg-[#072b2f]/90 border border-teal-500/30 rounded-2xl p-4 shadow-xl backdrop-blur-md">
+        {/* 3-Step Sequential Progress Stepper (Mobile Optimized) */}
+        <section aria-labelledby="stepper-heading" className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-3.5 sm:p-4 shadow-sm">
           <h2 id="stepper-heading" className="sr-only">Alur Tanda Tangan Berjenjang</h2>
-          <div className="text-[10px] uppercase tracking-wider font-bold text-teal-300 mb-3 text-center">
+          <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-teal-300/80 mb-2.5 text-center">
             Alur Pengesahan Berjenjang:
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
             {docSignatures.map((sig) => {
               const isCurrent = sig.signer_role === activeRole;
               const isComplete = sig.status === 'signed';
@@ -264,37 +311,37 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                   : sig.signer_role === 'leader'
                   ? '2. Pimpinan'
                   : sig.signer_role === 'headmaster'
-                  ? '3. Kepala Sekolah'
-                  : 'Petugas Ekspedisi';
+                  ? '3. Kepala'
+                  : 'Ekspedisi';
 
               return (
                 <button
                   key={sig.id}
                   type="button"
                   onClick={() => setActiveRole(sig.signer_role)}
-                  className={`p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-between ${
+                  className={`p-2 sm:p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-between min-h-[72px] sm:min-h-[80px] ${
                     isCurrent
-                      ? 'bg-teal-500/20 border-teal-400 ring-2 ring-teal-500/40 text-white'
+                      ? 'bg-teal-50 dark:bg-teal-950/40 border-teal-600 dark:border-teal-400 ring-2 ring-teal-500/30 text-teal-950 dark:text-white'
                       : isComplete
-                      ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                      : 'bg-slate-900/40 border-teal-900/40 text-slate-400 hover:text-slate-200'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-300'
+                      : 'bg-slate-50 dark:bg-[#031e21] border-slate-200 dark:border-[#0f4950] text-slate-600 dark:text-teal-300/60 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 mb-1">
+                  <div className="flex items-center gap-1 mb-0.5">
                     {isComplete ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     ) : isCurrent ? (
-                      <div className="w-3.5 h-3.5 rounded-full bg-teal-400 animate-pulse shrink-0" />
+                      <div className="w-2.5 h-2.5 rounded-full bg-teal-600 dark:bg-teal-400 animate-pulse shrink-0" />
                     ) : (
-                      <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <Clock className="w-3 h-3 text-slate-400 shrink-0" />
                     )}
-                    <span className="text-xs font-bold truncate">{roleTitle}</span>
+                    <span className="text-[11px] sm:text-xs font-black truncate">{roleTitle}</span>
                   </div>
-                  <span className="text-[10px] truncate max-w-full font-medium opacity-90">
+                  <span className="text-[10px] truncate max-w-full font-semibold">
                     {sig.signer_name}
                   </span>
-                  <span className="text-[9px] mt-1 font-mono">
-                    {isComplete ? '✓ Disahkan' : 'Menunggu'}
+                  <span className={`text-[9px] font-mono font-bold mt-0.5 ${isComplete ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500 dark:text-teal-400/60'}`}>
+                    {isComplete ? '✓ Sah' : 'Menunggu'}
                   </span>
                 </button>
               );
@@ -304,15 +351,15 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
 
         {/* Step Locked Warning Banner */}
         {isStepLocked && (
-          <div className="p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 text-amber-200 text-xs flex items-start gap-3 shadow-lg">
-            <Lock className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-3 shadow-xs">
+            <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
-              <span className="font-bold text-amber-300 text-sm block">
+              <span className="font-bold text-amber-900 dark:text-amber-300 text-xs sm:text-sm block">
                 PENGESAHAN TAHAP INI BELUM DIBUKA
               </span>
-              <p className="leading-relaxed">
-                Berdasarkan aturan alur berjenjang, pengesahan dokumen ini harus ditandatangani oleh{' '}
-                <strong className="text-white">
+              <p className="leading-relaxed text-[11px] sm:text-xs text-amber-800 dark:text-amber-200">
+                Alur berjenjang: dokumen harus ditandatangani oleh{' '}
+                <strong className="underline">
                   {previousSigner?.signer_role === 'secretary'
                     ? 'Notulis Rapat'
                     : previousSigner?.signer_role === 'leader'
@@ -320,45 +367,45 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                     : 'Petugas Ekspedisi'}{' '}
                   ({previousSigner?.signer_name})
                 </strong>{' '}
-                terlebih dahulu sebelum diserahkan kepada Anda.
+                terlebih dahulu sebelum Anda dapat memberikan persetujuan.
               </p>
             </div>
           </div>
         )}
 
         {/* Agenda Details Card */}
-        <section aria-labelledby="agenda-heading" className="bg-[#072b2f]/90 backdrop-blur-md border border-[#0f4950] rounded-2xl p-5 shadow-xl space-y-4 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-400 via-teal-400 to-indigo-500" />
+        <section aria-labelledby="agenda-heading" className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-4 sm:p-5 shadow-sm space-y-3 relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-emerald-500 to-indigo-600" />
 
-          <div className="flex items-start justify-between gap-3 border-b border-[#0f4950]/80 pb-3 pt-1">
-            <div>
-              <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-400/15 text-amber-300 border border-amber-400/30 mb-1.5">
+          <div className="flex items-start justify-between gap-2 border-b border-slate-200 dark:border-[#0f4950] pb-2.5 pt-1">
+            <div className="min-w-0 flex-1">
+              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-800 mb-1">
                 {currentMeeting?.category || 'Rapat Dinas'}
               </span>
-              <h2 id="agenda-heading" className="text-lg font-bold text-white leading-snug">
+              <h2 id="agenda-heading" className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">
                 {currentMeeting?.title}
               </h2>
             </div>
-            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-mono font-bold shrink-0">
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 text-xs font-mono font-bold shrink-0">
               {attendancePercentage}% Hadir
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="flex items-center gap-2.5 text-slate-200 bg-slate-900/40 p-2.5 rounded-xl border border-teal-900/50">
-              <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>{formattedDate}</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#031e21] p-2 sm:p-2.5 rounded-xl border border-slate-200 dark:border-[#0f4950] text-slate-800 dark:text-teal-200">
+              <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span className="truncate">{formattedDate}</span>
             </div>
-            <div className="flex items-center gap-2.5 text-slate-200 bg-slate-900/40 p-2.5 rounded-xl border border-teal-900/50">
-              <Clock className="w-4 h-4 text-sky-400 shrink-0" />
-              <span>{meetingTime}</span>
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#031e21] p-2 sm:p-2.5 rounded-xl border border-slate-200 dark:border-[#0f4950] text-slate-800 dark:text-teal-200">
+              <Clock className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+              <span className="truncate">{meetingTime}</span>
             </div>
-            <div className="flex items-center gap-2.5 text-slate-200 bg-slate-900/40 p-2.5 rounded-xl border border-teal-900/50">
-              <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#031e21] p-2 sm:p-2.5 rounded-xl border border-slate-200 dark:border-[#0f4950] text-slate-800 dark:text-teal-200">
+              <MapPin className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
               <span className="truncate">{currentMeeting?.room}</span>
             </div>
-            <div className="flex items-center gap-2.5 text-slate-200 bg-slate-900/40 p-2.5 rounded-xl border border-teal-900/50">
-              <User className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-[#031e21] p-2 sm:p-2.5 rounded-xl border border-slate-200 dark:border-[#0f4950] text-slate-800 dark:text-teal-200">
+              <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span className="truncate">Pimpinan: {currentMeeting?.leader_name}</span>
             </div>
           </div>
@@ -367,55 +414,58 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
         {/* ========================================================================= */}
         {/* DETAIL DAFTAR NAMA YANG TIDAK HADIR (TRANSPARANSI SEBELUM TTD)             */}
         {/* ========================================================================= */}
-        <section aria-labelledby="absent-heading" className="bg-[#072b2f]/90 backdrop-blur-md border border-rose-500/30 rounded-2xl p-5 shadow-xl space-y-3">
-          <div className="flex items-center justify-between gap-2 border-b border-[#0f4950] pb-2.5">
-            <div className="flex items-center gap-2 text-rose-300">
-              <XCircle className="w-4 h-4 text-rose-400" />
-              <h3 id="absent-heading" className="text-sm font-bold text-white uppercase tracking-wide">
+        <section aria-labelledby="absent-heading" className="bg-white dark:bg-[#072b2f] border-2 border-rose-300 dark:border-rose-900/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between gap-2 border-b border-rose-200 dark:border-rose-900/60 pb-2">
+            <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400">
+              <XCircle className="w-4 h-4 shrink-0" />
+              <h3 id="absent-heading" className="text-xs sm:text-sm font-bold uppercase tracking-wide">
                 Daftar Pegawai Tidak Hadir:
               </h3>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono">
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700 font-mono">
               {absentTeachers.length} Orang
             </span>
           </div>
 
-          <p className="text-[11px] text-slate-300">
-            Daftar ini ditampilkan agar penandatangan memeriksa kepastian kehadiran peserta sebelum memberikan persetujuan:
+          <p className="text-[11px] text-slate-600 dark:text-teal-200/80">
+            Periksa rincian ketidakhadiran sebelum memberikan persetujuan resmi:
           </p>
 
           {absentTeachers.length === 0 ? (
-            <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs text-center font-medium">
+            <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs text-center font-bold">
               ✓ Seluruh peserta hadir lengkap (Nihil Pegawai Tidak Hadir).
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-56 overflow-y-auto rounded-xl border border-[#0f4950]">
+            <div className="overflow-x-auto max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#0f4950]">
               <table className="w-full text-xs text-left">
-                <thead className="bg-[#042024] text-slate-300 font-bold sticky top-0">
+                <thead className="bg-slate-100 dark:bg-[#031e21] text-slate-700 dark:text-teal-200 font-bold sticky top-0 border-b border-slate-200 dark:border-[#0f4950]">
                   <tr>
-                    <th className="py-2 px-2.5 w-10 text-center">No</th>
-                    <th className="py-2 px-3">Nama Pegawai</th>
-                    <th className="py-2 px-3">Jabatan / Mapel</th>
-                    <th className="py-2 px-3 text-center">Keterangan</th>
+                    <th className="py-2 px-2 w-8 text-center">No</th>
+                    <th className="py-2 px-2.5">Nama Pegawai</th>
+                    <th className="py-2 px-2.5 hidden sm:table-cell">Jabatan</th>
+                    <th className="py-2 px-2.5 text-center">Keterangan</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#0f4950]">
+                <tbody className="divide-y divide-slate-200 dark:divide-[#0f4950]">
                   {absentTeachers.map((item, idx) => (
-                    <tr key={item.teacher.id} className="hover:bg-white/5 transition-colors">
-                      <td className="py-2 px-2.5 text-center font-mono font-bold text-slate-400">
+                    <tr key={item.teacher.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                      <td className="py-2 px-2 text-center font-mono font-bold text-slate-500 dark:text-teal-300">
                         {idx + 1}
                       </td>
-                      <td className="py-2 px-3">
-                        <div className="font-bold text-white">{item.teacher.name}</div>
-                        <div className="text-[10px] text-slate-400 font-mono">
+                      <td className="py-2 px-2.5">
+                        <div className="font-bold text-slate-900 dark:text-white leading-tight">{item.teacher.name}</div>
+                        <div className="text-[9.5px] text-slate-500 dark:text-teal-300/80 font-mono">
                           NIY: {item.teacher.niy || item.teacher.nip || '-'}
                         </div>
+                        <div className="sm:hidden text-[10px] text-slate-500 dark:text-teal-300/80 mt-0.5">
+                          {item.teacher.role_title}
+                        </div>
                       </td>
-                      <td className="py-2 px-3 text-slate-300 text-[11px]">
+                      <td className="py-2 px-2.5 text-slate-700 dark:text-teal-200 text-[11px] hidden sm:table-cell">
                         {item.teacher.role_title}
                       </td>
-                      <td className="py-2 px-3 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      <td className="py-2 px-2.5 text-center">
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
                           {item.notes}
                         </span>
                       </td>
@@ -427,15 +477,15 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
           )}
         </section>
 
-        {/* Current Signer Card & Action */}
+        {/* Current Signer Card & Action (Mobile-First) */}
         {currentSigner && (
-          <section aria-labelledby="signer-action-heading" className="bg-[#072b2f]/95 backdrop-blur-md border border-teal-500/40 rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#0f4950] pb-3">
+          <section aria-labelledby="signer-action-heading" className="bg-white dark:bg-[#072b2f] border-2 border-teal-600 dark:border-teal-500 rounded-2xl p-4 sm:p-5 shadow-md space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-[#0f4950] pb-2.5">
               <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-teal-300 block">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-teal-700 dark:text-teal-300 block">
                   Pihak Penandatangan:
                 </span>
-                <h3 id="signer-action-heading" className="text-base font-bold text-white">
+                <h3 id="signer-action-heading" className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                   {currentSigner.signer_role === 'secretary'
                     ? 'Notulis Rapat'
                     : currentSigner.signer_role === 'leader'
@@ -446,24 +496,24 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                 </h3>
               </div>
               <div className="text-right">
-                <span className="text-xs font-bold text-slate-200 block">{currentSigner.signer_name}</span>
-                <span className="text-[10px] text-teal-300 font-mono block">NIY: {currentSigner.signer_niy || '-'}</span>
+                <span className="text-xs font-bold text-slate-900 dark:text-white block">{currentSigner.signer_name}</span>
+                <span className="text-[10px] text-slate-600 dark:text-teal-300 font-mono block">NIY: {currentSigner.signer_niy || '-'}</span>
               </div>
             </div>
 
             {/* If Already Signed: Show Certificate Badge */}
             {currentSigner.status === 'signed' ? (
-              <div className="p-5 rounded-2xl bg-[#042024] border border-emerald-500/40 text-center space-y-3">
-                <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
+              <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50/70 dark:bg-[#042024] border border-emerald-300 dark:border-emerald-500/50 text-center space-y-3">
+                <div className="w-11 h-11 mx-auto rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 block">
                     Dokumen Telah Disahkan Secara Elektronik
                   </span>
-                  <p className="text-xs text-slate-300 mt-1">
+                  <p className="text-xs text-slate-700 dark:text-slate-300 mt-1">
                     Disetujui pada{' '}
-                    <strong className="text-white">
+                    <strong className="text-slate-900 dark:text-white">
                       {new Date(currentSigner.signed_at || '').toLocaleDateString('id-ID', {
                         day: 'numeric',
                         month: 'long',
@@ -478,13 +528,13 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                       WIB
                     </strong>
                   </p>
-                  <p className="text-xs font-mono font-bold text-teal-300 mt-1">
+                  <p className="text-xs font-mono font-bold text-teal-800 dark:text-teal-300 mt-1">
                     Kode Verifikasi: {currentSigner.verification_code}
                   </p>
                 </div>
 
                 <div className="pt-2 flex justify-center">
-                  <div className="p-3 bg-white rounded-xl shadow-xs text-slate-900 max-w-sm">
+                  <div className="p-3 bg-white rounded-xl shadow-xs border border-slate-200 dark:border-teal-800 text-slate-900 max-w-sm">
                     <DigitalSignatureBadge
                       signature={currentSigner}
                       role={currentSigner.signer_role}
@@ -501,6 +551,21 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* Direct link to public verification view */}
+                {currentSigner.verification_code && (
+                  <div className="pt-2">
+                    <a
+                      href={`${window.location.origin}${window.location.pathname}?verify=${currentSigner.verification_code}&meeting=${currentSigner.meeting_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 dark:text-teal-300 hover:underline"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Buka Halaman Verifikasi Publik QR Code</span>
+                    </a>
+                  </div>
+                )}
               </div>
             ) : (
               /* If Not Signed Yet: Action Button */
@@ -509,33 +574,31 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                   <div
                     className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
                       feedback.type === 'success'
-                        ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-200'
-                        : 'bg-rose-500/15 border border-rose-500/30 text-rose-200'
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200'
+                        : 'bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200'
                     }`}
                   >
                     {feedback.type === 'success' ? (
-                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-rose-700 dark:text-rose-400" />
                     )}
                     <span>{feedback.text}</span>
                   </div>
                 )}
 
-                <div className="p-3.5 rounded-xl bg-slate-900/50 border border-teal-900/50 text-xs text-slate-300 leading-relaxed">
+                <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950] text-xs text-slate-700 dark:text-teal-200 leading-relaxed">
                   Dengan mengklik tombol di bawah ini, saya menyatakan telah memeriksa dan menyetujui seluruh data kehadiran dan berita acara rapat ini secara sah.
-                  {currentSigner.signer_role === 'headmaster' && (
-                    <span className="block mt-1 text-teal-300 font-semibold">
-                      ★ Pengesahan ini akan otomatis membubuhkan Stempel Digital Resmi Sekolah & QR Code Verifikasi Kedinasan.
-                    </span>
-                  )}
+                  <span className="block mt-1 text-teal-800 dark:text-teal-300 font-semibold">
+                    ✓ Pengesahan ini otomatis menerbitkan QR Code Verifikasi Kedinasan resmi yang dapat dipindai publik.
+                  </span>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleApprove}
                   disabled={isSubmitting || isStepLocked}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-white font-bold text-sm shadow-xl shadow-teal-950/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
+                  className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-gradient-to-r from-teal-700 via-teal-600 to-emerald-600 hover:from-teal-600 hover:to-emerald-500 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer active:scale-[0.99]"
                 >
                   {isSubmitting ? (
                     <>
@@ -555,14 +618,14 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
         )}
 
         {/* Footer info & attribution */}
-        <footer className="text-center text-[11px] text-slate-400 space-y-1 pt-3 border-t border-teal-900/40">
+        <footer className="text-center text-xs text-slate-500 dark:text-teal-300/70 space-y-1 pt-3 pb-6 border-t border-slate-200 dark:border-[#0f4950]">
           <p>© {new Date().getFullYear()} {schoolProfile.school_name || 'SMP Muhammadiyah 1 Gombong'}</p>
           <p>
             <a
               href="https://github.com/oebaedz"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-semibold text-teal-400 hover:text-teal-300 underline underline-offset-2 transition-colors"
+              className="inline-flex items-center gap-1 font-semibold text-teal-700 dark:text-teal-400 hover:underline"
             >
               <span>dePresent made by Mr Zee</span>
             </a>

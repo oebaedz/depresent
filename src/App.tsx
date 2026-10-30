@@ -11,6 +11,7 @@ import { MobileCheckinView } from './components/MobileCheckinView';
 import { InvitationsView } from './components/InvitationsView';
 import { RsvpConfirmationView } from './components/RsvpConfirmationView';
 import { SignatureApprovalView } from './components/SignatureApprovalView';
+import { SignatureVerificationView } from './components/SignatureVerificationView';
 import { AdminPinModal } from './components/AdminPinModal';
 import { SupabaseModal } from './components/SupabaseModal';
 import { VercelDeployModal } from './components/VercelDeployModal';
@@ -95,6 +96,22 @@ export default function App() {
     }
     return null;
   });
+
+  // Check if current URL is a QR code document verification link (e.g. ?verify=<code> or ?code=<code>)
+  const [verifyParams] = useState<{ code: string; meetingId?: string } | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('verify') || params.get('code') || params.get('cert');
+      if (code) {
+        return {
+          code,
+          meetingId: params.get('meeting') || params.get('meetingId') || undefined,
+        };
+      }
+    }
+    return null;
+  });
+
 
   // Check if current URL is a teacher mobile checkin link (e.g. ?checkin=<meetingId>)
   const [mobileCheckinMeetingId] = useState<string | null>(() => {
@@ -346,6 +363,25 @@ export default function App() {
   const targetCheckinMeeting = mobileMeeting || meetings.find((m) => m.id === mobileCheckinMeetingId);
 
   // -------------------------------------------------------------------------
+  // PUBLIC DOCUMENT & SIGNATURE VERIFICATION MODE (via QR Code Scan)
+  // -------------------------------------------------------------------------
+  if (verifyParams) {
+    return (
+      <SignatureVerificationView
+        verificationCode={verifyParams.code}
+        meetingId={verifyParams.meetingId}
+        meetings={meetings}
+        teachers={teachers}
+        attendances={attendances}
+        schoolProfile={schoolProfile}
+        onDone={() => {
+          if (typeof window !== 'undefined') window.location.href = window.location.pathname;
+        }}
+      />
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // DIGITAL SIGNATURE APPROVAL MODE (Isolated View for Signers via WhatsApp Link)
   // -------------------------------------------------------------------------
   if (signParams) {
@@ -362,6 +398,7 @@ export default function App() {
       />
     );
   }
+
 
   // -------------------------------------------------------------------------
   // RSVP CONFIRMATION MODE (Isolated View for Teachers via WhatsApp Link)

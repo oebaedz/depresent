@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, ExternalLink } from 'lucide-react';
 import { DocumentSignature, SchoolProfile, SignerRole } from '../types';
 
 interface DigitalSignatureBadgeProps {
@@ -26,9 +26,8 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   const isSigned = signature?.status === 'signed';
-  const isHeadmaster = role === 'headmaster';
 
-  // Format signed time (with seconds as requested by the user for timestamps)
+  // Format signed time (with seconds for accuracy)
   const signedDateStr = signature?.signed_at
     ? new Date(signature.signed_at).toLocaleDateString('id-ID', {
         day: '2-digit',
@@ -45,25 +44,23 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
       })
     : '';
 
-  // Generate QR Code data
+  // Verification URL for scan redirection
+  const verificationUrl = typeof window !== 'undefined' && signature?.verification_code
+    ? `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(signature.verification_code)}&meeting=${signature.meeting_id}`
+    : '';
+
+  // Generate QR Code data that directly directs scanner to the dedicated verification page
   useEffect(() => {
     if (isSigned && signature?.verification_code) {
-      const verifyPayload = JSON.stringify({
-        app: 'dePresent',
-        code: signature.verification_code,
-        role: signature.signer_role,
-        name: signature.signer_name,
-        niy: signature.signer_niy,
-        meetingId: signature.meeting_id,
-        signedAt: signature.signed_at,
-        doc: signature.document_type,
-      });
+      const targetUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}${window.location.pathname}?verify=${encodeURIComponent(signature.verification_code)}&meeting=${signature.meeting_id}`
+        : `https://depresent.verify/?code=${signature.verification_code}`;
 
-      QRCode.toDataURL(verifyPayload, {
+      QRCode.toDataURL(targetUrl, {
         width: 140,
         margin: 1,
         color: {
-          dark: '#000000',
+          dark: '#0f172a',
           light: '#ffffff',
         },
         errorCorrectionLevel: 'M',
@@ -73,72 +70,44 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
     }
   }, [isSigned, signature]);
 
-  // JIKA SUDAH TTD:
+  // JIKA SUDAH TTD (DISAHKAN SECARA ELEKTRONIK):
+  // Cukup QR Code verifikasi otentik untuk semua penandatangan (Stempel ditiadakan)
   if (isSigned) {
     return (
       <div className="flex flex-col items-center justify-between text-center select-none py-1">
-        <p className="text-xs font-semibold text-slate-800 dark:text-white print:text-black mb-1">
+        <p className="text-xs font-bold text-slate-800 dark:text-teal-100 print:text-black mb-1">
           {roleTitle}
         </p>
 
-        {/* CONTAINER TTD DIGITAL:
-            - Kepala Sekolah: Stempel Digital Resmi Sekolah + QR Code
-            - Selain Kepala Sekolah (Notulis & Pimpinan): CUKUP QR Code saja */}
-        <div className="h-28 flex items-center justify-center gap-3 my-1">
-          {/* 1. STEMPEL RESMI KEDINASAN (KHUSUS KEPALA SEKOLAH) */}
-          {isHeadmaster && (
-            <div className="relative w-24 h-24 rounded-full border-2 border-double border-blue-800 flex items-center justify-center p-1 text-blue-900 font-sans tracking-tight shrink-0 shadow-xs bg-blue-50/40 print:bg-transparent">
-              {/* Lingkaran dalam */}
-              <div className="w-full h-full rounded-full border border-blue-700/80 flex flex-col items-center justify-center text-center p-1 relative">
-                {/* Teks Atas Sekolah */}
-                <span className="text-[7px] font-black uppercase tracking-tighter leading-tight max-w-[76px] truncate text-blue-950">
-                  {schoolProfile.school_name?.replace('SMP ', '') || 'SMP MUH 1'}
-                </span>
-
-                {/* Garis pemisah tengah stempel */}
-                <div className="w-14 h-[1px] bg-blue-800 my-0.5" />
-
-                {/* Teks Status Tengah Stempel */}
-                <div className="flex flex-col items-center justify-center">
-                  <span className="text-[7.5px] font-black uppercase text-blue-900 tracking-wider leading-none">
-                    TERSAHKAN
-                  </span>
-                  <span className="text-[6.5px] font-bold text-blue-800 leading-tight">
-                    ELEKTRONIK
-                  </span>
-                </div>
-
-                <div className="w-14 h-[1px] bg-blue-800 my-0.5" />
-
-                {/* Tanggal & Jam dengan detik */}
-                <span className="text-[6px] font-mono font-bold text-blue-950 leading-none">
-                  {signedDateStr} {signedTimeStr}
-                </span>
-
-                {/* Bintang Ornamen */}
-                <span className="text-[6px] text-blue-800 absolute left-1 top-1/2 -translate-y-1/2">★</span>
-                <span className="text-[6px] text-blue-800 absolute right-1 top-1/2 -translate-y-1/2">★</span>
-              </div>
-            </div>
-          )}
-
-          {/* 2. QR CODE VERIFIKASI RESMI (UNTUK SEMUA PEJABAT: NOTULIS, PIMPINAN, DAN KEPALA SEKOLAH) */}
-          <div className="flex flex-col items-center shrink-0">
+        {/* CONTAINER TTD DIGITAL: CUKUP QR CODE VERIFIKASI RESMI */}
+        <div className="h-28 flex flex-col items-center justify-center my-1">
+          <a
+            href={verificationUrl || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Klik untuk membuka Halaman Verifikasi Keabsahan Dokumen"
+            className="group relative flex flex-col items-center cursor-pointer transition-transform hover:scale-105"
+          >
             {qrDataUrl ? (
-              <img
-                src={qrDataUrl}
-                alt="QR Verifikasi TTD"
-                className="w-16 h-16 object-contain border border-slate-300 p-0.5 bg-white shadow-2xs"
-              />
+              <div className="relative">
+                <img
+                  src={qrDataUrl}
+                  alt="QR Verifikasi TTD"
+                  className="w-18 h-18 object-contain border border-slate-300 dark:border-teal-700/60 p-1 bg-white rounded-md shadow-xs"
+                />
+                <span className="no-print opacity-0 group-hover:opacity-100 absolute inset-0 bg-teal-900/70 text-white rounded-md text-[8px] font-bold flex items-center justify-center gap-0.5 transition-opacity">
+                  <ExternalLink className="w-2.5 h-2.5" /> Verifikasi
+                </span>
+              </div>
             ) : (
-              <div className="w-16 h-16 border border-slate-300 flex items-center justify-center bg-white">
+              <div className="w-18 h-18 border border-slate-300 dark:border-teal-700/60 rounded-md flex items-center justify-center bg-white">
                 <CheckCircle2 className="w-8 h-8 text-emerald-600" />
               </div>
             )}
-            <span className="text-[8px] font-mono font-bold text-slate-700 dark:text-teal-300 print:text-black mt-0.5">
+            <span className="text-[8.5px] font-mono font-bold text-slate-800 dark:text-teal-200 print:text-black mt-1 tracking-tight">
               {signature?.verification_code || 'DEP-VERIFIED'}
             </span>
-          </div>
+          </a>
         </div>
 
         {/* NAMA PEJABAT & NIY */}
@@ -146,12 +115,15 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
           <p className="font-bold underline text-xs text-slate-900 dark:text-white print:text-black">
             {signerName}
           </p>
-          <p className="text-[10px] text-slate-700 dark:text-teal-300/80 font-mono print:text-black">
+          <p className="text-[10px] text-slate-700 dark:text-teal-200 font-mono print:text-black">
             NIY. {signerNiy || '-'}
           </p>
           <p className="text-[8px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1 mt-0.5">
             <ShieldCheck className="w-2.5 h-2.5 inline" />
             <span>Tanda Tangan Elektronik Sah</span>
+          </p>
+          <p className="text-[7.5px] text-slate-500 dark:text-teal-300/70 font-mono print:text-slate-600 mt-0.5">
+            {signedDateStr} {signedTimeStr} WIB
           </p>
         </div>
       </div>
