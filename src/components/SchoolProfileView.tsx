@@ -319,7 +319,7 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
               <span>Pimpinan Sekolah (Kepala Sekolah)</span>
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">Nama Kepala Sekolah</label>
                 <input
@@ -343,18 +343,7 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">Jabatan / Golongan</label>
-                <input
-                  type="text"
-                  value={formData.headmaster_rank}
-                  onChange={(e) => setFormData({ ...formData, headmaster_rank: e.target.value })}
-                  placeholder="Pembina Yayasan / Guru Utama"
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">No. HP / WhatsApp Kepala *</label>
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">No. HP / WhatsApp *</label>
                 <input
                   type="text"
                   value={formData.headmaster_phone || ''}
@@ -462,9 +451,9 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
             {/* Official Indonesian Foundation & School Letterhead Box */}
             <div className="p-5 border border-slate-300 rounded-lg bg-white shadow-2xs space-y-3 font-serif">
               <div className="text-center relative pb-2">
-                <div className="w-12 h-12 rounded-full border border-slate-300 bg-slate-50 absolute left-0 top-0 flex items-center justify-center font-bold text-xs text-blue-950 overflow-hidden">
+                <div className="w-12 h-12 absolute left-0 top-0 flex items-center justify-center font-bold text-xs text-blue-950">
                   {formData.logo_url ? (
-                    <img src={formData.logo_url} alt="Logo" className="w-full h-full object-contain p-0.5" />
+                    <img src={formData.logo_url} alt="Logo" className="w-full h-full object-contain" />
                   ) : (
                     'LOGO'
                   )}

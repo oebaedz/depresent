@@ -359,7 +359,7 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                 <option value="" className="text-slate-500 dark:text-teal-300/80">-- Pilih Nama Guru --</option>
                 {unpresentTeachers.map((t) => (
                   <option key={t.id} value={t.id} className="dark:bg-[#072b2f]">
-                    {t.name} ({t.niy || t.nip || '-'})
+                    {t.name} ({t.teacher_group || 'Guru Mapel'})
                   </option>
                 ))}
               </select>
@@ -444,8 +444,12 @@ export const ProjectorView: React.FC<ProjectorViewProps> = ({
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] text-slate-500 dark:text-teal-200/70 font-mono">
-                          NIY. {teacher.niy || teacher.nip || '-'} · {teacher.role_title}
+                        <p className={`text-[11px] flex items-center gap-1.5 mt-0.5 ${isFullscreen ? 'text-teal-200/90' : 'text-slate-500 dark:text-teal-200/70'}`}>
+                          <span className="font-semibold text-[10px] px-1.5 py-0.2 rounded border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-[#02181a] text-teal-700 dark:text-teal-300">
+                            {teacher.teacher_group || 'Guru Mapel'}
+                          </span>
+                          <span>·</span>
+                          <span>{teacher.role_title}</span>
                         </p>
                       </div>
                     </div>

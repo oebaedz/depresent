@@ -1078,8 +1078,8 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                             </span>
                           )}
                           {rsvp === 'permission' && (
-                            <div className="flex flex-col">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                            <div className="flex flex-col items-start gap-0.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30 w-fit">
                                 <AlertCircle className="w-3 h-3" />
                                 Izin
                               </span>

@@ -459,6 +459,7 @@ export default function App() {
         schoolProfile={schoolProfile}
         correctPin={adminPin}
         onSuccess={handleAdminUnlock}
+        isLoading={isInitialLoading}
       />
     );
   }

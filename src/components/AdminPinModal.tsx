@@ -6,12 +6,14 @@ interface AdminPinModalProps {
   schoolProfile: SchoolProfile;
   correctPin: string;
   onSuccess: () => void;
+  isLoading?: boolean;
 }
 
 export const AdminPinModal: React.FC<AdminPinModalProps> = ({
   schoolProfile,
   correctPin,
   onSuccess,
+  isLoading = false,
 }) => {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
@@ -49,11 +51,13 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 dark:bg-black/85 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950 dark:bg-[#021417]">
       <div className="bg-white dark:bg-[#072b2f] rounded-3xl shadow-2xl max-w-sm w-full p-6 sm:p-7 border border-slate-100 dark:border-[#0f4950] space-y-6 text-center animate-in fade-in zoom-in-95 duration-200">
         {/* App & School Branding */}
         <div className="space-y-2">
-          {schoolProfile.logo_url ? (
+          {isLoading ? (
+            <div className="w-16 h-16 rounded-2xl mx-auto bg-slate-200 dark:bg-[#042024] animate-pulse" />
+          ) : schoolProfile.logo_url ? (
             <img
               src={schoolProfile.logo_url}
               alt="Logo"
@@ -69,9 +73,13 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
             <p className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-300">
               dePresent Sistem Presensi Kegiatan
             </p>
-            <h2 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
-              {schoolProfile.school_name || 'SMP Harapan Bangsa'}
-            </h2>
+            {isLoading ? (
+              <div className="h-5 w-40 bg-slate-200 dark:bg-[#042024] rounded-md mx-auto my-1 animate-pulse" />
+            ) : (
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
+                {schoolProfile.school_name || 'Presensi Kegiatan Kedinasan'}
+              </h2>
+            )}
             <div className="flex items-center justify-center gap-1.5 mt-1 text-slate-500 dark:text-teal-200/80 text-xs">
               <Shield className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
               <span className="font-medium">Akses Panel Admin & Operator</span>

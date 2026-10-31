@@ -731,15 +731,17 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         {/* 1. Official Foundation & School Letterhead (Kop Surat) */}
         <div className="border-b-4 border-double border-slate-900 pb-3 mb-6 text-center relative font-serif">
           {/* Logo */}
-          <div className="absolute left-2 top-1 w-16 h-16 rounded-full border border-slate-400 bg-slate-50 flex items-center justify-center font-bold text-xs text-blue-950 font-sans print:border-slate-800 overflow-hidden">
+          <div className="absolute left-2 top-1 w-16 h-16 flex items-center justify-center font-bold text-xs text-blue-950 font-sans">
             {schoolProfile.logo_url ? (
               <img
                 src={schoolProfile.logo_url}
                 alt="Logo"
-                className="w-full h-full object-contain p-1"
+                className="w-full h-full object-contain"
               />
             ) : (
-              'LOGO'
+              <div className="w-full h-full border border-slate-300 flex items-center justify-center text-slate-400">
+                LOGO
+              </div>
             )}
           </div>
 

@@ -28,7 +28,8 @@ interface MobileCheckinViewProps {
 interface DeviceLockInfo {
   teacherId: string;
   teacherName: string;
-  teacherNiy: string;
+  teacherGroup: string;
+  teacherNiy?: string;
   teacherRole: string;
   checkInTime: string;
   statusText: string;
@@ -164,9 +165,11 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
   const filteredTeachers = activeTeachers.filter((t) => {
     const q = searchQuery.toLowerCase();
+    const groupVal = (t.teacher_group || '').toLowerCase();
     const niyVal = (t.niy || t.nip || '').toLowerCase();
     return (
       t.name.toLowerCase().includes(q) ||
+      groupVal.includes(q) ||
       niyVal.includes(q) ||
       t.role_title.toLowerCase().includes(q)
     );
@@ -214,6 +217,7 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
     const lockInfo: DeviceLockInfo = {
       teacherId: selectedTeacher.id,
       teacherName: selectedTeacher.name,
+      teacherGroup: selectedTeacher.teacher_group || 'Guru Mapel',
       teacherNiy: selectedTeacher.niy || selectedTeacher.nip || '-',
       teacherRole: selectedTeacher.role_title,
       checkInTime: timeStr,
@@ -370,10 +374,12 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-snug">
                     {existingDeviceLock.teacherName}
                   </h4>
-                  <p className="text-slate-500 dark:text-teal-300/80 font-mono text-[11px] mt-0.5">
-                    NIY. {existingDeviceLock.teacherNiy}
-                  </p>
-                  <p className="text-slate-600 dark:text-teal-200/90 text-xs">
+                  <div className="mt-1">
+                    <span className="inline-block text-[11px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-[#031e21] px-2 py-0.5 rounded-md border border-teal-200 dark:border-teal-850">
+                      {existingDeviceLock.teacherGroup || 'Guru Mapel'}
+                    </span>
+                  </div>
+                  <p className="text-slate-600 dark:text-teal-200/90 text-xs mt-1">
                     {existingDeviceLock.teacherRole}
                   </p>
                 </div>
@@ -407,10 +413,12 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
               <h4 className="text-base font-black text-slate-900 dark:text-white pt-2">
                 {checkinDone.teacher.name}
               </h4>
-              <p className="text-xs font-mono text-slate-500 dark:text-teal-300/80">
-                NIY. {checkinDone.teacher.niy || checkinDone.teacher.nip || '-'}
-              </p>
-              <p className="text-xs text-slate-600 dark:text-teal-200/90">
+              <div className="pt-1">
+                <span className="inline-block text-[11px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-[#031e21] px-2.5 py-0.5 rounded-md border border-teal-200 dark:border-teal-800">
+                  {checkinDone.teacher.teacher_group || 'Guru Mapel'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-teal-200/90 pt-0.5">
                 {checkinDone.teacher.role_title}
               </p>
             </div>
@@ -452,7 +460,7 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
                   disabled={isTokenExpired}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={isTokenExpired ? 'Kode QR kadaluarsa — silakan pindai ulang...' : 'Ketik nama guru atau NIY...'}
+                  placeholder={isTokenExpired ? 'Kode QR kadaluarsa — silakan pindai ulang...' : 'Ketik nama guru atau kelompok / jabatan...'}
                   className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-xl bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden disabled:bg-slate-100 dark:disabled:bg-[#02181a] disabled:text-slate-400 dark:disabled:text-teal-400/50 disabled:cursor-not-allowed"
                 />
               </div>
@@ -485,8 +493,12 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
                         <p className={`font-bold leading-tight ${isSelected ? 'text-teal-950 dark:text-teal-200' : 'text-slate-900 dark:text-white'}`}>
                           {t.name}
                         </p>
-                        <p className="text-[11px] font-mono text-slate-500 dark:text-teal-300/80 mt-0.5">
-                          NIY. {t.niy || t.nip || '-'} · {t.role_title}
+                        <p className="text-[11px] text-slate-500 dark:text-teal-300/80 mt-1 flex items-center gap-1.5">
+                          <span className="font-semibold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-[#02181a] px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800 text-[10px]">
+                            {t.teacher_group || 'Guru Mapel'}
+                          </span>
+                          <span>·</span>
+                          <span>{t.role_title}</span>
                         </p>
                       </div>
 

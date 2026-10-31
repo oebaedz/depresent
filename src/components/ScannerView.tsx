@@ -255,9 +255,11 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
   const filteredTeachers = searchQuery.trim()
     ? eligibleTeachers.filter((t) => {
         const q = searchQuery.toLowerCase();
+        const groupVal = (t.teacher_group || '').toLowerCase();
         const niyVal = (t.niy || t.nip || '').toLowerCase();
         return (
           t.name.toLowerCase().includes(q) ||
+          groupVal.includes(q) ||
           niyVal.includes(q) ||
           t.role_title.toLowerCase().includes(q)
         );
@@ -445,10 +447,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
                       <h4 className="font-bold text-slate-900 dark:text-white text-sm leading-snug">
                         {lastScanned.teacher.name}
                       </h4>
-                      <p className="text-xs font-mono text-slate-600 dark:text-teal-300/80 mt-0.5">
-                        NIY. {lastScanned.teacher.niy || lastScanned.teacher.nip || '-'}
-                      </p>
-                      <p className="text-xs text-slate-700 dark:text-teal-100/90 mt-0.5">
+                      <div className="mt-1">
+                        <span className="inline-block text-[11px] font-bold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-[#031e21] px-2 py-0.5 rounded border border-teal-200 dark:border-teal-800">
+                          {lastScanned.teacher.teacher_group || 'Guru Mapel'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-700 dark:text-teal-100/90 mt-1">
                         {lastScanned.teacher.role_title} · {lastScanned.teacher.rank_group}
                       </p>
                     </div>
@@ -489,7 +493,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari Nama Guru atau NIY..."
+                placeholder="Cari Nama Guru atau Kelompok / Jabatan..."
                 className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] bg-white dark:bg-[#031e21] text-slate-800 dark:text-white rounded-lg focus:outline-hidden focus:ring-2 focus:ring-teal-600"
               />
             </div>
@@ -506,7 +510,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
                     >
                       <div className="min-w-0 pr-2">
                         <p className="font-semibold text-slate-900 dark:text-white truncate">{t.name}</p>
-                        <p className="font-mono text-[10px] text-slate-500 dark:text-teal-300/80">NIY. {t.niy || t.nip || '-'}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-teal-300/80 flex items-center gap-1 mt-0.5">
+                          <span className="font-semibold text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-[#02181a] px-1 py-0.2 rounded border border-teal-200 dark:border-teal-800">
+                            {t.teacher_group || 'Guru Mapel'}
+                          </span>
+                          <span>·</span>
+                          <span>{t.role_title}</span>
+                        </p>
                       </div>
                       <button
                         onClick={() => processAttendance(t, 'manual')}

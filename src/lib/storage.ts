@@ -19,21 +19,41 @@ function ensureValidUUIDs<T extends { id: string }>(records: T[]): T[] {
   }));
 }
 
-// Initialise local storage with demo data if empty
+// Initialise local storage and purge any old demo data
 export function initLocalStorage() {
   if (typeof window === 'undefined') return;
+
+  try {
+    // Purge legacy demo profile
+    const rawProfile = localStorage.getItem(KEY_PROFILE);
+    if (rawProfile && (rawProfile.includes('SMP HARAPAN BANGSA') || rawProfile.includes('YAYASAN PENDIDIKAN HARAPAN BANGSA'))) {
+      localStorage.removeItem(KEY_PROFILE);
+    }
+    // Purge legacy demo teachers
+    const rawTeachers = localStorage.getItem(KEY_TEACHERS);
+    if (rawTeachers && (rawTeachers.includes('Bambang Sudarsono') || rawTeachers.includes('Ahmad Fauzi') || rawTeachers.includes('Hendra Gunawan'))) {
+      localStorage.removeItem(KEY_TEACHERS);
+    }
+    // Purge legacy demo meetings
+    const rawMeetings = localStorage.getItem(KEY_MEETINGS);
+    if (rawMeetings && (rawMeetings.includes('Rapat Koordinasi Dewan Guru') || rawMeetings.includes('Kurikulum Merdeka Sekolah Yayasan') || rawMeetings.includes('PORSENI'))) {
+      localStorage.removeItem(KEY_MEETINGS);
+    }
+  } catch (e) {
+    console.warn('Error purging legacy demo data:', e);
+  }
 
   if (!localStorage.getItem(KEY_PROFILE)) {
     localStorage.setItem(KEY_PROFILE, JSON.stringify(INITIAL_SCHOOL_PROFILE));
   }
   if (!localStorage.getItem(KEY_TEACHERS)) {
-    localStorage.setItem(KEY_TEACHERS, JSON.stringify(ensureValidUUIDs(INITIAL_TEACHERS)));
+    localStorage.setItem(KEY_TEACHERS, JSON.stringify([]));
   }
   if (!localStorage.getItem(KEY_MEETINGS)) {
-    localStorage.setItem(KEY_MEETINGS, JSON.stringify(ensureValidUUIDs(INITIAL_MEETINGS)));
+    localStorage.setItem(KEY_MEETINGS, JSON.stringify([]));
   }
   if (!localStorage.getItem(KEY_ATTENDANCES)) {
-    localStorage.setItem(KEY_ATTENDANCES, JSON.stringify(INITIAL_ATTENDANCES));
+    localStorage.setItem(KEY_ATTENDANCES, JSON.stringify([]));
   }
   if (!localStorage.getItem(KEY_INVITATIONS)) {
     localStorage.setItem(KEY_INVITATIONS, JSON.stringify([]));
@@ -49,6 +69,10 @@ export function getCachedProfile(): SchoolProfile {
     const stored = localStorage.getItem(KEY_PROFILE);
     if (stored) {
       const parsed = JSON.parse(stored);
+      if (parsed.school_name === 'SMP HARAPAN BANGSA') {
+        parsed.school_name = '';
+        parsed.foundation_name = '';
+      }
       return { ...INITIAL_SCHOOL_PROFILE, ...parsed };
     }
   } catch {
@@ -58,13 +82,20 @@ export function getCachedProfile(): SchoolProfile {
 }
 
 export function getCachedTeachers(): Teacher[] {
-  if (typeof window === 'undefined') return sortTeachersStructuralFirst(ensureValidUUIDs(INITIAL_TEACHERS));
+  if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(KEY_TEACHERS);
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const enriched = parsed.map((t: Teacher) => ({
+        // filter out legacy demo data
+        const clean = parsed.filter(
+          (t: Teacher) =>
+            !t.name?.includes('Bambang Sudarsono') &&
+            !t.name?.includes('Ahmad Fauzi') &&
+            !t.name?.includes('Hendra Gunawan')
+        );
+        const enriched = clean.map((t: Teacher) => ({
           ...t,
           teacher_group: t.teacher_group || getTeacherGroup(t),
         }));
@@ -74,27 +105,33 @@ export function getCachedTeachers(): Teacher[] {
   } catch {
     // fallback
   }
-  return sortTeachersStructuralFirst(ensureValidUUIDs(INITIAL_TEACHERS));
+  return [];
 }
 
 export function getCachedMeetings(): Meeting[] {
-  if (typeof window === 'undefined') return ensureValidUUIDs(INITIAL_MEETINGS);
+  if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(KEY_MEETINGS);
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return ensureValidUUIDs(parsed);
+        const clean = parsed.filter(
+          (m: Meeting) =>
+            !m.title?.includes('Rapat Koordinasi Dewan Guru') &&
+            !m.title?.includes('Kurikulum Merdeka Sekolah Yayasan') &&
+            !m.title?.includes('PORSENI')
+        );
+        return ensureValidUUIDs(clean);
       }
     }
   } catch {
     // fallback
   }
-  return ensureValidUUIDs(INITIAL_MEETINGS);
+  return [];
 }
 
 export function getCachedAttendances(): Attendance[] {
-  if (typeof window === 'undefined') return INITIAL_ATTENDANCES;
+  if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem(KEY_ATTENDANCES);
     if (stored) {
@@ -106,7 +143,7 @@ export function getCachedAttendances(): Attendance[] {
   } catch {
     // fallback
   }
-  return INITIAL_ATTENDANCES;
+  return [];
 }
 
 // ---------------------------------------------------------------------------
