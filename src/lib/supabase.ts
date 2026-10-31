@@ -200,10 +200,14 @@ CREATE TABLE IF NOT EXISTS smp_school_profile (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Pastikan kolom yayasan dan PIN ada jika tabel sudah terbuat sebelumnya
+-- Pastikan kolom yayasan, PIN, dan kontak penandatangan ada jika tabel sudah terbuat sebelumnya
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS foundation_name TEXT DEFAULT 'YAYASAN PENDIDIKAN HARAPAN BANGSA';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS headmaster_niy TEXT DEFAULT 'YHB-1994-001';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_pin TEXT DEFAULT '1234';
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS headmaster_phone TEXT DEFAULT '';
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_staff_name TEXT DEFAULT 'Staf Administrasi';
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_staff_niy TEXT DEFAULT '-';
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_staff_phone TEXT DEFAULT '';
 
 -- 2. TABEL DATA GURU / PTK (NIY & ptk_id UUID)
 CREATE TABLE IF NOT EXISTS smp_teachers (
@@ -476,6 +480,24 @@ GRANT ALL ON TABLE smp_message_templates TO anon, authenticated;
 
 DROP POLICY IF EXISTS "Public All smp_message_templates" ON smp_message_templates;
 CREATE POLICY "Public All smp_message_templates" ON smp_message_templates FOR ALL USING (true) WITH CHECK (true);
+`;
+
+export const SUPABASE_SQL_SIGNER_PROFILES = `-- ============================================================
+-- UPDATE PROFIL SEKOLAH: PENANDATANGAN ELEKTRONIK & NO. WA
+-- Jalankan skrip ini di SQL Editor Supabase untuk menambahkan
+-- kolom nomor WhatsApp Kepala Sekolah dan Staf Administrasi:
+-- ============================================================
+ALTER TABLE smp_school_profile 
+ADD COLUMN IF NOT EXISTS headmaster_phone TEXT DEFAULT '';
+
+ALTER TABLE smp_school_profile 
+ADD COLUMN IF NOT EXISTS admin_staff_name TEXT DEFAULT 'Staf Administrasi';
+
+ALTER TABLE smp_school_profile 
+ADD COLUMN IF NOT EXISTS admin_staff_niy TEXT DEFAULT '-';
+
+ALTER TABLE smp_school_profile 
+ADD COLUMN IF NOT EXISTS admin_staff_phone TEXT DEFAULT '';
 `;
 
 

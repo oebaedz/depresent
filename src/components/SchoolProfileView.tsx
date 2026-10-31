@@ -319,7 +319,7 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
               <span>Pimpinan Sekolah (Kepala Sekolah)</span>
             </h3>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">Nama Kepala Sekolah</label>
                 <input
@@ -352,7 +352,73 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
                   className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
                 />
               </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">No. HP / WhatsApp Kepala *</label>
+                <input
+                  type="text"
+                  value={formData.headmaster_phone || ''}
+                  onChange={(e) => setFormData({ ...formData, headmaster_phone: e.target.value })}
+                  placeholder="081234567800"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden font-mono"
+                />
+              </div>
             </div>
+
+            {/* Staf Administrasi (Pengganti Petugas Ekspedisi) */}
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide border-b border-slate-100 dark:border-[#0f4950] pb-2 pt-3 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <User className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span>Staf Administrasi (Penandatangan Buku Ekspedisi)</span>
+              </span>
+              <span className="text-[10px] text-teal-600 dark:text-teal-400 font-normal">
+                Pengganti Petugas Ekspedisi
+              </span>
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
+                  Nama Staf Administrasi *
+                </label>
+                <input
+                  type="text"
+                  value={formData.admin_staff_name || ''}
+                  onChange={(e) => setFormData({ ...formData, admin_staff_name: e.target.value })}
+                  placeholder="Contoh: Siti Aminah, A.Md."
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
+                  NIY Staf Administrasi
+                </label>
+                <input
+                  type="text"
+                  value={formData.admin_staff_niy || ''}
+                  onChange={(e) => setFormData({ ...formData, admin_staff_niy: e.target.value })}
+                  placeholder="YHB-2015-089"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
+                  No. HP / WhatsApp *
+                </label>
+                <input
+                  type="text"
+                  value={formData.admin_staff_phone || ''}
+                  onChange={(e) => setFormData({ ...formData, admin_staff_phone: e.target.value })}
+                  placeholder="081234567899"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden font-mono"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-teal-300/70">
+              Nama dan nomor ini digunakan untuk integrasi pengiriman tautan persetujuan Tanda Tangan Elektronik Buku Ekspedisi secara resmi via WhatsApp.
+            </p>
 
             <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide border-b border-slate-100 dark:border-[#0f4950] pb-2 pt-3 flex items-center gap-1.5">
               <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />

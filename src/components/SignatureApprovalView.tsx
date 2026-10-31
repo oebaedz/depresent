@@ -15,6 +15,7 @@ import {
   FileCheck,
   Check,
   XCircle,
+  AlertCircle,
   ExternalLink,
   Sun,
   Moon,
@@ -28,11 +29,13 @@ import {
   SignerRole,
   Teacher,
   Attendance,
+  Invitation,
 } from '../types';
 import {
   ensureMeetingSignatures,
   fetchDocumentSignatures,
   signDocumentStep,
+  getCachedInvitations,
 } from '../lib/storage';
 import { invokeWahaNotification } from '../lib/waha';
 import { DigitalSignatureBadge } from './DigitalSignatureBadge';
@@ -44,6 +47,7 @@ interface SignatureApprovalViewProps {
   meetings: Meeting[];
   teachers: Teacher[];
   attendances: Attendance[];
+  invitations?: Invitation[];
   schoolProfile: SchoolProfile;
   onRefresh?: () => void;
 }
@@ -55,6 +59,7 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
   meetings,
   teachers,
   attendances,
+  invitations,
   schoolProfile,
   onRefresh,
 }) => {
@@ -141,24 +146,76 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
   const sakit = meetingAttendances.filter((a) => a.status === 'sakit').length;
   const tidakHadir = Math.max(0, total - (hadir + terlambat + izin + sakit));
 
-  // Filter absent teachers
-  const absentTeachers = useMemo(() => {
-    const list: { teacher: Teacher; notes: string }[] = [];
+  // Invitations map for current meeting
+  const meetingInvitationsMap = useMemo(() => {
+    const list = invitations && invitations.length > 0 ? invitations : getCachedInvitations();
+    const map = new Map<string, Invitation>();
+    if (!currentMeeting) return map;
+    list
+      .filter((inv) => inv.meeting_id === currentMeeting.id)
+      .forEach((inv) => map.set(inv.teacher_id, inv));
+    return map;
+  }, [invitations, currentMeeting]);
+
+  // 1. LAPORAN RAPAT: Daftar pegawai tidak hadir (Sakit, Izin, Tidak Hadir/Alpa)
+  const reportAbsentTeachers = useMemo(() => {
+    const list: { teacher: Teacher; status: 'sakit' | 'izin' | 'alpa'; statusLabel: string; notes: string }[] = [];
     activeTeachers.forEach((t) => {
       const att = attendanceMap.get(t.id);
       if (att) {
-        if (att.status === 'alpa') {
-          list.push({ teacher: t, notes: att.notes || 'Tanpa Keterangan (Alpa)' });
+        if (att.status === 'sakit') {
+          list.push({ teacher: t, status: 'sakit', statusLabel: 'Sakit', notes: att.notes || 'Keterangan Sakit' });
+        } else if (att.status === 'izin') {
+          list.push({ teacher: t, status: 'izin', statusLabel: 'Izin', notes: att.notes || 'Keterangan Izin' });
+        } else if (att.status === 'alpa') {
+          list.push({ teacher: t, status: 'alpa', statusLabel: 'Tidak Hadir (Alpa)', notes: att.notes || 'Tanpa Keterangan' });
         }
       } else {
         list.push({
           teacher: t,
+          status: 'alpa',
+          statusLabel: 'Tidak Hadir',
           notes: currentMeeting?.status === 'completed' ? 'Tidak Hadir hingga Rapat Ditutup' : 'Belum Presensi',
         });
       }
     });
     return list;
   }, [activeTeachers, attendanceMap, currentMeeting]);
+
+  // 2. BUKU EKSPEDISI: Daftar pegawai yang konfirmasi tidak bisa hadir (Izin, Sakit, Belum Konfirmasi)
+  const expeditionUnavailableTeachers = useMemo(() => {
+    const list: { teacher: Teacher; rsvpStatus: 'permission' | 'sick' | 'unconfirmed'; statusLabel: string; notes: string; date?: string }[] = [];
+    activeTeachers.forEach((t) => {
+      const inv = meetingInvitationsMap.get(t.id);
+      const rsvp = inv?.rsvp_status || 'unconfirmed';
+      if (rsvp === 'permission') {
+        list.push({
+          teacher: t,
+          rsvpStatus: 'permission',
+          statusLabel: 'Izin',
+          notes: inv?.rsvp_notes || 'Konfirmasi Izin Tidak Hadir',
+          date: inv?.rsvp_at,
+        });
+      } else if (rsvp === 'sick') {
+        list.push({
+          teacher: t,
+          rsvpStatus: 'sick',
+          statusLabel: 'Sakit',
+          notes: inv?.rsvp_notes || 'Konfirmasi Sakit',
+          date: inv?.rsvp_at,
+        });
+      } else if (rsvp === 'unconfirmed') {
+        list.push({
+          teacher: t,
+          rsvpStatus: 'unconfirmed',
+          statusLabel: 'Belum Konfirmasi',
+          notes: inv?.dispatch_status === 'sent' ? 'Undangan Terkirim WA (Belum Konfirmasi)' : 'Belum Mengonfirmasi Tanda Terima',
+          date: inv?.sent_at,
+        });
+      }
+    });
+    return list;
+  }, [activeTeachers, meetingInvitationsMap]);
 
   const totalPresent = hadir + terlambat;
   const attendancePercentage = total > 0 ? Math.round((totalPresent / total) * 100) : 0;
@@ -212,14 +269,21 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                 ? 'Pimpinan Rapat'
                 : nextSig.signer_role === 'headmaster'
                 ? 'Kepala Sekolah'
+                : nextSig.signer_role === 'expedition_officer'
+                ? 'Staf Administrasi'
                 : 'Notulis';
+
+            const docTitle =
+              docParam === 'expedition_book'
+                ? 'Buku Ekspedisi & Tanda Terima Undangan'
+                : 'Laporan Daftar Hadir Rapat';
 
             const approvalUrl = `${window.location.origin}${window.location.pathname}?sign=${currentMeeting.id}&role=${nextSig.signer_role}&doc=${docParam}`;
             const message = `*PERMINTAAN TANDA TANGAN & PENGESAHAN DOKUMEN*\n` +
               `Yth. ${nextSig.signer_name} (${nextRoleLabel}),\n\n` +
               `Tahap tanda tangan sebelumnya telah disetujui. Mohon kesediaan Bapak/Ibu untuk memeriksa dan menandatangani dokumen:\n` +
               `• Agenda: *${currentMeeting.title}*\n` +
-              `• Dokumen: *Laporan Daftar Hadir Rapat*\n\n` +
+              `• Dokumen: *${docTitle}*\n\n` +
               `Silakan klik tautan resmi berikut untuk pengesahan elektronik:\n` +
               `👉 ${approvalUrl}\n\n` +
               `_${schoolProfile.school_name}_\n_dePresent made by Mr Zee_`;
@@ -287,21 +351,25 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
             <span>{schoolProfile.school_name || 'SMP MUHAMMADIYAH 1 GOMBONG'}</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-            Persetujuan & Pengesahan Dokumen
+            {docParam === 'expedition_book'
+              ? 'Persetujuan & Pengesahan Buku Ekspedisi'
+              : 'Persetujuan & Pengesahan Dokumen Rapat'}
           </h1>
           <p className="text-xs text-slate-600 dark:text-teal-200/80 font-medium">
-            Pengesahan Elektronik Resmi Berjenjang dengan QR Verifikasi Otentik
+            {docParam === 'expedition_book'
+              ? 'Pengesahan Elektronik Resmi Tanda Terima Surat Undangan & Konfirmasi Kehadiran'
+              : 'Pengesahan Elektronik Resmi Berjenjang dengan QR Verifikasi Otentik'}
           </p>
         </header>
 
-        {/* 3-Step Sequential Progress Stepper (Mobile Optimized) */}
+        {/* Sequential Progress Stepper (Mobile Optimized) */}
         <section aria-labelledby="stepper-heading" className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-3.5 sm:p-4 shadow-sm">
           <h2 id="stepper-heading" className="sr-only">Alur Tanda Tangan Berjenjang</h2>
           <div className="text-[10px] uppercase tracking-wider font-bold text-slate-500 dark:text-teal-300/80 mb-2.5 text-center">
-            Alur Pengesahan Berjenjang:
+            {docParam === 'expedition_book' ? 'Alur Pengesahan Buku Ekspedisi (2 Tahap):' : 'Alur Pengesahan Berjenjang (3 Tahap):'}
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+          <div className={`grid gap-1.5 sm:gap-2 ${docParam === 'expedition_book' ? 'grid-cols-2' : 'grid-cols-3'}`}>
             {docSignatures.map((sig) => {
               const isCurrent = sig.signer_role === activeRole;
               const isComplete = sig.status === 'signed';
@@ -311,8 +379,8 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                   : sig.signer_role === 'leader'
                   ? '2. Pimpinan'
                   : sig.signer_role === 'headmaster'
-                  ? '3. Kepala'
-                  : 'Ekspedisi';
+                  ? (docParam === 'expedition_book' ? '2. Kepala' : '3. Kepala')
+                  : '1. Staf Admin';
 
               return (
                 <button
@@ -364,7 +432,7 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                     ? 'Notulis Rapat'
                     : previousSigner?.signer_role === 'leader'
                     ? 'Pimpinan Rapat'
-                    : 'Petugas Ekspedisi'}{' '}
+                    : 'Staf Administrasi'}{' '}
                   ({previousSigner?.signer_name})
                 </strong>{' '}
                 terlebih dahulu sebelum Anda dapat memberikan persetujuan.
@@ -412,70 +480,174 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* DETAIL DAFTAR NAMA YANG TIDAK HADIR (TRANSPARANSI SEBELUM TTD)             */}
+        {/* KONTEN BERBEDA: LAPORAN RAPAT VS BUKU EKSPEDISI                           */}
         {/* ========================================================================= */}
-        <section aria-labelledby="absent-heading" className="bg-white dark:bg-[#072b2f] border-2 border-rose-300 dark:border-rose-900/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
-          <div className="flex items-center justify-between gap-2 border-b border-rose-200 dark:border-rose-900/60 pb-2">
-            <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400">
-              <XCircle className="w-4 h-4 shrink-0" />
-              <h3 id="absent-heading" className="text-xs sm:text-sm font-bold uppercase tracking-wide">
-                Daftar Pegawai Tidak Hadir:
-              </h3>
+        {docParam === 'attendance_report' ? (
+          /* 1. LAPORAN RAPAT: DAFTAR PEGAWAI TIDAK HADIR (SAKIT, IZIN, ALPA) */
+          <section aria-labelledby="report-absent-heading" className="bg-white dark:bg-[#072b2f] border-2 border-rose-300 dark:border-rose-900/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between gap-2 border-b border-rose-200 dark:border-rose-900/60 pb-2">
+              <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400">
+                <XCircle className="w-4 h-4 shrink-0" />
+                <h3 id="report-absent-heading" className="text-xs sm:text-sm font-bold uppercase tracking-wide">
+                  Daftar Pegawai Tidak Hadir (Sakit, Izin, Alpa)
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700 font-mono">
+                {reportAbsentTeachers.length} Orang
+              </span>
             </div>
-            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700 font-mono">
-              {absentTeachers.length} Orang
-            </span>
-          </div>
 
-          <p className="text-[11px] text-slate-600 dark:text-teal-200/80">
-            Periksa rincian ketidakhadiran sebelum memberikan persetujuan resmi:
-          </p>
+            <p className="text-[11px] text-slate-600 dark:text-teal-200/80">
+              Rincian seluruh pegawai yang berstatus sakit, izin, atau tidak hadir (alpa) pada rapat dinas ini:
+            </p>
 
-          {absentTeachers.length === 0 ? (
-            <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs text-center font-bold">
-              ✓ Seluruh peserta hadir lengkap (Nihil Pegawai Tidak Hadir).
-            </div>
-          ) : (
-            <div className="overflow-x-auto max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#0f4950]">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-100 dark:bg-[#031e21] text-slate-700 dark:text-teal-200 font-bold sticky top-0 border-b border-slate-200 dark:border-[#0f4950]">
-                  <tr>
-                    <th className="py-2 px-2 w-8 text-center">No</th>
-                    <th className="py-2 px-2.5">Nama Pegawai</th>
-                    <th className="py-2 px-2.5 hidden sm:table-cell">Jabatan</th>
-                    <th className="py-2 px-2.5 text-center">Keterangan</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-[#0f4950]">
-                  {absentTeachers.map((item, idx) => (
-                    <tr key={item.teacher.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                      <td className="py-2 px-2 text-center font-mono font-bold text-slate-500 dark:text-teal-300">
-                        {idx + 1}
-                      </td>
-                      <td className="py-2 px-2.5">
-                        <div className="font-bold text-slate-900 dark:text-white leading-tight">{item.teacher.name}</div>
-                        <div className="text-[9.5px] text-slate-500 dark:text-teal-300/80 font-mono">
-                          NIY: {item.teacher.niy || item.teacher.nip || '-'}
-                        </div>
-                        <div className="sm:hidden text-[10px] text-slate-500 dark:text-teal-300/80 mt-0.5">
-                          {item.teacher.role_title}
-                        </div>
-                      </td>
-                      <td className="py-2 px-2.5 text-slate-700 dark:text-teal-200 text-[11px] hidden sm:table-cell">
-                        {item.teacher.role_title}
-                      </td>
-                      <td className="py-2 px-2.5 text-center">
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
-                          {item.notes}
-                        </span>
-                      </td>
+            {reportAbsentTeachers.length === 0 ? (
+              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs text-center font-bold">
+                ✓ Seluruh peserta hadir lengkap (Nihil Pegawai Sakit, Izin, atau Alpa).
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#0f4950]">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100 dark:bg-[#031e21] text-slate-700 dark:text-teal-200 font-bold sticky top-0 border-b border-slate-200 dark:border-[#0f4950]">
+                    <tr>
+                      <th className="py-2 px-2 w-8 text-center">No</th>
+                      <th className="py-2 px-2.5">Nama Pegawai</th>
+                      <th className="py-2 px-2.5 text-center w-28">Status</th>
+                      <th className="py-2 px-2.5">Keterangan</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-[#0f4950]">
+                    {reportAbsentTeachers.map((item, idx) => (
+                      <tr key={item.teacher.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                        <td className="py-2 px-2 text-center font-mono font-bold text-slate-500 dark:text-teal-300">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2 px-2.5">
+                          <div className="font-bold text-slate-900 dark:text-white leading-tight">{item.teacher.name}</div>
+                          <div className="text-[9.5px] text-slate-500 dark:text-teal-300/80 font-mono">
+                            NIY: {item.teacher.niy || item.teacher.nip || '-'} • {item.teacher.role_title}
+                          </div>
+                        </td>
+                        <td className="py-2 px-2.5 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                            item.status === 'sakit'
+                              ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 border-sky-300 dark:border-sky-800'
+                              : item.status === 'izin'
+                              ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                              : 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800'
+                          }`}>
+                            {item.statusLabel}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2.5 text-[11px] text-slate-700 dark:text-teal-200">
+                          {item.notes}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Quick summary tally */}
+            <div className="pt-1 flex flex-wrap gap-2 text-[10.5px] text-slate-600 dark:text-teal-300/80 font-medium">
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950]">
+                🏥 Sakit: <strong className="text-sky-700 dark:text-sky-300 font-mono">{sakit}</strong>
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950]">
+                📝 Izin: <strong className="text-amber-700 dark:text-amber-300 font-mono">{izin}</strong>
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950]">
+                ❌ Alpa/Tidak Hadir: <strong className="text-rose-700 dark:text-rose-300 font-mono">{tidakHadir}</strong>
+              </span>
             </div>
-          )}
-        </section>
+          </section>
+        ) : (
+          /* 2. BUKU EKSPEDISI: DAFTAR PEGAWAI KONFIRMASI TIDAK BISA HADIR (IZIN, SAKIT, BELUM KONFIRMASI) */
+          <section aria-labelledby="expedition-unavailable-heading" className="bg-white dark:bg-[#072b2f] border-2 border-amber-400 dark:border-amber-800/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+            <div className="flex items-center justify-between gap-2 border-b border-amber-200 dark:border-amber-900/60 pb-2">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <h3 id="expedition-unavailable-heading" className="text-xs sm:text-sm font-bold uppercase tracking-wide">
+                  Daftar Pegawai Konfirmasi Tidak Bisa Hadir / Belum Konfirmasi
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 font-mono">
+                {expeditionUnavailableTeachers.length} Orang
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-600 dark:text-teal-200/80">
+              Rincian tanda terima ekspedisi: pegawai yang mengonfirmasi berhalangan (izin, sakit) atau belum konfirmasi tanda terima surat:
+            </p>
+
+            {expeditionUnavailableTeachers.length === 0 ? (
+              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs text-center font-bold">
+                ✓ Seluruh pegawai telah mengonfirmasi Hadir pada ekspedisi ini.
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-56 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#0f4950]">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-100 dark:bg-[#031e21] text-slate-700 dark:text-teal-200 font-bold sticky top-0 border-b border-slate-200 dark:border-[#0f4950]">
+                    <tr>
+                      <th className="py-2 px-2 w-8 text-center">No</th>
+                      <th className="py-2 px-2.5">Nama Pegawai</th>
+                      <th className="py-2 px-2.5 text-center w-32">Status RSVP</th>
+                      <th className="py-2 px-2.5">Catatan Respon</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-[#0f4950]">
+                    {expeditionUnavailableTeachers.map((item, idx) => (
+                      <tr key={item.teacher.id} className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                        <td className="py-2 px-2 text-center font-mono font-bold text-slate-500 dark:text-teal-300">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2 px-2.5">
+                          <div className="font-bold text-slate-900 dark:text-white leading-tight">{item.teacher.name}</div>
+                          <div className="text-[9.5px] text-slate-500 dark:text-teal-300/80 font-mono">
+                            NIY: {item.teacher.niy || item.teacher.nip || '-'} • {item.teacher.role_title}
+                          </div>
+                        </td>
+                        <td className="py-2 px-2.5 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                            item.rsvpStatus === 'permission'
+                              ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                              : item.rsvpStatus === 'sick'
+                              ? 'bg-sky-100 dark:bg-sky-950/80 text-sky-800 dark:text-sky-300 border-sky-300 dark:border-sky-800'
+                              : 'bg-rose-100 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800'
+                          }`}>
+                            {item.statusLabel}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2.5 text-[11px] text-slate-700 dark:text-teal-200">
+                          <div>{item.notes}</div>
+                          {item.date && (
+                            <div className="text-[9.5px] text-slate-500 dark:text-teal-400 font-mono mt-0.5">
+                              {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })} {new Date(item.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Quick summary tally */}
+            <div className="pt-1 flex flex-wrap gap-2 text-[10.5px] text-slate-600 dark:text-teal-300/80 font-medium">
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950]">
+                📝 Izin: <strong className="text-amber-700 dark:text-amber-300 font-mono">{expeditionUnavailableTeachers.filter((i) => i.rsvpStatus === 'permission').length}</strong>
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950]">
+                🏥 Sakit: <strong className="text-sky-700 dark:text-sky-300 font-mono">{expeditionUnavailableTeachers.filter((i) => i.rsvpStatus === 'sick').length}</strong>
+              </span>
+              <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950]">
+                ⏳ Belum Konfirmasi: <strong className="text-rose-700 dark:text-rose-300 font-mono">{expeditionUnavailableTeachers.filter((i) => i.rsvpStatus === 'unconfirmed').length}</strong>
+              </span>
+            </div>
+          </section>
+        )}
 
         {/* Current Signer Card & Action (Mobile-First) */}
         {currentSigner && (
@@ -492,7 +664,7 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                     ? 'Pimpinan Rapat'
                     : currentSigner.signer_role === 'headmaster'
                     ? 'Kepala Sekolah (Pengesahan Institusi)'
-                    : 'Petugas Ekspedisi'}
+                    : 'Staf Administrasi (Penerbit Ekspedisi)'}
                 </h3>
               </div>
               <div className="text-right">
@@ -549,7 +721,9 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                           ? 'Notulis Rapat'
                           : currentSigner.signer_role === 'leader'
                           ? 'Pimpinan Rapat'
-                          : 'Kepala Sekolah'
+                          : currentSigner.signer_role === 'headmaster'
+                          ? 'Kepala Sekolah'
+                          : 'Staf Administrasi'
                       }
                       signerName={currentSigner.signer_name}
                       signerNiy={currentSigner.signer_niy}

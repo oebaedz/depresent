@@ -126,6 +126,10 @@ export async function fetchSchoolProfile(): Promise<SchoolProfile> {
           ...row,
           foundation_name: row.foundation_name || INITIAL_SCHOOL_PROFILE.foundation_name,
           headmaster_niy: row.headmaster_niy || row.headmaster_nip || INITIAL_SCHOOL_PROFILE.headmaster_niy,
+          headmaster_phone: row.headmaster_phone !== undefined ? row.headmaster_phone : (row.phone || INITIAL_SCHOOL_PROFILE.headmaster_phone),
+          admin_staff_name: row.admin_staff_name || INITIAL_SCHOOL_PROFILE.admin_staff_name,
+          admin_staff_niy: row.admin_staff_niy || INITIAL_SCHOOL_PROFILE.admin_staff_niy,
+          admin_staff_phone: row.admin_staff_phone || INITIAL_SCHOOL_PROFILE.admin_staff_phone,
           admin_pin: row.admin_pin || INITIAL_SCHOOL_PROFILE.admin_pin || '1234',
         };
         localStorage.setItem(KEY_PROFILE, JSON.stringify(mapped));
@@ -164,7 +168,22 @@ export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolP
     (async () => {
       try {
         const { error } = await supabase.from('smp_school_profile').upsert(payload);
-        if (error) console.error('Error updating school profile in Supabase:', error.message);
+        if (error) {
+          if (
+            error.message?.includes('headmaster_phone') ||
+            error.message?.includes('admin_staff') ||
+            error.code === 'PGRST204'
+          ) {
+            const fallback: Record<string, any> = { ...payload };
+            delete fallback.headmaster_phone;
+            delete fallback.admin_staff_name;
+            delete fallback.admin_staff_niy;
+            delete fallback.admin_staff_phone;
+            await supabase.from('smp_school_profile').upsert(fallback);
+          } else {
+            console.error('Error updating school profile in Supabase:', error.message);
+          }
+        }
       } catch (e) {
         console.warn('Could not sync school profile to Supabase:', e);
       }
@@ -1366,7 +1385,12 @@ export async function ensureMeetingSignatures(
   // Kepala Sekolah info
   const headmasterName = profile.headmaster_name || 'Kepala Sekolah';
   const headmasterNiy = profile.headmaster_niy || profile.headmaster_nip || '-';
-  const headmasterPhone = profile.phone || '';
+  const headmasterPhone = profile.headmaster_phone || profile.phone || '';
+
+  // Staf Administrasi (menggantikan Petugas Ekspedisi)
+  const adminStaffName = profile.admin_staff_name || 'Staf Administrasi';
+  const adminStaffNiy = profile.admin_staff_niy || '-';
+  const adminStaffPhone = profile.admin_staff_phone || '';
 
   // 1. Slot TTD Laporan Daftar Hadir (3 Tahap Terurut)
   // Step 1: Notulis
@@ -1398,7 +1422,8 @@ export async function ensureMeetingSignatures(
   }
 
   // Step 3: Kepala Sekolah
-  if (!existing.some((s) => s.document_type === 'attendance_report' && s.signer_role === 'headmaster')) {
+  const existingReportHeadSig = existing.find((s) => s.document_type === 'attendance_report' && s.signer_role === 'headmaster');
+  if (!existingReportHeadSig) {
     needed.push({
       meeting_id: meeting.id,
       document_type: 'attendance_report',
@@ -1409,25 +1434,37 @@ export async function ensureMeetingSignatures(
       signer_phone: headmasterPhone,
       status: 'pending',
     });
+  } else if (existingReportHeadSig.status === 'pending' && !existingReportHeadSig.signer_phone && headmasterPhone) {
+    existingReportHeadSig.signer_phone = headmasterPhone;
+    saveDocumentSignature(existingReportHeadSig).catch(() => {});
   }
 
   // 2. Slot TTD Buku Ekspedisi (2 Tahap)
-  // Step 1: Petugas Ekspedisi / TU
-  if (!existing.some((s) => s.document_type === 'expedition_book' && s.signer_role === 'expedition_officer')) {
+  // Step 1: Staf Administrasi (menggantikan Petugas Ekspedisi)
+  const existingExpSig = existing.find((s) => s.document_type === 'expedition_book' && s.signer_role === 'expedition_officer');
+  if (!existingExpSig) {
     needed.push({
       meeting_id: meeting.id,
       document_type: 'expedition_book',
       signer_role: 'expedition_officer',
       step_order: 1,
-      signer_name: 'Petugas Ekspedisi / TU',
-      signer_niy: '-',
-      signer_phone: '',
+      signer_name: adminStaffName,
+      signer_niy: adminStaffNiy,
+      signer_phone: adminStaffPhone,
       status: 'pending',
     });
+  } else if (existingExpSig.status === 'pending') {
+    if (existingExpSig.signer_name === 'Petugas Ekspedisi / TU' || !existingExpSig.signer_phone) {
+      existingExpSig.signer_name = adminStaffName;
+      existingExpSig.signer_niy = adminStaffNiy;
+      existingExpSig.signer_phone = adminStaffPhone;
+      saveDocumentSignature(existingExpSig).catch(() => {});
+    }
   }
 
   // Step 2: Kepala Sekolah
-  if (!existing.some((s) => s.document_type === 'expedition_book' && s.signer_role === 'headmaster')) {
+  const existingHeadSig = existing.find((s) => s.document_type === 'expedition_book' && s.signer_role === 'headmaster');
+  if (!existingHeadSig) {
     needed.push({
       meeting_id: meeting.id,
       document_type: 'expedition_book',
@@ -1438,6 +1475,9 @@ export async function ensureMeetingSignatures(
       signer_phone: headmasterPhone,
       status: 'pending',
     });
+  } else if (existingHeadSig.status === 'pending' && !existingHeadSig.signer_phone && headmasterPhone) {
+    existingHeadSig.signer_phone = headmasterPhone;
+    saveDocumentSignature(existingHeadSig).catch(() => {});
   }
 
   if (needed.length > 0) {

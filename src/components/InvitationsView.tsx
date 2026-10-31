@@ -603,20 +603,47 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     showToast('File Excel Buku Ekspedisi berhasil diunduh.');
   };
 
+  const expeditionAdminSig = signatures.find(
+    (s) => s.document_type === 'expedition_book' && s.signer_role === 'expedition_officer'
+  );
+  const isExpeditionAdminSigned = expeditionAdminSig?.status === 'signed';
+
   const expeditionHeadmasterSig = signatures.find(
     (s) => s.document_type === 'expedition_book' && s.signer_role === 'headmaster'
   );
   const isExpeditionHeadmasterSigned = expeditionHeadmasterSig?.status === 'signed';
+  const isExpeditionFullySigned = Boolean(isExpeditionAdminSigned && isExpeditionHeadmasterSigned);
 
   const handleSendExpeditionSignWa = async () => {
     if (!currentMeeting) return;
-    const signUrl = `${window.location.origin}${window.location.pathname}?sign=${currentMeeting.id}&role=headmaster&doc=expedition_book`;
-    const targetName = schoolProfile.headmaster_name || 'Kepala Sekolah';
+
+    // Check who is next to sign: Staf Administrasi (Step 1) or Kepala Sekolah (Step 2)
+    const needAdminSign = !isExpeditionAdminSigned;
+    const targetRole: SignerRole = needAdminSign ? 'expedition_officer' : 'headmaster';
+    const targetRoleLabel = needAdminSign ? 'Staf Administrasi' : 'Kepala Sekolah';
+    const targetName = needAdminSign
+      ? (schoolProfile.admin_staff_name || 'Staf Administrasi')
+      : (schoolProfile.headmaster_name || 'Kepala Sekolah');
+    const targetPhone = needAdminSign
+      ? (schoolProfile.admin_staff_phone || '')
+      : (schoolProfile.headmaster_phone || schoolProfile.phone || '');
+
+    if (isExpeditionFullySigned) {
+      showToast('Buku Ekspedisi telah lengkap disahkan oleh Staf Administrasi dan Kepala Sekolah!', 'info');
+      const signUrl = `${window.location.origin}${window.location.pathname}?sign=${currentMeeting.id}&role=headmaster&doc=expedition_book`;
+      window.open(signUrl, '_blank');
+      return;
+    }
+
+    const signUrl = `${window.location.origin}${window.location.pathname}?sign=${currentMeeting.id}&role=${targetRole}&doc=expedition_book`;
+    const stepLabel = needAdminSign ? 'Tahap 1: Staf Administrasi' : 'Tahap 2: Kepala Sekolah';
+
     const textMsg = `*PERMOHONAN PENGESAHAN BUKU EKSPEDISI RESMI*\n` +
-      `Yth. Bapak/Ibu *${targetName}* (Kepala Sekolah)\n` +
+      `*${stepLabel}*\n\n` +
+      `Yth. Bapak/Ibu *${targetName}* (${targetRoleLabel})\n` +
       `${schoolProfile.school_name || 'SMP Muhammadiyah 1 Gombong'}\n\n` +
       `Sehubungan dengan penerbitan dan pengiriman surat undangan agenda rapat kedinasan:\n` +
-      `📌 *${currentMeeting.title}*\n` +
+      `📌 Agenda: *${currentMeeting.title}*\n` +
       `📄 Nomor Surat: ${letterNumber.trim() || '-'}\n` +
       `📅 Hari/Tanggal: ${currentMeeting.meeting_date}\n` +
       `⏰ Waktu: ${currentMeeting.start_time.slice(0, 5)} - ${currentMeeting.end_time.slice(0, 5)} WIB\n\n` +
@@ -626,11 +653,10 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       `- Konfirmasi Hadir: ${stats.attendingCount} orang\n` +
       `- Konfirmasi Izin/Sakit: ${stats.permissionCount + stats.sickCount} orang\n` +
       `- Belum Konfirmasi: ${stats.unconfirmedCount} orang\n\n` +
-      `Mohon kesediaan Bapak Kepala Sekolah untuk memeriksa buku ekspedisi dan membubuhkan Tanda Tangan Elektronik Resmi (QR Verifikasi) melalui tautan di bawah ini:\n` +
+      `Mohon kesediaan Bapak/Ibu untuk memeriksa buku ekspedisi dan membubuhkan Tanda Tangan Elektronik Resmi (QR Verifikasi) melalui tautan di bawah ini:\n` +
       `👉 *Buka Lembar Pengesahan Ekspedisi:*\n${signUrl}\n\n` +
       `_Pesan otomatis dikirim melalui Sistem Presensi Resmi dePresent._`;
 
-    const targetPhone = schoolProfile.phone || '';
     if (targetPhone) {
       try {
         const res = await invokeWahaNotification({
@@ -639,13 +665,13 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
           message: textMsg,
           metadata: {
             meetingId: currentMeeting.id,
-            role: 'headmaster',
+            role: targetRole,
             doc: 'expedition_book',
             type: 'expedition_signature_request',
           },
         });
         if (res.success) {
-          showToast(`Permohonan TTD Buku Ekspedisi berhasil dikirim ke WhatsApp Kepala Sekolah (${targetPhone})!`);
+          showToast(`Permohonan TTD Buku Ekspedisi (${targetRoleLabel}) berhasil dikirim ke WhatsApp (${targetPhone})!`);
           return;
         }
       } catch (e) {
@@ -658,7 +684,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(textMsg)}`
       : `https://wa.me/?text=${encodeURIComponent(textMsg)}`;
     window.open(waUrl, '_blank');
-    showToast('Membuka WhatsApp untuk permohonan TTD Buku Ekspedisi Kepala Sekolah.');
+    showToast(`Membuka WhatsApp untuk permohonan TTD Buku Ekspedisi ${targetRoleLabel}.`);
   };
 
   // Filtered teachers for dashboard display
@@ -751,14 +777,22 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
             <button
               onClick={handleSendExpeditionSignWa}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
-                isExpeditionHeadmasterSigned
+                isExpeditionFullySigned
                   ? 'bg-blue-900/90 hover:bg-blue-800 text-white border border-blue-500'
+                  : isExpeditionAdminSigned
+                  ? 'bg-gradient-to-r from-teal-700 to-indigo-700 hover:from-teal-600 hover:to-indigo-600 text-white'
                   : 'bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white'
               }`}
-              title="Kirim tautan persetujuan TTD Ekspedisi (QR Verifikasi) ke WhatsApp Kepala Sekolah"
+              title="Kirim tautan persetujuan TTD Ekspedisi (QR Verifikasi) ke WhatsApp Staf Administrasi / Kepala Sekolah"
             >
               <ShieldCheck className="w-4 h-4" />
-              <span>{isExpeditionHeadmasterSigned ? '✓ Ekspedisi Disahkan' : 'Kirim TTD Ekspedisi (WA)'}</span>
+              <span>
+                {isExpeditionFullySigned
+                  ? '✓ Ekspedisi Lengkap Disahkan'
+                  : isExpeditionAdminSigned
+                  ? 'Kirim TTD Kepala Sekolah (WA)'
+                  : 'Kirim TTD Staf Admin (WA)'}
+              </span>
             </button>
 
             <button
@@ -1277,14 +1311,14 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
         {/* 2-Column Official Signature Block with Digital Signature Badges */}
         <div className="break-inside-avoid mt-8 grid grid-cols-2 text-center text-xs px-8">
-          {/* Petugas Ekspedisi (QR Code Verifikasi) */}
+          {/* Staf Administrasi (QR Code Verifikasi) */}
           <div className="px-3">
             <DigitalSignatureBadge
               signature={signatures.find((s) => s.document_type === 'expedition_book' && s.signer_role === 'expedition_officer')}
               role="expedition_officer"
-              roleTitle="Petugas Ekspedisi / TU"
-              signerName="Petugas Ekspedisi / TU"
-              signerNiy="-"
+              roleTitle="Staf Administrasi"
+              signerName={schoolProfile.admin_staff_name || 'Staf Administrasi'}
+              signerNiy={schoolProfile.admin_staff_niy || '-'}
               schoolProfile={schoolProfile}
               isPrintView={true}
             />

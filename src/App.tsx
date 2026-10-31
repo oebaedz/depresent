@@ -393,6 +393,7 @@ export default function App() {
         meetings={meetings}
         teachers={teachers}
         attendances={attendances}
+        invitations={invitations}
         schoolProfile={schoolProfile}
         onRefresh={loadAllData}
       />

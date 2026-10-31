@@ -67,6 +67,10 @@ export interface SchoolProfile {
   headmaster_niy: string; // NIY Kepala Sekolah
   headmaster_nip?: string; // alias
   headmaster_rank: string;
+  headmaster_phone?: string; // No HP / WhatsApp Kepala Sekolah untuk pengesahan TTD
+  admin_staff_name?: string; // Nama Staf Administrasi (pengganti Petugas Ekspedisi)
+  admin_staff_niy?: string; // NIY Staf Administrasi
+  admin_staff_phone?: string; // No HP / WhatsApp Staf Administrasi untuk TTD Ekspedisi
   waha_group_id: string; // e.g. "120363024823924@g.us"
   logo_url?: string;
   admin_pin?: string; // PIN akses admin tersinkronisasi di database (default: '1234')
