@@ -12,6 +12,8 @@ interface DigitalSignatureBadgeProps {
   schoolProfile: SchoolProfile;
   meetingDate?: string;
   isPrintView?: boolean;
+  hideRoleTitle?: boolean;
+  hideSignerInfo?: boolean;
 }
 
 export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
@@ -22,6 +24,8 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
   signerNiy,
   schoolProfile,
   isPrintView = false,
+  hideRoleTitle = false,
+  hideSignerInfo = false,
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
@@ -75,9 +79,11 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
   if (isSigned) {
     return (
       <div className="flex flex-col items-center justify-between text-center select-none py-1 text-slate-900">
-        <p className="text-xs font-bold text-slate-900 print:text-black mb-1">
-          {roleTitle}
-        </p>
+        {!hideRoleTitle && (
+          <p className="text-xs font-bold text-slate-900 print:text-black mb-1">
+            {roleTitle}
+          </p>
+        )}
 
         {/* CONTAINER TTD DIGITAL: CUKUP QR CODE VERIFIKASI RESMI */}
         <div className="h-28 flex flex-col items-center justify-center my-1">
@@ -111,45 +117,51 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
         </div>
 
         {/* NAMA PEJABAT & NIY */}
-        <div className="mt-1">
-          <p className="font-bold underline text-xs text-slate-950 print:text-black">
-            {signerName}
-          </p>
-          <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
-            NIY. {signerNiy || '-'}
-          </p>
-          <p className="text-[8.5px] text-emerald-800 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1 mt-0.5">
-            <ShieldCheck className="w-2.5 h-2.5 inline text-emerald-700" />
-            <span>Tanda Tangan Elektronik Sah</span>
-          </p>
-          <p className="text-[8px] text-slate-600 font-mono print:text-slate-600 mt-0.5">
-            {signedDateStr} {signedTimeStr} WIB
-          </p>
-        </div>
+        {!hideSignerInfo && (
+          <div className="mt-1">
+            <p className="font-bold underline text-xs text-slate-950 print:text-black">
+              {signerName}
+            </p>
+            <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
+              NIY. {signerNiy || '-'}
+            </p>
+            <p className="text-[8.5px] text-emerald-800 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1 mt-0.5">
+              <ShieldCheck className="w-2.5 h-2.5 inline text-emerald-700" />
+              <span>Tanda Tangan Elektronik Sah</span>
+            </p>
+            <p className="text-[8px] text-slate-600 font-mono print:text-slate-600 mt-0.5">
+              {signedDateStr} {signedTimeStr} WIB
+            </p>
+          </div>
+        )}
       </div>
     );
   }
 
   // JIKA BELUM TTD (PENDING / DOKUMEN CETAK BELUM DISAHKAN):
   return (
-    <div className="flex flex-col justify-between h-36 text-center text-xs py-1 text-slate-900">
-      <p className="font-bold text-slate-900 print:text-black">
-        {roleTitle}
-      </p>
+    <div className={`flex flex-col justify-between text-center text-xs py-1 text-slate-900 ${hideRoleTitle && hideSignerInfo ? 'h-24' : 'h-36'}`}>
+      {!hideRoleTitle && (
+        <p className="font-bold text-slate-900 print:text-black">
+          {roleTitle}
+        </p>
+      )}
 
       {/* Kolom kosong untuk tanda tangan basah konvensional */}
       <div className="h-20 flex items-center justify-center text-slate-400 text-[10px] italic print:hidden">
         (Menunggu Persetujuan & Pengesahan)
       </div>
 
-      <div className="mt-auto">
-        <p className="font-bold underline text-slate-950 print:text-black">
-          {signerName ? signerName : '( ............................................ )'}
-        </p>
-        <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
-          NIY. {signerNiy || '-'}
-        </p>
-      </div>
+      {!hideSignerInfo && (
+        <div className="mt-auto">
+          <p className="font-bold underline text-slate-950 print:text-black">
+            {signerName ? signerName : '( ............................................ )'}
+          </p>
+          <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
+            NIY. {signerNiy || '-'}
+          </p>
+        </div>
+      )}
     </div>
   );
 };

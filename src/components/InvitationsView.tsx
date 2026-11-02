@@ -499,9 +499,24 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
     showToast(`Tautan RSVP untuk ${teacherName} berhasil disalin ke clipboard.`);
   };
 
-  // Print Expedition Book
+  // Print Expedition Book (Clean white margins in print preview regardless of dark theme)
   const handlePrint = () => {
-    window.print();
+    const isDark = document.documentElement.classList.contains('dark');
+    if (isDark) {
+      document.documentElement.classList.remove('dark');
+    }
+
+    requestAnimationFrame(() => {
+      window.print();
+      if (isDark) {
+        const restoreDark = () => {
+          document.documentElement.classList.add('dark');
+          window.removeEventListener('afterprint', restoreDark);
+        };
+        window.addEventListener('afterprint', restoreDark);
+        setTimeout(restoreDark, 1500);
+      }
+    });
   };
 
   // Export Expedition Book to Excel (.xlsx) without per-participant letter number column
@@ -1309,37 +1324,111 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
           </tbody>
         </table>
 
-        {/* 2-Column Official Signature Block with Digital Signature Badges */}
-        <div className="break-inside-avoid mt-8 grid grid-cols-2 text-center text-xs px-8">
-          {/* Staf Administrasi (QR Code Verifikasi) */}
-          <div className="px-3">
-            <DigitalSignatureBadge
-              signature={signatures.find((s) => s.document_type === 'expedition_book' && s.signer_role === 'expedition_officer')}
-              role="expedition_officer"
-              roleTitle="Staf Administrasi"
-              signerName={schoolProfile.admin_staff_name || 'Staf Administrasi'}
-              signerNiy={schoolProfile.admin_staff_niy || '-'}
-              schoolProfile={schoolProfile}
-              isPrintView={true}
-            />
-          </div>
+        {/* 2-Column Official Signature Block with Synchronized Rows (Dijamin Sejajar 100%) */}
+        <div className="break-inside-avoid mt-8 px-6">
+          <table className="w-full text-center text-xs font-sans border-none">
+            <tbody>
+              {/* Row 1: Tanggal & Mengetahui (Header Row) */}
+              <tr>
+                <td className="w-1/2 align-bottom pb-1 px-3">
+                  <p className="text-gray-700 text-xs mb-1 invisible select-none leading-normal" aria-hidden="true">&nbsp;</p>
+                  <p className="text-gray-700 text-xs mb-1 invisible select-none leading-normal" aria-hidden="true">&nbsp;</p>
+                </td>
+                <td className="w-1/2 align-bottom pb-1 px-3">
+                  <p className="text-gray-700 text-xs mb-1 leading-normal">
+                    {schoolProfile.city || 'Gombong'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                  <p className="text-gray-700 text-xs mb-1 leading-normal">Mengetahui,</p>
+                </td>
+              </tr>
 
-          {/* Kepala Sekolah (QR Code Verifikasi Resmi) */}
-          <div className="px-3">
-            <p className="text-gray-700 text-xs mb-1">
-              {schoolProfile.city || 'Gombong'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-            <p className="text-gray-700 text-xs mb-1">Mengetahui,</p>
-            <DigitalSignatureBadge
-              signature={signatures.find((s) => s.document_type === 'expedition_book' && s.signer_role === 'headmaster')}
-              role="headmaster"
-              roleTitle="Kepala Sekolah"
-              signerName={schoolProfile.headmaster_name || 'Kepala Sekolah'}
-              signerNiy={schoolProfile.headmaster_niy}
-              schoolProfile={schoolProfile}
-              isPrintView={true}
-            />
-          </div>
+              {/* Row 2: Jabatan Penandatangan (Dijamin Sejajar 100%) */}
+              <tr>
+                <td className="w-1/2 align-top pb-1 px-3">
+                  <p className="font-bold text-xs text-slate-900 print:text-black">
+                    Staf Administrasi
+                  </p>
+                </td>
+                <td className="w-1/2 align-top pb-1 px-3">
+                  <p className="font-bold text-xs text-slate-900 print:text-black">
+                    Kepala Sekolah
+                  </p>
+                </td>
+              </tr>
+
+              {/* Row 3: QR Code / Kolom Tanda Tangan (Dijamin Sejajar 100%) */}
+              <tr>
+                <td className="w-1/2 align-middle py-1 px-3">
+                  <DigitalSignatureBadge
+                    signature={expeditionAdminSig}
+                    role="expedition_officer"
+                    roleTitle="Staf Administrasi"
+                    signerName={schoolProfile.admin_staff_name || 'Staf Administrasi'}
+                    signerNiy={schoolProfile.admin_staff_niy || '-'}
+                    schoolProfile={schoolProfile}
+                    isPrintView={true}
+                    hideRoleTitle={true}
+                    hideSignerInfo={true}
+                  />
+                </td>
+                <td className="w-1/2 align-middle py-1 px-3">
+                  <DigitalSignatureBadge
+                    signature={expeditionHeadmasterSig}
+                    role="headmaster"
+                    roleTitle="Kepala Sekolah"
+                    signerName={schoolProfile.headmaster_name || 'Kepala Sekolah'}
+                    signerNiy={schoolProfile.headmaster_niy}
+                    schoolProfile={schoolProfile}
+                    isPrintView={true}
+                    hideRoleTitle={true}
+                    hideSignerInfo={true}
+                  />
+                </td>
+              </tr>
+
+              {/* Row 4: Nama & NIY Penandatangan (Dijamin Sejajar 100%) */}
+              <tr>
+                <td className="w-1/2 align-top pt-1 px-3">
+                  <p className="font-bold underline text-xs text-slate-950 print:text-black">
+                    {schoolProfile.admin_staff_name || 'Staf Administrasi'}
+                  </p>
+                  <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
+                    NIY. {schoolProfile.admin_staff_niy || '-'}
+                  </p>
+                  {expeditionAdminSig?.status === 'signed' && expeditionAdminSig.signed_at && (
+                    <div className="mt-0.5">
+                      <p className="text-[8.5px] text-emerald-800 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1">
+                        <ShieldCheck className="w-2.5 h-2.5 inline text-emerald-700" />
+                        <span>Tanda Tangan Elektronik Sah</span>
+                      </p>
+                      <p className="text-[8px] text-slate-600 font-mono print:text-slate-600">
+                        {new Date(expeditionAdminSig.signed_at).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(expeditionAdminSig.signed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB
+                      </p>
+                    </div>
+                  )}
+                </td>
+                <td className="w-1/2 align-top pt-1 px-3">
+                  <p className="font-bold underline text-xs text-slate-950 print:text-black">
+                    {schoolProfile.headmaster_name || 'Kepala Sekolah'}
+                  </p>
+                  <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
+                    NIY. {schoolProfile.headmaster_niy || '-'}
+                  </p>
+                  {expeditionHeadmasterSig?.status === 'signed' && expeditionHeadmasterSig.signed_at && (
+                    <div className="mt-0.5">
+                      <p className="text-[8.5px] text-emerald-800 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1">
+                        <ShieldCheck className="w-2.5 h-2.5 inline text-emerald-700" />
+                        <span>Tanda Tangan Elektronik Sah</span>
+                      </p>
+                      <p className="text-[8px] text-slate-600 font-mono print:text-slate-600">
+                        {new Date(expeditionHeadmasterSig.signed_at).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(expeditionHeadmasterSig.signed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB
+                      </p>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         {/* Official Document Print Footer */}
@@ -1367,7 +1456,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       {/* MODAL EDIT TEMPLATE PESAN WHATSAPP (UNDANGAN & RE-CHAT)                  */}
       {/* ========================================================================= */}
       {isTemplateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs">
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs">
           <div className="bg-white dark:bg-[#072b2f] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-[#0f4950]">
             {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 dark:border-[#0f4950] flex items-center justify-between bg-teal-950 text-white">

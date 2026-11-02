@@ -191,9 +191,24 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
     setTimeout(() => setSignatureFeedback(null), 4000);
   };
 
-  // Print Handler
+  // Print Handler (Clean white margins in print preview regardless of dark theme)
   const handlePrint = () => {
-    window.print();
+    const isDark = document.documentElement.classList.contains('dark');
+    if (isDark) {
+      document.documentElement.classList.remove('dark');
+    }
+
+    requestAnimationFrame(() => {
+      window.print();
+      if (isDark) {
+        const restoreDark = () => {
+          document.documentElement.classList.add('dark');
+          window.removeEventListener('afterprint', restoreDark);
+        };
+        window.addEventListener('afterprint', restoreDark);
+        setTimeout(restoreDark, 1500);
+      }
+    });
   };
 
 

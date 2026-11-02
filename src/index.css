@@ -63,6 +63,7 @@
   }
 
   /* Force pure white background and remove all dark-mode margins and page borders */
+  :root,
   html,
   html.dark,
   body,
@@ -72,6 +73,7 @@
   #root > div > div,
   main,
   header {
+    color-scheme: light !important;
     background-color: #ffffff !important;
     background: #ffffff !important;
     color: #000000 !important;
@@ -122,8 +124,9 @@
     break-inside: avoid !important;
   }
 
-  /* Official report document container */
-  .report-printable-area {
+  /* Official report document container and expedition print container */
+  .report-printable-area,
+  .print-container {
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
@@ -133,6 +136,7 @@
     background-color: #ffffff !important;
     background: #ffffff !important;
     color: #000000 !important;
+    color-scheme: light !important;
     overflow: visible !important;
     height: auto !important;
     max-height: none !important;
@@ -257,5 +261,6 @@
   @page {
     size: A4 portrait;
     margin: 12mm 10mm 15mm 10mm;
+    background: #ffffff !important;
   }
 }

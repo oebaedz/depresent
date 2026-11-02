@@ -308,7 +308,7 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-xs overflow-y-auto">
+    <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white dark:bg-[#072b2f] rounded-2xl shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 dark:border-[#0f4950] animate-in fade-in duration-200">
         {/* Modal Header */}
         <div className="px-5 py-4 border-b border-slate-200 dark:border-[#0f4950] flex items-center justify-between bg-gradient-to-r from-teal-950 via-[#072b2f] to-indigo-950 text-white shrink-0">
