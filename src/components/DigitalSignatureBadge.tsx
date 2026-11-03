@@ -110,8 +110,9 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
                 <CheckCircle2 className="w-8 h-8 text-emerald-600" />
               </div>
             )}
-            <span className="text-[9px] font-mono font-bold text-slate-800 print:text-black mt-1 tracking-tight">
-              {signature?.verification_code || 'DEP-VERIFIED'}
+            <span className="text-[9px] font-mono font-bold text-slate-800 print:text-black mt-1 tracking-tight flex items-center justify-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 print:text-black shrink-0" />
+              <span>{signature?.verification_code || 'DEP-VERIFIED'}</span>
             </span>
           </a>
         </div>
@@ -124,13 +125,6 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
             </p>
             <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
               NIY. {signerNiy || '-'}
-            </p>
-            <p className="text-[8.5px] text-emerald-800 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1 mt-0.5">
-              <ShieldCheck className="w-2.5 h-2.5 inline text-emerald-700" />
-              <span>Tanda Tangan Elektronik Sah</span>
-            </p>
-            <p className="text-[8px] text-slate-600 font-mono print:text-slate-600 mt-0.5">
-              {signedDateStr} {signedTimeStr} WIB
             </p>
           </div>
         )}

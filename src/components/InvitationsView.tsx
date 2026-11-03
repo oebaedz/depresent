@@ -35,6 +35,26 @@ import { UnconfirmedRsvpModal } from './UnconfirmedRsvpModal';
 import { DigitalSignatureBadge } from './DigitalSignatureBadge';
 
 
+// Helper to convert 0-indexed month to Roman numeral
+export const getRomanMonth = (monthIndex: number): string => {
+  const romanMonths = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  return romanMonths[monthIndex] || 'I';
+};
+
+// Default format: "???/SMP.DWK/A-01/X/2026" with month and year dynamically adjusted
+export const getDefaultLetterNumber = (dateString?: string): string => {
+  let dateObj = new Date();
+  if (dateString) {
+    const parsed = new Date(dateString);
+    if (!isNaN(parsed.getTime())) {
+      dateObj = parsed;
+    }
+  }
+  const romanMonth = getRomanMonth(dateObj.getMonth());
+  const year = dateObj.getFullYear();
+  return `???/SMP.DWK/A-01/${romanMonth}/${year}`;
+};
+
 interface InvitationsViewProps {
   meetings: Meeting[];
   teachers: Teacher[];
@@ -77,11 +97,13 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       .catch((err) => console.warn('Could not load DB templates:', err));
   }, []);
 
-  // 1 Nomor surat untuk 1 kegiatan (sama untuk seluruh peserta rapat)
-  const [letterNumber, setLetterNumber] = useState<string>('421.3/048/SMP.M.1/X/2026');
-  const [dispatchDate, setDispatchDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
-
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || sortedMeetingsList[0] || meetings[0];
+
+  // 1 Nomor surat untuk 1 kegiatan (sama untuk seluruh peserta rapat)
+  const [dispatchDate, setDispatchDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [letterNumber, setLetterNumber] = useState<string>(() =>
+    getDefaultLetterNumber(currentMeeting?.meeting_date)
+  );
 
   // Sync letter number from current meeting record or existing invitations of this meeting
   useEffect(() => {
@@ -97,9 +119,11 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
         if (inv.dispatch_date) {
           setDispatchDate(inv.dispatch_date);
         }
+      } else {
+        setLetterNumber(getDefaultLetterNumber(currentMeeting.meeting_date || dispatchDate));
       }
     }
-  }, [currentMeeting, invitations]);
+  }, [currentMeeting, invitations, dispatchDate]);
 
   // Teachers expected for this meeting (respecting target_type and invited_teacher_ids)
   const meetingTeachers = useMemo(() => {
@@ -228,7 +252,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       year: 'numeric',
     });
 
-    const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
+    const activeLetterNum = letterNumber.trim() || getDefaultLetterNumber(currentMeeting?.meeting_date || dispatchDate);
     const cfg = getWahaConfig();
     const template = cfg.message_template_invitation || DEFAULT_WAHA_CONFIG.message_template_invitation || '';
 
@@ -282,7 +306,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
     try {
       const existing = currentMeetingInvitationsMap.get(teacher.id);
-      const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
+      const activeLetterNum = letterNumber.trim() || getDefaultLetterNumber(currentMeeting?.meeting_date || dispatchDate);
       const msg = getPersonalizedMessage(teacher);
 
       const res = await invokeWahaNotification({
@@ -419,7 +443,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
     let successCount = 0;
     const toSave: Invitation[] = [];
-    const activeLetterNum = letterNumber.trim() || '421.3/048/SMP.M.1/X/2026';
+    const activeLetterNum = letterNumber.trim() || getDefaultLetterNumber(currentMeeting?.meeting_date || dispatchDate);
 
     for (let i = 0; i < unsentTeachers.length; i++) {
       const teacher = unsentTeachers[i];
@@ -470,7 +494,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
   // Quick manual RSVP change by panitia/TU
   const handleUpdateRsvpManual = async (teacher: Teacher, newStatus: RsvpStatus) => {
     const existing = currentMeetingInvitationsMap.get(teacher.id);
-    const activeLetterNum = letterNumber.trim() || existing?.letter_number || '421.3/048/SMP.M.1/X/2026';
+    const activeLetterNum = letterNumber.trim() || existing?.letter_number || getDefaultLetterNumber(currentMeeting?.meeting_date || dispatchDate);
 
     const updated: Invitation = {
       id: isValidUUID(existing?.id || '') ? existing!.id : generateUUID(),
@@ -873,7 +897,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                   type="text"
                   value={letterNumber}
                   onChange={(e) => setLetterNumber(e.target.value)}
-                  placeholder="Contoh: 421.3/048/SMP.M.1/X/2026"
+                  placeholder={`Contoh: ${getDefaultLetterNumber(currentMeeting?.meeting_date || dispatchDate)}`}
                   className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-teal-100 font-mono font-medium focus:outline-hidden focus:border-teal-500"
                 />
               </div>
@@ -1395,17 +1419,6 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                   <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
                     NIY. {schoolProfile.admin_staff_niy || '-'}
                   </p>
-                  {expeditionAdminSig?.status === 'signed' && expeditionAdminSig.signed_at && (
-                    <div className="mt-0.5">
-                      <p className="text-[8.5px] text-emerald-800 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1">
-                        <ShieldCheck className="w-2.5 h-2.5 inline text-emerald-700" />
-                        <span>Tanda Tangan Elektronik Sah</span>
-                      </p>
-                      <p className="text-[8px] text-slate-600 font-mono print:text-slate-600">
-                        {new Date(expeditionAdminSig.signed_at).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(expeditionAdminSig.signed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB
-                      </p>
-                    </div>
-                  )}
                 </td>
                 <td className="w-1/2 align-top pt-1 px-3">
                   <p className="font-bold underline text-xs text-slate-950 print:text-black">
@@ -1414,17 +1427,6 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                   <p className="text-[10px] text-slate-700 font-mono font-medium print:text-black">
                     NIY. {schoolProfile.headmaster_niy || '-'}
                   </p>
-                  {expeditionHeadmasterSig?.status === 'signed' && expeditionHeadmasterSig.signed_at && (
-                    <div className="mt-0.5">
-                      <p className="text-[8.5px] text-emerald-800 font-bold uppercase tracking-wider print:text-black flex items-center justify-center gap-1">
-                        <ShieldCheck className="w-2.5 h-2.5 inline text-emerald-700" />
-                        <span>Tanda Tangan Elektronik Sah</span>
-                      </p>
-                      <p className="text-[8px] text-slate-600 font-mono print:text-slate-600">
-                        {new Date(expeditionHeadmasterSig.signed_at).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })} {new Date(expeditionHeadmasterSig.signed_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB
-                      </p>
-                    </div>
-                  )}
                 </td>
               </tr>
             </tbody>

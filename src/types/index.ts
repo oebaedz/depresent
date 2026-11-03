@@ -99,7 +99,7 @@ export interface Invitation {
   id: string;
   meeting_id: string;
   teacher_id: string;
-  letter_number: string; // e.g. "421.3/048/SMP.M.1/X/2026"
+  letter_number: string; // e.g. "???/SMP.DWK/A-01/X/2026"
   dispatch_date: string; // YYYY-MM-DD
   dispatch_channel: DispatchChannel;
   dispatch_status: DispatchStatus;
