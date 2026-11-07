@@ -1,6 +1,6 @@
 {
-  "summary":  "Pembaruan aturan visual tanda tangan dokumen: Stempel kedinasan sekolah HANYA dibubuhkan pada kolom Kepala Sekolah (sebagai pengesahan tertinggi instansi), sedangkan Pimpinan Rapat, Notulis Rapat, dan Petugas TU cukup menggunakan QR Code verifikasi otentisitas digital.",
-  "updatedAt":  "2026-10-29T18:39:28.916105938Z",
+  "summary":  "Rencana implementasi pembaruan UI dan logika presensi: perampingan sidebar (hapus Vercel & perkecil tombol), validasi wajib alasan RSVP untuk izin/sakit, eliminasi real-time guru yang sudah hadir dari daftar Check In mandiri, serta kartu ringkas adaptif mobile (Card View) untuk Dashboard dan Ekspedisi.",
+  "updatedAt":  "2026-11-07T07:51:25.896936512Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

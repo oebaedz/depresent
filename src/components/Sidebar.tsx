@@ -7,7 +7,6 @@ import {
   FileText,
   Settings,
   Database,
-  Rocket,
   MessageSquare,
   CheckCircle2,
   AlertCircle,
@@ -35,7 +34,7 @@ interface SidebarProps {
   isOpenMobile: boolean;
   onCloseMobile: () => void;
   onOpenSupabaseModal: () => void;
-  onOpenVercelModal: () => void;
+  onOpenVercelModal?: () => void;
   onOpenWahaModal: () => void;
 }
 
@@ -149,24 +148,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* Admin Security & Database Card */}
-        <div className="p-3 border-t border-teal-900/60 dark:border-[#0f4950] space-y-2 bg-teal-950/80 dark:bg-[#031d20] shrink-0 text-xs">
-          <div className="px-1 text-[10px] font-bold uppercase tracking-wider text-teal-400/80">
+        {/* Admin Security & Database Card (Compact & Slim) */}
+        <div className="p-2.5 border-t border-teal-900/60 dark:border-[#0f4950] space-y-1.5 bg-teal-950/80 dark:bg-[#031d20] shrink-0 text-xs">
+          <div className="px-1 text-[9.5px] font-bold uppercase tracking-wider text-teal-400/80">
             Akses & Sistem
           </div>
 
-          {/* Admin Lock / Unlock Button */}
+          {/* Admin Lock / Unlock Button (Compact) */}
           {isAdminUnlocked ? (
             <button
               onClick={onAdminLock}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-teal-700/60 bg-teal-900/50 hover:bg-teal-900/80 text-teal-100 transition-colors text-left group"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-teal-700/60 bg-teal-900/50 hover:bg-teal-900/80 text-teal-100 transition-colors text-left group cursor-pointer"
               title="Klik untuk mengunci panel admin"
             >
-              <div className="flex items-center gap-2 truncate">
-                <Unlock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span className="truncate font-semibold text-[11px]">Admin Terbuka</span>
+              <div className="flex items-center gap-1.5 truncate">
+                <Unlock className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span className="truncate font-semibold text-[10.5px]">Admin Terbuka</span>
               </div>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-950/80 text-teal-300 font-mono flex items-center gap-1 group-hover:bg-rose-900/60 group-hover:text-rose-200 transition-colors">
+              <span className="text-[9px] px-1 py-0.2 rounded bg-teal-950/80 text-teal-300 font-mono flex items-center gap-0.5 group-hover:bg-rose-900/60 group-hover:text-rose-200 transition-colors">
                 <Lock className="w-2.5 h-2.5" />
                 Kunci
               </span>
@@ -174,23 +173,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <button
               onClick={onAdminUnlockRequest}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-amber-800/60 bg-amber-950/40 hover:bg-amber-950/70 text-amber-200 transition-colors text-left"
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-amber-800/60 bg-amber-950/40 hover:bg-amber-950/70 text-amber-200 transition-colors text-left cursor-pointer"
               title="Klik untuk membuka kunci panel admin"
             >
-              <div className="flex items-center gap-2 truncate">
-                <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                <span className="truncate font-semibold text-[11px]">Admin Terkunci</span>
+              <div className="flex items-center gap-1.5 truncate">
+                <Lock className="w-3 h-3 text-amber-400 shrink-0" />
+                <span className="truncate font-semibold text-[10.5px]">Admin Terkunci</span>
               </div>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/60 text-amber-200 font-mono">
+              <span className="text-[9px] px-1 py-0.2 rounded bg-amber-900/60 text-amber-200 font-mono">
                 Buka
               </span>
             </button>
           )}
 
-          {/* Supabase / Cloud Database Status Button */}
+          {/* Supabase / Cloud Database Status Button (Compact) */}
           <button
             onClick={onOpenSupabaseModal}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors cursor-pointer ${
+            className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer ${
               supabaseStatus === 'connected'
                 ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300 hover:bg-emerald-950/60'
                 : supabaseStatus === 'tables_missing'
@@ -198,9 +197,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 : 'bg-teal-900/30 border-teal-800/60 text-teal-200 hover:bg-teal-900/60'
             }`}
           >
-            <div className="flex items-center gap-2 truncate">
-              <Database className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate text-[11px] font-medium">
+            <div className="flex items-center gap-1.5 truncate">
+              <Database className="w-3 h-3 shrink-0" />
+              <span className="truncate text-[10.5px] font-medium">
                 {supabaseStatus === 'connected'
                   ? 'Supabase Terhubung'
                   : supabaseStatus === 'tables_missing'
@@ -209,42 +208,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </div>
             {supabaseStatus === 'connected' ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
             ) : supabaseStatus === 'tables_missing' ? (
-              <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
             ) : (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-950 text-teal-300 font-mono">
+              <span className="text-[9px] px-1 py-0.2 rounded bg-teal-950 text-teal-300 font-mono">
                 Lokal
               </span>
             )}
           </button>
 
-          {/* WAHA Trigger Button */}
+          {/* WAHA Trigger Button (Compact) */}
           <button
             onClick={onOpenWahaModal}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-teal-900/50 bg-teal-900/40 hover:bg-teal-900/80 text-teal-200 hover:text-white transition-colors text-left"
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border border-teal-900/50 bg-teal-900/40 hover:bg-teal-900/80 text-teal-200 hover:text-white transition-colors text-left cursor-pointer"
           >
-            <div className="flex items-center gap-2">
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="text-[11px]">WAHA WhatsApp</span>
+            <div className="flex items-center gap-1.5">
+              <MessageSquare className="w-3 h-3 text-emerald-400 shrink-0" />
+              <span className="text-[10.5px]">WAHA WhatsApp</span>
             </div>
-            <span className="text-[10px] font-mono text-emerald-400">Aktif</span>
-          </button>
-
-          {/* Vercel Deploy Button */}
-          <button
-            onClick={onOpenVercelModal}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-teal-900/50 bg-teal-900/40 hover:bg-teal-900/80 text-teal-200 hover:text-white transition-colors text-left"
-          >
-            <div className="flex items-center gap-2">
-              <Rocket className="w-3.5 h-3.5 text-teal-300 shrink-0" />
-              <span className="text-[11px]">Deploy Vercel</span>
-            </div>
-            <span className="text-[10px] text-teal-400/70 font-mono">Git</span>
+            <span className="text-[9.5px] font-mono text-emerald-400 font-medium">Aktif</span>
           </button>
 
           {/* Attribution Footer */}
-          <div className="pt-2 text-center text-[10px] text-teal-300/60 border-t border-teal-900/40">
+          <div className="pt-1.5 text-center text-[9.5px] text-teal-300/60 border-t border-teal-900/40">
             <a
               href="https://github.com/oebaedz"
               target="_blank"

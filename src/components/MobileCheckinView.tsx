@@ -14,7 +14,7 @@ import {
   User,
 } from 'lucide-react';
 import { Meeting, SchoolProfile, Teacher } from '../types';
-import { recordAttendance } from '../lib/storage';
+import { recordAttendance, fetchAttendances } from '../lib/storage';
 import { sound } from '../lib/audio';
 import { getWahaConfig, invokeWahaNotification } from '../lib/waha';
 
@@ -56,6 +56,50 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
 
   // Verifikasi kehadiran mandiri per rapat
   const [existingDeviceLock, setExistingDeviceLock] = useState<DeviceLockInfo | null>(null);
+
+  // Daftar ID guru yang sudah presensi pada rapat ini (akan langsung di-filter keluar)
+  const [checkedInTeacherIds, setCheckedInTeacherIds] = useState<Set<string>>(new Set());
+
+  // Sinkronisasi data kehadiran rapat secara berkala & real-time
+  useEffect(() => {
+    if (!meeting) return;
+
+    let isMounted = true;
+    const syncAttendances = async () => {
+      try {
+        const atts = await fetchAttendances(meeting.id);
+        if (isMounted && Array.isArray(atts)) {
+          const ids = new Set(atts.map((a) => a.teacher_id));
+          setCheckedInTeacherIds(ids);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch attendances in MobileCheckinView:', e);
+      }
+    };
+
+    syncAttendances();
+
+    // Event listener custom jika terjadi presensi lokal di browser ini
+    const handleAttendanceEvent = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (customEvt?.detail?.meeting_id === meeting.id && customEvt?.detail?.teacher_id) {
+        setCheckedInTeacherIds((prev) => new Set(prev).add(customEvt.detail.teacher_id));
+      } else {
+        syncAttendances();
+      }
+    };
+
+    window.addEventListener('smp_attendance_recorded', handleAttendanceEvent);
+
+    // Polling setiap 3 detik untuk mengecek apakah ada guru lain yang baru saja scan & mengisi kehadiran
+    const intervalId = setInterval(syncAttendances, 3000);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('smp_attendance_recorded', handleAttendanceEvent);
+      clearInterval(intervalId);
+    };
+  }, [meeting]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !meeting) return;
@@ -163,7 +207,10 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
     activeTeachers = activeTeachers.filter((t) => meeting.invited_teacher_ids!.includes(t.id));
   }
 
-  const filteredTeachers = activeTeachers.filter((t) => {
+  // Saring keluar guru yang sudah mengisi kehadiran (nama otomatis hilang setelah presensi)
+  const availableTeachers = activeTeachers.filter((t) => !checkedInTeacherIds.has(t.id));
+
+  const filteredTeachers = availableTeachers.filter((t) => {
     const q = searchQuery.toLowerCase();
     const groupVal = (t.teacher_group || '').toLowerCase();
     const niyVal = (t.niy || t.nip || '').toLowerCase();
@@ -175,7 +222,7 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
     );
   });
 
-  const selectedTeacher = activeTeachers.find((t) => t.id === selectedTeacherId);
+  const selectedTeacher = availableTeachers.find((t) => t.id === selectedTeacherId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,6 +294,9 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
       });
       waNotice = res.success ? 'Konfirmasi WhatsApp otomatis telah terkirim!' : `Status WA: ${res.message}`;
     }
+
+    setCheckedInTeacherIds((prev) => new Set(prev).add(selectedTeacher.id));
+    setSelectedTeacherId('');
 
     setCheckinDone({
       teacher: selectedTeacher,
@@ -451,28 +501,45 @@ export const MobileCheckinView: React.FC<MobileCheckinViewProps> = ({
                 <label className="block text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide">
                   Cari & Pilih Nama Anda
                 </label>
+                <span className="text-[11px] font-semibold text-teal-700 dark:text-teal-300">
+                  {availableTeachers.length} dari {activeTeachers.length} belum presensi
+                </span>
               </div>
 
               <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 dark:text-teal-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
-                  disabled={isTokenExpired}
+                  disabled={isTokenExpired || availableTeachers.length === 0}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={isTokenExpired ? 'Kode QR kadaluarsa — silakan pindai ulang...' : 'Ketik nama guru atau kelompok / jabatan...'}
+                  placeholder={
+                    isTokenExpired
+                      ? 'Kode QR kadaluarsa — silakan pindai ulang...'
+                      : availableTeachers.length === 0
+                      ? 'Semua guru telah mengisi kehadiran'
+                      : 'Ketik nama guru atau kelompok / jabatan...'
+                  }
                   className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-xl bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden disabled:bg-slate-100 dark:disabled:bg-[#02181a] disabled:text-slate-400 dark:disabled:text-teal-400/50 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
-            {/* Teacher Selection List */}
+            {/* Teacher Selection List (Guru yang sudah presensi otomatis dihilangkan) */}
             <div className={`max-h-56 overflow-y-auto space-y-1.5 border border-slate-200 dark:border-[#0f4950] rounded-xl p-2 bg-slate-50 dark:bg-[#031e21] ${isTokenExpired ? 'opacity-50 pointer-events-none' : ''}`}>
-              {filteredTeachers.length === 0 ? (
+              {availableTeachers.length === 0 ? (
+                <div className="text-center py-6 px-3 text-xs text-emerald-700 dark:text-emerald-400 font-semibold space-y-1">
+                  <CheckCircle2 className="w-6 h-6 mx-auto text-emerald-600 dark:text-emerald-400" />
+                  <p>Seluruh guru terdaftar telah mengisi kehadiran!</p>
+                  <p className="text-[11px] font-normal text-slate-500 dark:text-teal-300/70">
+                    Tidak ada guru yang tersisa untuk agenda rapat ini.
+                  </p>
+                </div>
+              ) : filteredTeachers.length === 0 ? (
                 <div className="text-center py-6 text-xs text-slate-400 dark:text-teal-400/60">
-                  {isCustomMeeting
-                    ? 'Tidak ada nama yang terdaftar sebagai peserta pada rapat ini.'
-                    : 'Tidak ada guru yang cocok dengan kata kunci.'}
+                  {searchQuery
+                    ? 'Tidak ada guru belum hadir yang cocok dengan pencarian.'
+                    : 'Tidak ada guru yang terdaftar sebagai peserta pada rapat ini.'}
                 </div>
               ) : (
                 filteredTeachers.map((t) => {

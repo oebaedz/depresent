@@ -25,6 +25,7 @@ import {
   FileEdit,
   Share2,
   ShieldCheck,
+  Phone,
 } from 'lucide-react';
 import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher, WahaConfig, DocumentSignature, SignerRole } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
@@ -1041,9 +1042,10 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
           </div>
         </div>
 
-        {/* Expedition Table (Screen View - Tanpa kolom No. Surat per peserta) */}
+        {/* Expedition Table & Mobile Cards Container */}
         <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View (≥ sm) */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-[#031e21] text-slate-600 dark:text-teal-200/90 border-b border-slate-200 dark:border-[#0f4950] uppercase font-semibold text-[10px] tracking-wider">
                 <tr>
@@ -1215,6 +1217,182 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View (< sm, Poin Penting: NIY, Kelompok, No HP, Distribusi, RSVP) */}
+          <div className="block sm:hidden divide-y divide-slate-100 dark:divide-[#0f4950]/60">
+            {displayedTeachers.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400 dark:text-teal-300/60">
+                Tidak ada data guru yang cocok dengan filter.
+              </div>
+            ) : (
+              displayedTeachers.map((teacher, idx) => {
+                const inv = currentMeetingInvitationsMap.get(teacher.id);
+                const isSent = inv?.dispatch_status === 'sent';
+                const rsvp = inv?.rsvp_status || 'unconfirmed';
+
+                return (
+                  <div key={teacher.id} className="p-3.5 space-y-2.5 bg-white dark:bg-[#072b2f]">
+                    {/* Header: Nama & Status RSVP */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-[10px] text-slate-400 dark:text-teal-400/80">#{idx + 1}</span>
+                          <h4 className="font-bold text-slate-900 dark:text-white text-xs leading-snug truncate">
+                            {teacher.name}
+                          </h4>
+                        </div>
+                        <p className="text-[10px] text-slate-400 dark:text-teal-300/70 font-mono mt-0.5">
+                          NIY: {teacher.niy || '-'}
+                        </p>
+                      </div>
+
+                      {/* Status RSVP Badge */}
+                      <div className="shrink-0">
+                        {rsvp === 'attending' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            Akan Hadir
+                          </span>
+                        )}
+                        {rsvp === 'permission' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                            <AlertCircle className="w-2.5 h-2.5" />
+                            Izin
+                          </span>
+                        )}
+                        {rsvp === 'sick' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30">
+                            <HeartPulse className="w-2.5 h-2.5" />
+                            Sakit
+                          </span>
+                        )}
+                        {rsvp === 'unconfirmed' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-[#031e21] text-slate-500 dark:text-teal-300/70 border border-slate-200 dark:border-[#0f4950]">
+                            Belum Konfirmasi
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Poin Penting: Kelompok / Jabatan, No. WhatsApp, Distribusi */}
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 dark:bg-[#031e21] p-2.5 rounded-lg border border-slate-200 dark:border-[#0f4950]">
+                      <div>
+                        <span className="text-[9.5px] text-slate-400 dark:text-teal-400/70 block uppercase font-bold tracking-wider">
+                          Kelompok / Jabatan
+                        </span>
+                        <span className="font-semibold text-slate-800 dark:text-teal-100 truncate block">
+                          {teacher.teacher_group || 'Guru Mapel'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-teal-300/70 truncate block">
+                          {teacher.role_title}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-[9.5px] text-slate-400 dark:text-teal-400/70 block uppercase font-bold tracking-wider">
+                          No. WhatsApp / HP
+                        </span>
+                        {teacher.phone_wa ? (
+                          <a
+                            href={`https://wa.me/${teacher.phone_wa.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold truncate"
+                          >
+                            <Phone className="w-2.5 h-2.5 shrink-0" />
+                            <span>{teacher.phone_wa}</span>
+                          </a>
+                        ) : (
+                          <span className="text-rose-400 italic text-[10px]">Belum ada</span>
+                        )}
+                        <div className="mt-1">
+                          {isSent ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                              Terkirim WA
+                              {inv?.sent_at && (
+                                <span className="font-mono font-normal text-[9px] text-slate-400 dark:text-teal-300/60">
+                                  ({new Date(inv.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })})
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 dark:text-teal-300/60">Belum Dikirim</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Jika ada alasan / catatan izin */}
+                    {inv?.rsvp_notes && (
+                      <div className="text-[10px] bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 p-2 rounded-lg text-amber-900 dark:text-amber-200">
+                        <span className="font-bold">Alasan / Catatan:</span> {inv.rsvp_notes}
+                      </div>
+                    )}
+
+                    {/* Mobile Action Controls */}
+                    <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                      <div className="flex items-center gap-1">
+                        {/* Send WA Button */}
+                        <button
+                          onClick={() => handleSendSingleWA(teacher)}
+                          disabled={sendingTeacherId === teacher.id || isSendingBulk || isSendingRechatBulk}
+                          className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-[10.5px] font-semibold flex items-center gap-1 transition-colors disabled:opacity-50 cursor-pointer shadow-2xs"
+                        >
+                          {sendingTeacherId === teacher.id && sendingType === 'invitation' ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <MessageSquare className="w-3 h-3" />
+                          )}
+                          <span>Kirim WA</span>
+                        </button>
+
+                        {/* Re-chat button */}
+                        {rsvp === 'unconfirmed' && (
+                          <button
+                            onClick={() => handleSendRechatSingle(teacher)}
+                            disabled={sendingTeacherId === teacher.id || isSendingBulk || isSendingRechatBulk}
+                            className="p-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 cursor-pointer"
+                            title="Kirim Re-Chat Pengingat"
+                          >
+                            {sendingTeacherId === teacher.id && sendingType === 'rechat' ? (
+                              <RefreshCw className="w-3 h-3 animate-spin text-amber-400" />
+                            ) : (
+                              <BellRing className="w-3 h-3" />
+                            )}
+                          </button>
+                        )}
+
+                        {/* Copy Link */}
+                        <button
+                          onClick={() => handleCopyLink(teacher.id, teacher.name)}
+                          className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-[#031e21] dark:hover:bg-[#0b383d] text-slate-600 dark:text-teal-200 border border-slate-300 dark:border-[#0f4950] cursor-pointer"
+                          title="Salin Tautan RSVP"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Update RSVP Selector */}
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-slate-400 dark:text-teal-400/70">RSVP:</span>
+                        <select
+                          value={rsvp}
+                          onChange={(e) => handleUpdateRsvpManual(teacher, e.target.value as RsvpStatus)}
+                          className="bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-lg px-2 py-1 text-[10.5px] font-semibold text-slate-800 dark:text-teal-200 focus:outline-hidden cursor-pointer"
+                        >
+                          <option value="unconfirmed">Belum</option>
+                          <option value="attending">Hadir</option>
+                          <option value="permission">Izin</option>
+                          <option value="sick">Sakit</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>

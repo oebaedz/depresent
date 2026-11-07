@@ -73,8 +73,19 @@ export const RsvpConfirmationView: React.FC<RsvpConfirmationViewProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setFeedbackMessage(null);
+
+    // Validasi wajib: jika Izin atau Sakit, alasan wajib diisi
+    if ((selectedStatus === 'permission' || selectedStatus === 'sick') && !notes.trim()) {
+      setFeedbackMessage(
+        selectedStatus === 'permission'
+          ? 'Mohon isi alasan izin Anda terlebih dahulu (wajib diisi).'
+          : 'Mohon isi keterangan sakit atau istirahat medis Anda (wajib diisi).'
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const res = await submitRsvpConfirmation(
@@ -320,18 +331,31 @@ export const RsvpConfirmationView: React.FC<RsvpConfirmationViewProps> = ({
               </div>
             </div>
 
-            {/* Optional Notes / Reason Input */}
+            {/* Notes / Reason Input (Wajib jika Izin / Sakit) */}
             <div className="space-y-1.5">
-              <label htmlFor="rsvp-notes" className="block text-xs font-medium text-slate-200">
-                {selectedStatus === 'attending'
-                  ? 'Catatan untuk Panitia (Opsional)'
-                  : selectedStatus === 'permission'
-                  ? 'Alasan Izin (Wajib dicatat)'
-                  : 'Keterangan Sakit (Opsional)'}
+              <label htmlFor="rsvp-notes" className="block text-xs font-semibold text-slate-200">
+                {selectedStatus === 'attending' ? (
+                  <span className="text-slate-300">Catatan untuk Panitia (Opsional)</span>
+                ) : selectedStatus === 'permission' ? (
+                  <span className="flex items-center gap-1.5 text-amber-300">
+                    <span>Alasan Izin Tidak Hadir</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/25 text-amber-200 px-1.5 py-0.5 rounded border border-amber-500/40">
+                      Wajib Diisi *
+                    </span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-rose-300">
+                    <span>Keterangan Sakit (Diagnosa / Istirahat Medis)</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-500/25 text-rose-200 px-1.5 py-0.5 rounded border border-rose-500/40">
+                      Wajib Diisi *
+                    </span>
+                  </span>
+                )}
               </label>
               <textarea
                 id="rsvp-notes"
                 rows={2}
+                required={selectedStatus === 'permission' || selectedStatus === 'sick'}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder={
@@ -341,13 +365,27 @@ export const RsvpConfirmationView: React.FC<RsvpConfirmationViewProps> = ({
                     ? 'Contoh: Menghadiri dinas luar MGMP / pelatihan dinas di Solo...'
                     : 'Contoh: Rawat inap / istirahat dokter...'
                 }
-                className="w-full bg-[#031e21] border border-[#0f4950] rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-hidden focus:border-teal-400 focus:ring-1 focus:ring-teal-400 transition-colors resize-none"
+                className={`w-full bg-[#031e21] rounded-xl px-3.5 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-hidden transition-colors resize-none ${
+                  (selectedStatus === 'permission' || selectedStatus === 'sick') && !notes.trim()
+                    ? 'border-2 border-amber-500/70 focus:border-amber-400 focus:ring-1 focus:ring-amber-400'
+                    : 'border border-[#0f4950] focus:border-teal-400 focus:ring-1 focus:ring-teal-400'
+                }`}
               />
             </div>
 
             {feedbackMessage && (
-              <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-xs text-emerald-200 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div
+                className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                  feedbackMessage.includes('Mohon') || feedbackMessage.includes('Gagal')
+                    ? 'bg-rose-950/60 border-rose-500/50 text-rose-200'
+                    : 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200'
+                }`}
+              >
+                {feedbackMessage.includes('Mohon') || feedbackMessage.includes('Gagal') ? (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                )}
                 <span>{feedbackMessage}</span>
               </div>
             )}

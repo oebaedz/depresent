@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, CheckCircle2, AlertTriangle, AlertCircle, HeartPulse, FileSpreadsheet, Send, MessageSquare, Clock, Search, Filter, RefreshCw, XCircle, Share2 } from 'lucide-react';
+import { Users, CheckCircle2, AlertTriangle, AlertCircle, HeartPulse, FileSpreadsheet, Send, MessageSquare, Clock, Search, Filter, RefreshCw, XCircle, Share2, Phone } from 'lucide-react';
 import { Attendance, AttendanceStatus, Meeting, Teacher, SchoolProfile } from '../types';
 import { recordAttendance, deleteAttendance } from '../lib/storage';
 import { getWahaConfig, invokeWahaNotification } from '../lib/waha';
@@ -412,8 +412,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* High-density Data Table */}
-        <div className="overflow-x-auto">
+        {/* Desktop View: High-density Data Table (≥ sm) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-50 dark:bg-[#042024] border-b border-slate-200 dark:border-[#0f4950] text-slate-600 dark:text-teal-200 font-semibold uppercase text-[10px] tracking-wider">
@@ -583,6 +583,153 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View: Touch-Friendly Card View (< sm, Poin Penting: NIY, Kelompok, No HP) */}
+        <div className="block sm:hidden divide-y divide-slate-100 dark:divide-[#0f4950]/70">
+          {rows.length === 0 ? (
+            <div className="py-10 text-center text-xs text-slate-400 dark:text-teal-300/60">
+              Tidak ada data guru yang memenuhi filter.
+            </div>
+          ) : (
+            rows.map((teacher, index) => {
+              const att = attendanceMap.get(teacher.id);
+              const isPresent = !!att;
+              const timeFormatted = att
+                ? new Date(att.check_in_time).toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })
+                : '-';
+
+              return (
+                <div key={teacher.id} className="p-3.5 space-y-2.5 bg-white dark:bg-[#072b2f]">
+                  {/* Card Header: Nama & Status Kehadiran */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-[10px] text-slate-400 dark:text-teal-400/80">#{index + 1}</span>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-xs leading-snug truncate">
+                          {teacher.name}
+                        </h4>
+                      </div>
+                      <p className="text-[10px] font-mono text-slate-500 dark:text-teal-300 mt-0.5">
+                        NIY. {teacher.niy || teacher.nip || '-'}
+                      </p>
+                    </div>
+
+                    {/* Badge Status */}
+                    <div className="shrink-0">
+                      {att ? (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            att.status === 'hadir'
+                              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                              : att.status === 'terlambat'
+                              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                              : att.status === 'izin'
+                              ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border-amber-500/30'
+                              : att.status === 'sakit'
+                              ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30'
+                              : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30'
+                          }`}
+                        >
+                          {att.status === 'hadir' && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />}
+                          {att.status === 'terlambat' && <Clock className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />}
+                          {att.status === 'izin' && <AlertCircle className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />}
+                          {att.status === 'sakit' && <HeartPulse className="w-2.5 h-2.5 text-sky-600 dark:text-sky-400" />}
+                          {att.status === 'alpa' && <XCircle className="w-2.5 h-2.5 text-rose-600 dark:text-rose-400" />}
+                          <span className="capitalize">{att.status === 'alpa' ? 'Alpa' : att.status}</span>
+                        </span>
+                      ) : currentMeeting?.status === 'completed' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                          <XCircle className="w-2.5 h-2.5 text-rose-600" />
+                          <span>Alpa</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-500/10 text-slate-500 dark:text-teal-300/70 border border-slate-300/40">
+                          <Clock className="w-2.5 h-2.5 text-slate-400" />
+                          <span>Belum</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Poin Penting: Kelompok, Jabatan, No HP */}
+                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 dark:bg-[#031e21] p-2 rounded-lg border border-slate-200 dark:border-[#0f4950]">
+                    <div>
+                      <span className="text-[10px] text-slate-400 dark:text-teal-400/70 block uppercase font-bold tracking-wider">
+                        Kelompok / Jabatan
+                      </span>
+                      <span className="font-semibold text-slate-800 dark:text-teal-100 truncate block">
+                        {teacher.teacher_group || 'Guru Mapel'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-teal-300/70 truncate block">
+                        {teacher.role_title}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] text-slate-400 dark:text-teal-400/70 block uppercase font-bold tracking-wider">
+                        No. WhatsApp / HP
+                      </span>
+                      {teacher.phone_wa ? (
+                        <a
+                          href={`https://wa.me/${teacher.phone_wa.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold truncate"
+                        >
+                          <Phone className="w-2.5 h-2.5 shrink-0" />
+                          <span>{teacher.phone_wa}</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 dark:text-teal-400/50 italic text-[10px]">Belum terdaftar</span>
+                      )}
+                      {isPresent && (
+                        <span className="text-[9.5px] font-mono text-slate-500 dark:text-teal-300/80 block mt-0.5">
+                          {timeFormatted} ({att.method === 'card_scan' ? 'Scan Kartu' : att.method === 'projector_scan' ? 'Scan HP' : 'Manual'})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Action Modifiers on Mobile */}
+                  <div className="flex items-center justify-end gap-1.5 pt-0.5">
+                    <span className="text-[10px] text-slate-400 dark:text-teal-400/70 mr-auto">Ubah:</span>
+                    <button
+                      onClick={() => handleQuickStatusChange(teacher, 'hadir')}
+                      className="px-2 py-1 text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 rounded border border-emerald-200 dark:border-emerald-800 cursor-pointer"
+                    >
+                      Hadir
+                    </button>
+                    <button
+                      onClick={() => handleQuickStatusChange(teacher, 'izin')}
+                      className="px-2 py-1 text-[10px] font-semibold bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 rounded border border-teal-200 dark:border-teal-800 cursor-pointer"
+                    >
+                      Izin
+                    </button>
+                    <button
+                      onClick={() => handleQuickStatusChange(teacher, 'sakit')}
+                      className="px-2 py-1 text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 rounded border border-amber-200 dark:border-amber-800 cursor-pointer"
+                    >
+                      Sakit
+                    </button>
+                    {isPresent && (
+                      <button
+                        onClick={() => handleQuickStatusChange(teacher, 'reset')}
+                        title="Reset Presensi"
+                        className="px-2 py-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded border border-rose-200 dark:border-rose-800 cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
