@@ -273,12 +273,20 @@ export const AbsentTeachersModal: React.FC<AbsentTeachersModalProps> = ({
     setIsSendingWA(false);
 
     if (result.success) {
-      setStatusMessage({
-        text: imgDataUrl
-          ? `Berhasil! Gambar infografis & rekap dikirim langsung via WAHA ke ${target}.`
-          : `Berhasil! Laporan rekap dikirim via WAHA ke ${target}.`,
-        type: 'success',
-      });
+      const responseType = (result.responseData as { type?: string } | undefined)?.type;
+      if (imgDataUrl && responseType === 'text') {
+        setStatusMessage({
+          text: `Pesan teks terkirim ke ${target}, tetapi GAMBAR tidak terlampir karena Edge Function Anda belum mendukung base64 (masih hanya membaca "url"). Perbarui skrip di menu Integrasi WAHA → Skrip Edge Function.`,
+          type: 'error',
+        });
+      } else {
+        setStatusMessage({
+          text: imgDataUrl
+            ? `Berhasil! Gambar infografis & rekap dikirim langsung via WAHA ke ${target}.`
+            : `Berhasil! Laporan rekap dikirim via WAHA ke ${target}.`,
+          type: 'success',
+        });
+      }
     } else {
       setStatusMessage({ text: result.message, type: 'error' });
     }
@@ -315,10 +323,18 @@ export const AbsentTeachersModal: React.FC<AbsentTeachersModalProps> = ({
       });
 
       if (result.success) {
-        setStatusMessage({
-          text: `Berhasil! Gambar infografis dikirim langsung via WAHA ke ${target} tanpa perlu diunduh.`,
-          type: 'success',
-        });
+        const responseType = (result.responseData as { type?: string } | undefined)?.type;
+        if (responseType === 'text') {
+          setStatusMessage({
+            text: `Edge Function merespons type "text" — gambar belum terlampir. Silakan update kode Edge Function Supabase Anda dari menu Integrasi WAHA → Skrip Edge Function.`,
+            type: 'error',
+          });
+        } else {
+          setStatusMessage({
+            text: `Berhasil! Gambar infografis dikirim langsung via WAHA ke ${target} tanpa perlu diunduh.`,
+            type: 'success',
+          });
+        }
       } else {
         setStatusMessage({ text: result.message, type: 'error' });
       }

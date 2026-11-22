@@ -109,11 +109,12 @@ serve(async (req) => {
   }
 
   try {
-    // AMBIL DATA: target dan message wajib diisi, file/image opsional
-    const body = await req.json()
-    const { target, message, file, image, filename } = body
+    // ===============================
+    // AMBIL DATA (mendukung target, message, url, image base64, maupun file)
+    // ===============================
+    const { target, message, url, image, file, filename } = await req.json()
 
-    if (!target || (!message && !file && !image)) {
+    if (!target || (!message && !url && !image && !file)) {
       return new Response(
         JSON.stringify({
           error: "target dan message atau gambar wajib diisi",
@@ -128,7 +129,9 @@ serve(async (req) => {
       )
     }
 
+    // ===============================
     // ENVIRONMENT VARIABLES
+    // ===============================
     const WAHA_URL = Deno.env.get("WAHA_URL")
     const WAHA_API_KEY = Deno.env.get("WAHA_API_KEY")
     const WAHA_SESSION = Deno.env.get("WAHA_SESSION") || "default"
@@ -137,75 +140,108 @@ serve(async (req) => {
       throw new Error("WAHA_URL atau WAHA_API_KEY belum diset")
     }
 
+    // ===============================
     // NORMALIZE TARGET
+    // ===============================
     const chatId = normalizeTarget(target)
 
-    const cleanImageBase64 = typeof image === "string"
-      ? image.replace(/^data:image\/[^;]+;base64,/, "")
-      : ""
+    // ===============================
+    // SIAPKAN FILE GAMBAR (URL atau Base64 murni)
+    // ===============================
+    const stripDataPrefix = (val: string) =>
+      val.replace(/^data:[^;]+;base64,/i, "").trim()
 
-    const rawFile = file
-      ? {
-          ...file,
-          data: typeof file.data === "string"
-            ? file.data.replace(/^data:image\/[^;]+;base64,/, "")
-            : file.data,
+    let imageFile: Record<string, unknown> | null = null
+
+    if (url && typeof url === "string") {
+      imageFile = {
+        mimetype: "image/png",
+        filename: filename || "infografis-rekap.png",
+        url: url.trim(),
+      }
+    } else if (file && typeof file === "object") {
+      if (typeof file.url === "string" && file.url.trim()) {
+        imageFile = {
+          mimetype: file.mimetype || "image/png",
+          filename: file.filename || filename || "infografis-rekap.png",
+          url: file.url.trim(),
         }
-      : cleanImageBase64
-      ? {
+      } else if (typeof file.data === "string" && file.data.trim()) {
+        imageFile = {
+          mimetype: file.mimetype || "image/png",
+          filename: file.filename || filename || "infografis-rekap.png",
+          data: stripDataPrefix(file.data),
+        }
+      }
+    } else if (image && typeof image === "string" && image.trim()) {
+      const trimmed = image.trim()
+      if (/^https?:\\/\\//i.test(trimmed)) {
+        imageFile = {
           mimetype: "image/png",
           filename: filename || "infografis-rekap.png",
-          data: cleanImageBase64,
+          url: trimmed,
         }
-      : null
-
-    let response = null
-
-    // Kirim via /api/sendImage jika menyertakan file gambar
-    if (rawFile) {
-      try {
-        response = await fetch(\`\${WAHA_URL}/api/sendImage\`, {
-          method: "POST",
-          headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "X-Api-Key": WAHA_API_KEY,
-          },
-          body: JSON.stringify({
-            session: WAHA_SESSION,
-            chatId: chatId,
-            file: rawFile,
-            caption: message || "",
-          }),
-        })
-      } catch {
-        // Lanjut ke fallback di bawah bila endpoint error
+      } else {
+        imageFile = {
+          mimetype: "image/png",
+          filename: filename || "infografis-rekap.png",
+          data: stripDataPrefix(trimmed),
+        }
       }
     }
 
-    // Fallback ke sendText jika tidak ada file atau sendImage gagal dan masih ada pesan teks
-    if ((!response || !response.ok) && message) {
-      response = await fetch(\`\${WAHA_URL}/api/sendText\`, {
-        method: "POST",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "X-Api-Key": WAHA_API_KEY,
-        },
-        body: JSON.stringify({
-          session: WAHA_SESSION,
-          chatId: chatId,
-          text: message,
-        }),
-      })
+    // ===============================
+    // TENTUKAN ENDPOINT & REQUEST BODY
+    // ===============================
+    const endpoint = imageFile ? "/api/sendImage" : "/api/sendText"
+
+    const body = {
+      session: WAHA_SESSION,
+      chatId: chatId,
+      ...(imageFile
+        ? {
+            file: imageFile,
+            caption: message || "",
+          }
+        : {
+            text: message,
+          }),
     }
 
-    const result = await response.json()
+    // ===============================
+    // REQUEST KE WAHA
+    // ===============================
+    const response = await fetch(\`\${WAHA_URL}\${endpoint}\`, {
+      method: "POST",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "X-Api-Key": WAHA_API_KEY,
+      },
+      body: JSON.stringify(body),
+    })
 
+    // ===============================
+    // BACA RESPONSE WAHA
+    // ===============================
+    const responseText = await response.text()
+
+    let result
+    try {
+      result = JSON.parse(responseText)
+    } catch {
+      result = { raw: responseText }
+    }
+
+    // ===============================
+    // RETURN KE FRONTEND
+    // ===============================
     return new Response(
       JSON.stringify({
         success: response.ok,
+        type: imageFile ? "image" : "text",
         target: chatId,
+        httpStatus: response.status,
         waha: result,
       }),
       {
