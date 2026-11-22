@@ -74,6 +74,8 @@ export interface SchoolProfile {
   waha_group_id: string; // e.g. "120363024823924@g.us"
   logo_url?: string;
   admin_pin?: string; // PIN akses admin tersinkronisasi di database (default: '1234')
+  meeting_rooms?: string[]; // Daftar tempat/ruang rapat dinamis
+  meeting_categories?: string[]; // Daftar kategori rapat dinamis
 }
 
 export interface WahaConfig {

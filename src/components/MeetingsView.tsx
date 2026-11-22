@@ -17,6 +17,7 @@ import {
   Check,
   Lock,
   Unlock,
+  RotateCcw,
 } from 'lucide-react';
 import { Meeting, Teacher } from '../types';
 import {
@@ -26,6 +27,11 @@ import {
   getMeetingCategories,
   addMeetingCategory,
   deleteMeetingCategory,
+  resetMeetingCategories,
+  getMeetingRooms,
+  addMeetingRoom,
+  deleteMeetingRoom,
+  resetMeetingRooms,
   sortMeetingsClosestFirst,
   toggleLockMeeting,
 } from '../lib/storage';
@@ -60,6 +66,14 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState('');
   const [categoryMsg, setCategoryMsg] = useState<string | null>(null);
+  const [isCustomCategoryMode, setIsCustomCategoryMode] = useState(false);
+
+  // Dynamic meeting rooms management state
+  const [rooms, setRooms] = useState<string[]>(() => getMeetingRooms());
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
+  const [newRoomInput, setNewRoomInput] = useState('');
+  const [roomMsg, setRoomMsg] = useState<string | null>(null);
+  const [isCustomRoomMode, setIsCustomRoomMode] = useState(false);
 
   // Dynamic teacher groups state
   const [teacherGroups, setTeacherGroups] = useState<string[]>(() => getTeacherGroups());
@@ -68,9 +82,19 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     const handleGroupsUpdated = (e: CustomEvent<string[]>) => {
       setTeacherGroups(e.detail || getTeacherGroups());
     };
+    const handleRoomsUpdated = (e: CustomEvent<string[]>) => {
+      setRooms(e.detail || getMeetingRooms());
+    };
+    const handleCategoriesUpdated = (e: CustomEvent<string[]>) => {
+      setCategories(e.detail || getMeetingCategories());
+    };
     window.addEventListener('smp_teacher_groups_updated', handleGroupsUpdated as EventListener);
+    window.addEventListener('smp_meeting_rooms_updated', handleRoomsUpdated as EventListener);
+    window.addEventListener('smp_categories_updated', handleCategoriesUpdated as EventListener);
     return () => {
       window.removeEventListener('smp_teacher_groups_updated', handleGroupsUpdated as EventListener);
+      window.removeEventListener('smp_meeting_rooms_updated', handleRoomsUpdated as EventListener);
+      window.removeEventListener('smp_categories_updated', handleCategoriesUpdated as EventListener);
     };
   }, []);
 
@@ -99,7 +123,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     meeting_date: new Date().toISOString().split('T')[0],
     start_time: '08:00',
     end_time: '11:00',
-    room: 'Aula Pertemuan Utama Yayasan',
+    room: rooms[0] || 'Aula Pertemuan Utama Yayasan',
     leader_name: sortedTeachers[0]?.name || 'Drs. H. Bambang Sudarsono, M.Pd.',
     leader_niy: sortedTeachers[0]?.niy || sortedTeachers[0]?.nip || 'YHB-1994-001',
     secretary_name: sortedTeachers[1]?.name || 'Siti Rahmawati, S.Pd.',
@@ -117,13 +141,15 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     setAttendeeSearch('');
     setAttendeeRoleFilter('all');
     setAttendeeGroupFilter('all');
+    setIsCustomCategoryMode(false);
+    setIsCustomRoomMode(false);
     setFormData({
       title: '',
       category: categories[0] || 'Rapat Dinas',
       meeting_date: new Date().toISOString().split('T')[0],
       start_time: '08:00',
       end_time: '11:00',
-      room: 'Aula Pertemuan Utama Yayasan',
+      room: rooms[0] || 'Aula Pertemuan Utama Yayasan',
       leader_name: sortedTeachers[0]?.name || 'Drs. H. Bambang Sudarsono, M.Pd.',
       leader_niy: sortedTeachers[0]?.niy || sortedTeachers[0]?.nip || 'YHB-1994-001',
       secretary_name: sortedTeachers[1]?.name || 'Siti Rahmawati, S.Pd.',
@@ -142,6 +168,10 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     setFormError(null);
     setAttendeeSearch('');
     setAttendeeRoleFilter('all');
+    const categoryInList = categories.includes(m.category);
+    setIsCustomCategoryMode(Boolean(m.category) && !categoryInList);
+    const roomInList = rooms.includes(m.room);
+    setIsCustomRoomMode(Boolean(m.room) && !roomInList);
     setFormData({
       title: m.title,
       category: m.category,
@@ -263,6 +293,8 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
     if (!cat) return;
     const updated = addMeetingCategory(cat);
     setCategories(updated);
+    setFormData((prev) => ({ ...prev, category: cat }));
+    setIsCustomCategoryMode(false);
     setNewCategoryInput('');
     setCategoryMsg(`Kategori "${cat}" berhasil ditambahkan!`);
     setTimeout(() => setCategoryMsg(null), 2500);
@@ -271,8 +303,48 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   const handleDeleteCategoryClick = (cat: string) => {
     const updated = deleteMeetingCategory(cat);
     setCategories(updated);
+    if (formData.category === cat) {
+      setFormData((prev) => ({ ...prev, category: updated[0] || '' }));
+    }
     setCategoryMsg(`Kategori "${cat}" dihapus.`);
     setTimeout(() => setCategoryMsg(null), 2500);
+  };
+
+  const handleResetCategoriesClick = () => {
+    const updated = resetMeetingCategories();
+    setCategories(updated);
+    setCategoryMsg('Daftar kategori rapat dikembalikan ke setelan awal.');
+    setTimeout(() => setCategoryMsg(null), 2500);
+  };
+
+  const handleAddRoomSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const room = newRoomInput.trim();
+    if (!room) return;
+    const updated = addMeetingRoom(room);
+    setRooms(updated);
+    setFormData((prev) => ({ ...prev, room }));
+    setIsCustomRoomMode(false);
+    setNewRoomInput('');
+    setRoomMsg(`Tempat rapat "${room}" berhasil ditambahkan!`);
+    setTimeout(() => setRoomMsg(null), 2500);
+  };
+
+  const handleDeleteRoomClick = (room: string) => {
+    const updated = deleteMeetingRoom(room);
+    setRooms(updated);
+    if (formData.room === room) {
+      setFormData((prev) => ({ ...prev, room: updated[0] || '' }));
+    }
+    setRoomMsg(`Tempat rapat "${room}" dihapus.`);
+    setTimeout(() => setRoomMsg(null), 2500);
+  };
+
+  const handleResetRoomsClick = () => {
+    const updated = resetMeetingRooms();
+    setRooms(updated);
+    setRoomMsg('Daftar tempat rapat dikembalikan ke setelan awal.');
+    setTimeout(() => setRoomMsg(null), 2500);
   };
 
   return (
@@ -282,15 +354,25 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
         <div>
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">Agenda Rapat & Kegiatan Yayasan (Tabel smp_meetings)</h2>
           <p className="text-xs text-slate-500 dark:text-teal-200/80 mt-0.5">
-            Pimpinan rapat, notulis, dan target peserta (semua guru / guru terpilih) dapat diatur secara fleksibel.
+            Pimpinan rapat, notulis, tempat rapat, dan target peserta dapat diatur secara fleksibel.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          {/* Menu Input & Kelola Tempat Rapat */}
+          <button
+            onClick={() => setIsRoomModalOpen(true)}
+            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-[#0f4950] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            title="Kelola daftar tempat/ruang rapat dinamis"
+          >
+            <MapPin className="w-3.5 h-3.5 text-teal-800 dark:text-teal-300" />
+            <span>Daftar Tempat Rapat</span>
+          </button>
+
           {/* Menu Input & Kelola Kategori Rapat */}
           <button
             onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-[#0f4950] rounded-lg transition-colors flex items-center gap-1.5"
+            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-[#0f4950] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
             title="Kelola daftar kategori rapat"
           >
             <Tag className="w-3.5 h-3.5 text-teal-800 dark:text-teal-300" />
@@ -299,7 +381,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
 
           <button
             onClick={handleOpenAdd}
-            className="px-4 py-2 text-xs font-semibold text-white bg-teal-800 hover:bg-teal-700 dark:bg-teal-700 dark:hover:bg-teal-600 rounded-lg transition-colors shadow-xs flex items-center gap-1.5"
+            className="px-4 py-2 text-xs font-semibold text-white bg-teal-800 hover:bg-teal-700 dark:bg-teal-700 dark:hover:bg-teal-600 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Buat Agenda Rapat Baru</span>
@@ -537,29 +619,70 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
                     <label className="block font-semibold text-slate-700 dark:text-teal-100">Kategori</label>
                     <button
                       type="button"
                       onClick={() => setIsCategoryModalOpen(true)}
-                      className="text-[10px] text-teal-700 dark:text-teal-300 hover:underline font-semibold"
+                      className="text-[10px] text-teal-700 dark:text-teal-300 hover:underline font-semibold cursor-pointer"
                     >
                       + Kelola Kategori
                     </button>
                   </div>
                   <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg focus:ring-2 focus:ring-teal-600 focus:outline-hidden bg-white dark:bg-[#031e21] text-slate-900 dark:text-white"
+                    value={isCustomCategoryMode ? '__custom__' : (categories.includes(formData.category) ? formData.category : '__custom__')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__custom__') {
+                        setIsCustomCategoryMode(true);
+                        if (categories.includes(formData.category)) {
+                          setFormData({ ...formData, category: '' });
+                        }
+                      } else {
+                        setIsCustomCategoryMode(false);
+                        setFormData({ ...formData, category: val });
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg focus:ring-2 focus:ring-teal-600 focus:outline-hidden bg-white dark:bg-[#031e21] text-slate-900 dark:text-white cursor-pointer"
                   >
                     {categories.map((c) => (
                       <option key={c} value={c} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
                         {c}
                       </option>
                     ))}
+                    <option value="__custom__" className="bg-white dark:bg-[#072b2f] text-teal-700 dark:text-teal-300 font-semibold">
+                      + Ketik Kategori Lainnya (Kustom)...
+                    </option>
                   </select>
+
+                  {(isCustomCategoryMode || (!categories.includes(formData.category) && formData.category !== '')) && (
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <input
+                        type="text"
+                        required
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        placeholder="Ketik nama kategori rapat lainnya..."
+                        className="flex-1 min-w-0 px-3 py-1.5 border border-teal-400 dark:border-teal-700 rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
+                      />
+                      {formData.category.trim() && !categories.includes(formData.category.trim()) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = addMeetingCategory(formData.category.trim());
+                            setCategories(updated);
+                            setIsCustomCategoryMode(false);
+                          }}
+                          className="px-2.5 py-1.5 bg-teal-700 hover:bg-teal-600 text-white rounded-lg text-[10.5px] font-semibold shrink-0 cursor-pointer"
+                          title="Simpan kategori ini ke daftar kategori rapat"
+                        >
+                          Simpan ke Daftar
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -608,15 +731,70 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">Tempat / Ruang</label>
-                <input
-                  type="text"
-                  value={formData.room}
-                  onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                  placeholder="Aula Pertemuan Utama Yayasan"
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
-                />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-semibold text-slate-700 dark:text-teal-100">Tempat / Ruang</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsRoomModalOpen(true)}
+                    className="text-[10px] text-teal-700 dark:text-teal-300 hover:underline font-semibold cursor-pointer"
+                  >
+                    + Kelola Tempat
+                  </button>
+                </div>
+
+                <select
+                  value={isCustomRoomMode ? '__custom__' : (rooms.includes(formData.room) ? formData.room : '__custom__')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '__custom__') {
+                      setIsCustomRoomMode(true);
+                      if (rooms.includes(formData.room)) {
+                        setFormData({ ...formData, room: '' });
+                      }
+                    } else {
+                      setIsCustomRoomMode(false);
+                      setFormData({ ...formData, room: val });
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg focus:ring-2 focus:ring-teal-600 focus:outline-hidden bg-white dark:bg-[#031e21] text-slate-900 dark:text-white cursor-pointer"
+                >
+                  {rooms.map((rm) => (
+                    <option key={rm} value={rm} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
+                      {rm}
+                    </option>
+                  ))}
+                  <option value="__custom__" className="bg-white dark:bg-[#072b2f] text-teal-700 dark:text-teal-300 font-semibold">
+                    + Ketik Tempat Lainnya (Kustom)...
+                  </option>
+                </select>
+
+                {(isCustomRoomMode || (!rooms.includes(formData.room) && formData.room !== '')) && (
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      required
+                      value={formData.room}
+                      onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                      placeholder="Ketik nama ruangan atau lokasi rapat lainnya..."
+                      className="flex-1 px-3 py-2 border border-teal-400 dark:border-teal-700 rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
+                    />
+                    {formData.room.trim() && !rooms.includes(formData.room.trim()) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = addMeetingRoom(formData.room.trim());
+                          setRooms(updated);
+                          setIsCustomRoomMode(false);
+                        }}
+                        className="px-3 py-2 bg-teal-700 hover:bg-teal-600 text-white rounded-lg text-[11px] font-semibold shrink-0 cursor-pointer"
+                        title="Simpan lokasi ini ke daftar tempat rapat"
+                      >
+                        Simpan ke Daftar
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Pimpinan Rapat (Nama & NIY) */}
@@ -1125,9 +1303,19 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
 
             {/* List Kategori Saat Ini */}
             <div className="space-y-2 pt-2">
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-teal-100 uppercase tracking-wide">
-                Daftar Kategori Tersedia ({categories.length})
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-teal-100 uppercase tracking-wide">
+                  Daftar Kategori Tersedia ({categories.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={handleResetCategoriesClick}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:text-teal-300 dark:hover:text-white flex items-center gap-1 hover:underline cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset Standar</span>
+                </button>
+              </div>
               <div className="max-h-52 overflow-y-auto space-y-1.5 p-2 bg-slate-50 dark:bg-[#031e21] rounded-xl border border-slate-200 dark:border-[#0f4950]">
                 {categories.map((cat) => (
                   <div
@@ -1139,7 +1327,7 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
                       <button
                         type="button"
                         onClick={() => handleDeleteCategoryClick(cat)}
-                        className="p-1 text-slate-400 hover:text-red-600 rounded"
+                        className="p-1 text-slate-400 hover:text-red-600 rounded cursor-pointer"
                         title="Hapus Kategori"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1154,7 +1342,109 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCategoryModalOpen(false)}
-                className="px-4 py-2 bg-teal-900 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold transition-colors"
+                className="px-4 py-2 bg-teal-900 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Selesai
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KELOLA DAFTAR TEMPAT RAPAT */}
+      {isRoomModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#072b2f] rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 dark:border-[#0f4950] p-6 space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-[#0f4950]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 flex items-center justify-center">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Kelola Daftar Tempat Rapat</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-teal-200/70">Daftar lokasi/ruangan dapat dipilih cepat saat membuat agenda</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsRoomModalOpen(false)}
+                className="p-1 text-slate-400 dark:text-teal-400 hover:text-slate-600 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-[#0b383d] cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {roomMsg && (
+              <div className="p-2.5 rounded-lg text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2">
+                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>{roomMsg}</span>
+              </div>
+            )}
+
+            {/* Form Tambah Tempat Baru */}
+            <form onSubmit={handleAddRoomSubmit} className="space-y-2">
+              <label className="block text-[11px] font-bold text-slate-700 dark:text-teal-100 uppercase tracking-wide">
+                Tambah Tempat / Ruangan Baru
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newRoomInput}
+                  onChange={(e) => setNewRoomInput(e.target.value)}
+                  placeholder="Contoh: Ruang Multimedia, Gazebo, Gedung Baru..."
+                  className="flex-1 px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg text-xs bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden"
+                />
+                <button
+                  type="submit"
+                  disabled={!newRoomInput.trim()}
+                  className="px-4 py-2 bg-teal-800 hover:bg-teal-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-colors shrink-0 cursor-pointer"
+                >
+                  Tambah
+                </button>
+              </div>
+            </form>
+
+            {/* List Tempat Saat Ini */}
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-teal-100 uppercase tracking-wide">
+                  Daftar Tempat Tersedia ({rooms.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={handleResetRoomsClick}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 dark:text-teal-300 dark:hover:text-white flex items-center gap-1 hover:underline cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset Standar</span>
+                </button>
+              </div>
+              <div className="max-h-52 overflow-y-auto space-y-1.5 p-2 bg-slate-50 dark:bg-[#031e21] rounded-xl border border-slate-200 dark:border-[#0f4950]">
+                {rooms.map((rm) => (
+                  <div
+                    key={rm}
+                    className="flex items-center justify-between p-2.5 bg-white dark:bg-[#072b2f] rounded-lg border border-slate-200 dark:border-[#0f4950] text-xs"
+                  >
+                    <span className="font-semibold text-slate-800 dark:text-white">{rm}</span>
+                    {rooms.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRoomClick(rm)}
+                        className="p-1 text-slate-400 hover:text-red-600 rounded cursor-pointer"
+                        title="Hapus Tempat Rapat"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsRoomModalOpen(false)}
+                className="px-4 py-2 bg-teal-900 hover:bg-teal-800 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
               >
                 Selesai
               </button>

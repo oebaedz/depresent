@@ -744,9 +744,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       {/* Official Printable Report Document */}
       <div className="bg-white text-slate-900 p-8 md:p-12 rounded-xl border border-slate-300 shadow-sm max-w-4xl mx-auto report-printable-area print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none">
         {/* 1. Official Foundation & School Letterhead (Kop Surat) */}
-        <div className="border-b-4 border-double border-slate-900 pb-3 mb-6 text-center relative font-serif">
+        <div className="border-b-4 border-double border-slate-900 pb-3 print:pb-2 mb-6 print:mb-3 text-center relative font-serif">
           {/* Logo */}
-          <div className="absolute left-2 top-1 w-16 h-16 flex items-center justify-center font-bold text-xs text-blue-950 font-sans">
+          <div className="absolute left-2 top-1 w-16 h-16 print:w-14 print:h-14 flex items-center justify-center font-bold text-xs text-blue-950 font-sans">
             {schoolProfile.logo_url ? (
               <img
                 src={schoolProfile.logo_url}
@@ -781,7 +781,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 2. Document Title & Metadata */}
-        <div className="text-center space-y-1 mb-6 font-sans">
+        <div className="text-center space-y-1 print:space-y-0.5 mb-6 print:mb-2.5 font-sans">
           <h2 className="text-sm md:text-base font-black uppercase underline tracking-wider text-slate-900">
             DAFTAR HADIR PESERTA KEGIATAN
           </h2>
@@ -791,8 +791,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 3. Meeting Schedule Info Table */}
-        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 font-sans text-xs space-y-2 print:bg-white print:border-slate-400">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-slate-50 p-4 print:p-2 rounded-lg border border-slate-200 mb-6 print:mb-2.5 font-sans text-xs space-y-2 print:bg-white print:border-slate-400">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 print:gap-2">
             <div>
               <span className="text-slate-600 block text-[10px] font-medium">Hari / Tanggal</span>
               <span className="font-bold text-slate-900">{currentMeeting?.meeting_date}</span>
@@ -813,16 +813,16 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 4. Tabular Attendance Grid with NIY & Signature Columns */}
-        <div className="mb-6 overflow-x-auto print:overflow-visible report-table-wrapper">
+        <div className="mb-6 print:mb-2.5 overflow-x-auto print:overflow-visible report-table-wrapper">
           <table className="w-full text-left border-collapse border border-slate-400 text-xs font-sans">
             <thead>
               <tr className="bg-slate-100 border-b border-slate-400 text-slate-900 font-bold uppercase text-[10px] tracking-wider text-center">
-                <th className="py-2 px-2 border-r border-slate-400 w-10">No</th>
-                <th className="py-2 px-3 border-r border-slate-400 text-left">Nama Pegawai</th>
-                <th className="py-2 px-3 border-r border-slate-400 text-left">Jabatan</th>
-                <th className="py-2 px-2 border-r border-slate-400 w-24">Jam Hadir</th>
-                <th className="py-2 px-2 border-r border-slate-400 w-24">Status</th>
-                <th className="py-2 px-3 border-slate-400 w-28 text-center">Verifikasi</th>
+                <th className="py-2 print:py-1 px-2 border-r border-slate-400 w-10">No</th>
+                <th className="py-2 print:py-1 px-3 border-r border-slate-400 text-left">Nama Pegawai</th>
+                <th className="py-2 print:py-1 px-3 border-r border-slate-400 text-left">Jabatan</th>
+                <th className="py-2 print:py-1 px-2 border-r border-slate-400 w-24">Jam Hadir</th>
+                <th className="py-2 print:py-1 px-2 border-r border-slate-400 w-24">Status</th>
+                <th className="py-2 print:py-1 px-3 border-slate-400 w-28 text-center">Verifikasi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-300">
@@ -834,23 +834,23 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                 return (
                   <tr key={t.id} className="hover:bg-slate-50/50 print:hover:bg-white page-break-inside-avoid">
                     {/* Explicit high-contrast text-slate-900 so number is clearly visible in both light & dark mode */}
-                    <td className="py-2 px-2 text-center border-r border-slate-300 font-mono font-bold text-slate-900 tabular-nums">
+                    <td className="py-2 print:py-1 px-2 text-center border-r border-slate-300 font-mono font-bold text-slate-900 tabular-nums">
                       {index + 1}
                     </td>
 
                     {/* Nama Pegawai (Nama & NIY digabung) */}
-                    <td className="py-2 px-3 border-r border-slate-300">
+                    <td className="py-2 print:py-1 px-3 border-r border-slate-300">
                       <div className="font-bold text-slate-900 leading-tight">{t.name}</div>
-                      <div className="text-[10px] text-slate-600 font-mono">NIY: {t.niy || t.nip || '-'}</div>
+                      <div className="text-[10px] text-slate-600 font-mono leading-tight">NIY: {t.niy || t.nip || '-'}</div>
                     </td>
 
-                    <td className="py-2 px-3 border-r border-slate-300 text-slate-800 text-[11px]">
-                      <div className="font-semibold text-slate-900">{t.role_title}</div>
-                      <div className="text-[10px] text-slate-600">{t.rank_group}</div>
+                    <td className="py-2 print:py-1 px-3 border-r border-slate-300 text-slate-800 text-[11px]">
+                      <div className="font-semibold text-slate-900 leading-tight">{t.role_title}</div>
+                      <div className="text-[10px] text-slate-600 leading-tight">{t.rank_group}</div>
                     </td>
 
                     {/* Explicit high-contrast text-slate-900 so check-in time is clearly visible in both light & dark mode */}
-                    <td className="py-2 px-2 border-r border-slate-300 text-center font-mono font-bold text-slate-900 text-[11px] tabular-nums">
+                    <td className="py-2 print:py-1 px-2 border-r border-slate-300 text-center font-mono font-bold text-slate-900 text-[11px] tabular-nums">
                       {att ? (
                         <span>{new Date(att.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                       ) : (
@@ -858,7 +858,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                       )}
                     </td>
 
-                    <td className="py-2 px-2 border-r border-slate-300 text-center text-[10px] font-bold">
+                    <td className="py-2 print:py-1 px-2 border-r border-slate-300 text-center text-[10px] font-bold">
                       {att ? (
                         <span
                           className={
@@ -881,7 +881,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                     </td>
 
                     {/* Verification Column: Verified if present, - if not present */}
-                    <td className="py-1 px-3 border-slate-300 text-xs text-center">
+                    <td className="py-1 print:py-0.5 px-3 border-slate-300 text-xs text-center">
                       {isPresent ? (
                         <div className="flex items-center justify-center gap-1.5 text-emerald-800 text-[10px]">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -899,11 +899,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 5. Attendance Recapitulation Box */}
-        <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 mb-8 font-sans text-xs print:bg-white print:border-slate-400 recap-box page-break-inside-avoid break-inside-avoid">
-          <h4 className="font-bold text-slate-900 mb-2 uppercase text-[11px] tracking-wide">
+        <div className="bg-slate-50 p-4 print:p-2 rounded-lg border border-slate-300 mb-8 print:mb-2 font-sans text-xs print:bg-white print:border-slate-400 recap-box page-break-inside-avoid break-inside-avoid">
+          <h4 className="font-bold text-slate-900 mb-2 print:mb-1 uppercase text-[11px] tracking-wide">
             Rekapitulasi Kehadiran Peserta:
           </h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-slate-800 font-medium">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 print:gap-1.5 text-slate-800 font-medium">
             <div>
               Total Pegawai: <strong className="font-mono text-slate-900">{total}</strong> orang
             </div>
@@ -936,13 +936,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 6. Formal Closing Signatures with Digital Signatures (QR Code Verifikasi Resmi) */}
-        <div className="pt-6 w-full signature-block page-break-inside-avoid break-inside-avoid">
+        <div className="pt-6 print:pt-1 w-full signature-block page-break-inside-avoid break-inside-avoid">
           <table className="w-full text-center text-xs font-sans border-none signature-table">
             <tbody>
               <tr>
                 {/* Kepala Sekolah (QR Code Verifikasi Resmi) */}
                 <td className="w-1/3 align-top px-2">
-                  <p className="text-slate-700 font-semibold mb-1">Mengetahui,</p>
+                  <p className="text-slate-700 font-semibold mb-1 print:mb-0.5">Mengetahui,</p>
                   <DigitalSignatureBadge
                     signature={headmasterSig}
                     role="headmaster"
@@ -956,7 +956,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
                 {/* Pimpinan Rapat (QR Code Only) */}
                 <td className="w-1/3 align-top px-2">
-                  <p className="text-slate-700 font-semibold mb-1">&nbsp;</p>
+                  <p className="text-slate-700 font-semibold mb-1 print:mb-0.5">&nbsp;</p>
                   <DigitalSignatureBadge
                     signature={leaderSig}
                     role="leader"
@@ -970,7 +970,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
                 {/* Notulis Rapat (QR Code Only) */}
                 <td className="w-1/3 align-top px-2">
-                  <p className="text-slate-700 font-semibold mb-1">
+                  <p className="text-slate-700 font-semibold mb-1 print:mb-0.5">
                     {schoolProfile.city || 'Kota'}, {currentMeeting?.meeting_date ? new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('id-ID')}
                   </p>
                   <DigitalSignatureBadge
@@ -989,7 +989,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* Official Document Print Footer */}
-        <div className="mt-8 pt-3 border-t-2 border-slate-400 text-[9px] text-slate-800 flex justify-between items-center print-doc-footer page-break-inside-avoid break-inside-avoid">
+        <div className="mt-8 print:mt-2 pt-3 print:pt-1.5 border-t-2 border-slate-400 text-[9px] text-slate-800 flex justify-between items-center print-doc-footer page-break-inside-avoid break-inside-avoid">
           <div className="space-y-0.5">
             <div className="font-bold uppercase tracking-wider text-slate-900">
               dePresent — Sistem Manajemen Presensi & Berita Acara Rapat Kedinasan

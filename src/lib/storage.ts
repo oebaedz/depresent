@@ -168,10 +168,26 @@ export async function fetchSchoolProfile(): Promise<SchoolProfile> {
           admin_staff_niy: row.admin_staff_niy || INITIAL_SCHOOL_PROFILE.admin_staff_niy,
           admin_staff_phone: row.admin_staff_phone || INITIAL_SCHOOL_PROFILE.admin_staff_phone,
           admin_pin: row.admin_pin || INITIAL_SCHOOL_PROFILE.admin_pin || '1234',
+          meeting_rooms: Array.isArray(row.meeting_rooms) ? row.meeting_rooms : undefined,
+          meeting_categories: Array.isArray(row.meeting_categories) ? row.meeting_categories : undefined,
         };
         localStorage.setItem(KEY_PROFILE, JSON.stringify(mapped));
         if (mapped.admin_pin) {
           localStorage.setItem('smp_admin_pin', mapped.admin_pin);
+        }
+        if (Array.isArray(row.meeting_rooms) && row.meeting_rooms.length > 0 && typeof window !== 'undefined') {
+          const cleanRooms = Array.from(new Set(row.meeting_rooms.map((r: string) => String(r).trim()).filter(Boolean)));
+          if (cleanRooms.length > 0) {
+            localStorage.setItem(KEY_MEETING_ROOMS, JSON.stringify(cleanRooms));
+            window.dispatchEvent(new CustomEvent('smp_meeting_rooms_updated', { detail: cleanRooms }));
+          }
+        }
+        if (Array.isArray(row.meeting_categories) && row.meeting_categories.length > 0 && typeof window !== 'undefined') {
+          const cleanCategories = Array.from(new Set(row.meeting_categories.map((c: string) => String(c).trim()).filter(Boolean)));
+          if (cleanCategories.length > 0) {
+            localStorage.setItem(KEY_MEETING_CATEGORIES, JSON.stringify(cleanCategories));
+            window.dispatchEvent(new CustomEvent('smp_categories_updated', { detail: cleanCategories }));
+          }
         }
         return mapped;
       }
@@ -209,6 +225,8 @@ export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolP
           if (
             error.message?.includes('headmaster_phone') ||
             error.message?.includes('admin_staff') ||
+            error.message?.includes('meeting_rooms') ||
+            error.message?.includes('meeting_categories') ||
             error.code === 'PGRST204'
           ) {
             const fallback: Record<string, any> = { ...payload };
@@ -216,6 +234,8 @@ export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolP
             delete fallback.admin_staff_name;
             delete fallback.admin_staff_niy;
             delete fallback.admin_staff_phone;
+            delete fallback.meeting_rooms;
+            delete fallback.meeting_categories;
             await supabase.from('smp_school_profile').upsert(fallback);
           } else {
             console.error('Error updating school profile in Supabase:', error.message);
@@ -843,18 +863,45 @@ export function getMeetingCategories(): string[] {
 
 export function saveMeetingCategories(categories: string[]): string[] {
   const clean = Array.from(new Set(categories.map((c) => c.trim()).filter(Boolean)));
+  const finalCategories = clean.length > 0 ? clean : DEFAULT_MEETING_CATEGORIES;
+
   if (typeof window !== 'undefined') {
-    localStorage.setItem(KEY_MEETING_CATEGORIES, JSON.stringify(clean));
-    window.dispatchEvent(new CustomEvent('smp_categories_updated', { detail: clean }));
+    localStorage.setItem(KEY_MEETING_CATEGORIES, JSON.stringify(finalCategories));
+    const cachedProfile = getCachedProfile();
+    localStorage.setItem(KEY_PROFILE, JSON.stringify({ ...cachedProfile, meeting_categories: finalCategories }));
+    window.dispatchEvent(new CustomEvent('smp_categories_updated', { detail: finalCategories }));
   }
-  return clean;
+
+  const supabase = getSupabase();
+  if (supabase) {
+    (async () => {
+      try {
+        const cached = getCachedProfile();
+        const { error } = await supabase
+          .from('smp_school_profile')
+          .update({ meeting_categories: finalCategories })
+          .eq('id', cached.id);
+
+        if (error && !error.message?.includes('meeting_categories') && error.code !== 'PGRST204') {
+          await supabase
+            .from('smp_school_profile')
+            .update({ meeting_categories: finalCategories })
+            .neq('school_name', '');
+        }
+      } catch (e) {
+        console.warn('Could not sync meeting categories to Supabase:', e);
+      }
+    })();
+  }
+
+  return finalCategories;
 }
 
 export function addMeetingCategory(newCat: string): string[] {
   const cat = newCat.trim();
   if (!cat) return getMeetingCategories();
   const current = getMeetingCategories();
-  if (!current.includes(cat)) {
+  if (!current.some((c) => c.toLowerCase() === cat.toLowerCase())) {
     const updated = [...current, cat];
     return saveMeetingCategories(updated);
   }
@@ -865,6 +912,93 @@ export function deleteMeetingCategory(catToDelete: string): string[] {
   const current = getMeetingCategories();
   const filtered = current.filter((c) => c !== catToDelete);
   return saveMeetingCategories(filtered.length > 0 ? filtered : DEFAULT_MEETING_CATEGORIES);
+}
+
+export function resetMeetingCategories(): string[] {
+  return saveMeetingCategories(DEFAULT_MEETING_CATEGORIES);
+}
+
+// ---------------------------------------------------------------------------
+// 3.1.5 MEETING ROOMS / VENUES (DINAMIS)
+// ---------------------------------------------------------------------------
+const KEY_MEETING_ROOMS = 'smp_meeting_rooms_v1';
+export const DEFAULT_MEETING_ROOMS: string[] = [
+  'Aula Pertemuan Utama Yayasan',
+  'Ruang Guru',
+  'Ruang Kepala Sekolah',
+  'Perpustakaan Sekolah',
+  'Laboratorium Komputer',
+  'Musholla / Masjid Sekolah',
+];
+
+export function getMeetingRooms(): string[] {
+  if (typeof window === 'undefined') return DEFAULT_MEETING_ROOMS;
+  try {
+    const stored = localStorage.getItem(KEY_MEETING_ROOMS);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return DEFAULT_MEETING_ROOMS;
+}
+
+export function saveMeetingRooms(rooms: string[]): string[] {
+  const clean = Array.from(new Set(rooms.map((r) => r.trim()).filter(Boolean)));
+  const finalRooms = clean.length > 0 ? clean : DEFAULT_MEETING_ROOMS;
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(KEY_MEETING_ROOMS, JSON.stringify(finalRooms));
+    const cachedProfile = getCachedProfile();
+    localStorage.setItem(KEY_PROFILE, JSON.stringify({ ...cachedProfile, meeting_rooms: finalRooms }));
+    window.dispatchEvent(new CustomEvent('smp_meeting_rooms_updated', { detail: finalRooms }));
+  }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    (async () => {
+      try {
+        const cached = getCachedProfile();
+        const { error } = await supabase
+          .from('smp_school_profile')
+          .update({ meeting_rooms: finalRooms })
+          .eq('id', cached.id);
+
+        if (error && !error.message?.includes('meeting_rooms') && error.code !== 'PGRST204') {
+          await supabase
+            .from('smp_school_profile')
+            .update({ meeting_rooms: finalRooms })
+            .neq('school_name', '');
+        }
+      } catch (e) {
+        console.warn('Could not sync meeting rooms to Supabase:', e);
+      }
+    })();
+  }
+
+  return finalRooms;
+}
+
+export function addMeetingRoom(newRoom: string): string[] {
+  const room = newRoom.trim();
+  if (!room) return getMeetingRooms();
+  const current = getMeetingRooms();
+  if (!current.some((r) => r.toLowerCase() === room.toLowerCase())) {
+    return saveMeetingRooms([...current, room]);
+  }
+  return current;
+}
+
+export function deleteMeetingRoom(roomToDelete: string): string[] {
+  const current = getMeetingRooms();
+  const filtered = current.filter((r) => r !== roomToDelete);
+  return saveMeetingRooms(filtered.length > 0 ? filtered : DEFAULT_MEETING_ROOMS);
+}
+
+export function resetMeetingRooms(): string[] {
+  return saveMeetingRooms(DEFAULT_MEETING_ROOMS);
 }
 
 // ---------------------------------------------------------------------------

@@ -78,15 +78,15 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
   // Cukup QR Code verifikasi otentik untuk semua penandatangan (Stempel ditiadakan)
   if (isSigned) {
     return (
-      <div className="flex flex-col items-center justify-between text-center select-none py-1 text-slate-900">
+      <div className="flex flex-col items-center justify-between text-center select-none py-0.5 print:py-0 text-slate-900">
         {!hideRoleTitle && (
-          <p className="text-xs font-bold text-slate-900 print:text-black mb-1">
+          <p className="text-xs font-bold text-slate-900 print:text-black mb-1 print:mb-0.5">
             {roleTitle}
           </p>
         )}
 
         {/* CONTAINER TTD DIGITAL: CUKUP QR CODE VERIFIKASI RESMI */}
-        <div className="h-28 flex flex-col items-center justify-center my-1">
+        <div className="h-24 print:h-auto flex flex-col items-center justify-center my-1 print:my-0.5">
           <a
             href={verificationUrl || '#'}
             target="_blank"
@@ -99,19 +99,19 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
                 <img
                   src={qrDataUrl}
                   alt="QR Verifikasi TTD"
-                  className="w-18 h-18 object-contain border border-slate-300 p-1 bg-white rounded-md shadow-xs"
+                  className="w-16 h-16 print:w-14 print:h-14 object-contain border border-slate-300 p-0.5 bg-white rounded-md shadow-xs"
                 />
                 <span className="no-print opacity-0 group-hover:opacity-100 absolute inset-0 bg-slate-900/80 text-white rounded-md text-[8.5px] font-bold flex items-center justify-center gap-0.5 transition-opacity">
                   <ExternalLink className="w-2.5 h-2.5" /> Verifikasi
                 </span>
               </div>
             ) : (
-              <div className="w-18 h-18 border border-slate-300 rounded-md flex items-center justify-center bg-white">
-                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+              <div className="w-16 h-16 print:w-14 print:h-14 border border-slate-300 rounded-md flex items-center justify-center bg-white">
+                <CheckCircle2 className="w-7 h-7 text-emerald-600" />
               </div>
             )}
-            <span className="text-[9px] font-mono font-bold text-slate-800 print:text-black mt-1 tracking-tight flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 print:text-black shrink-0" />
+            <span className="text-[9px] print:text-[8.5px] font-mono font-bold text-slate-800 print:text-black mt-1 print:mt-0.5 tracking-tight flex items-center justify-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-emerald-700 print:text-black shrink-0" />
               <span>{signature?.verification_code || 'DEP-VERIFIED'}</span>
             </span>
           </a>
@@ -119,7 +119,7 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
 
         {/* NAMA PEJABAT & NIY */}
         {!hideSignerInfo && (
-          <div className="mt-1">
+          <div className="mt-1 print:mt-0.5">
             <p className="font-bold underline text-xs text-slate-950 print:text-black">
               {signerName}
             </p>
@@ -134,7 +134,7 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
 
   // JIKA BELUM TTD (PENDING / DOKUMEN CETAK BELUM DISAHKAN):
   return (
-    <div className={`flex flex-col justify-between text-center text-xs py-1 text-slate-900 ${hideRoleTitle && hideSignerInfo ? 'h-24' : 'h-36'}`}>
+    <div className={`flex flex-col justify-between text-center text-xs py-0.5 print:py-0 text-slate-900 ${hideRoleTitle && hideSignerInfo ? 'h-20 print:h-14' : 'h-28 print:h-22'}`}>
       {!hideRoleTitle && (
         <p className="font-bold text-slate-900 print:text-black">
           {roleTitle}
@@ -142,7 +142,7 @@ export const DigitalSignatureBadge: React.FC<DigitalSignatureBadgeProps> = ({
       )}
 
       {/* Kolom kosong untuk tanda tangan basah konvensional */}
-      <div className="h-20 flex items-center justify-center text-slate-400 text-[10px] italic print:hidden">
+      <div className="h-14 print:h-10 flex items-center justify-center text-slate-400 text-[10px] italic print:hidden">
         (Menunggu Persetujuan & Pengesahan)
       </div>
 

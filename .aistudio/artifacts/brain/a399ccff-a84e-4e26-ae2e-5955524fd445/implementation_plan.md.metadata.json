@@ -1,6 +1,0 @@
-{
-  "summary":  "Rencana implementasi pembaruan UI dan logika presensi: perampingan sidebar (hapus Vercel & perkecil tombol), validasi wajib alasan RSVP untuk izin/sakit, eliminasi real-time guru yang sudah hadir dari daftar Check In mandiri, serta kartu ringkas adaptif mobile (Card View) untuk Dashboard dan Ekspedisi.",
-  "updatedAt":  "2026-11-07T07:51:25.896936512Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

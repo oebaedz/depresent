@@ -1401,17 +1401,17 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       {/* PRINT-ONLY OFFICIAL EXPEDITION REPORT (BER-KOP SURAT & TANDA TANGAN)      */}
       {/* 1 Nomor Surat di Header Rapat, Hapus Kolom No. Surat per Peserta         */}
       {/* ========================================================================= */}
-      <div className="hidden print:block print-container p-6 bg-white text-black font-sans leading-relaxed">
+      <div className="hidden print:block print-container p-6 print:p-0 bg-white text-black font-sans leading-snug">
         {/* Kop Surat Resmi */}
-        <div className="flex items-center gap-4 border-b-4 border-double border-black pb-3 mb-4">
+        <div className="flex items-center gap-4 border-b-4 border-double border-black pb-3 print:pb-2 mb-4 print:mb-2">
           {schoolProfile.logo_url ? (
             <img
               src={schoolProfile.logo_url}
               alt="Logo Sekolah"
-              className="w-20 h-20 object-contain shrink-0"
+              className="w-20 h-20 print:w-14 print:h-14 object-contain shrink-0"
             />
           ) : (
-            <div className="w-20 h-20 border-2 border-black flex items-center justify-center font-bold text-xs text-center p-1 shrink-0">
+            <div className="w-20 h-20 print:w-14 print:h-14 border-2 border-black flex items-center justify-center font-bold text-xs text-center p-1 shrink-0">
               LOGO SEKOLAH
             </div>
           )}
@@ -1434,7 +1434,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
         </div>
 
         {/* Title */}
-        <div className="text-center mb-4">
+        <div className="text-center mb-4 print:mb-2">
           <h2 className="text-base font-black uppercase underline tracking-wide">
             BUKU EKSPEDISI DAN TANDA TERIMA SURAT UNDANGAN
           </h2>
@@ -1444,7 +1444,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
         </div>
 
         {/* Meeting Metadata (Tanpa kategori rapat dan tanpa tanggal pengiriman) */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs mb-4 border border-black p-3 bg-gray-50">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs mb-4 print:mb-2.5 border border-black p-3 print:p-2 bg-gray-50 print:bg-white">
           <div>
             <span className="font-bold inline-block w-28">Nomor Surat</span>
             <span className="font-mono font-bold">: {letterNumber.trim() || '-'}</span>
@@ -1474,15 +1474,15 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
         </div>
 
         {/* Official Expedition Table - Kolom Nama Pegawai, tanpa NIP, kolom Konfirmasi */}
-        <table className="w-full text-[10px] border-collapse border border-black mb-6">
+        <table className="w-full text-[10px] border-collapse border border-black mb-6 print:mb-2.5">
           <thead>
             <tr className="bg-gray-100 border-b border-black text-center font-bold">
-              <th className="border border-black py-1.5 px-1 w-8">No</th>
-              <th className="border border-black py-1.5 px-2 text-left">Nama Pegawai</th>
-              <th className="border border-black py-1.5 px-2 text-left w-36">Jabatan / Mapel</th>
-              <th className="border border-black py-1.5 px-1 w-24 text-center">Media & Tgl Kirim</th>
-              <th className="border border-black py-1.5 px-2 w-28 text-center">Konfirmasi</th>
-              <th className="border border-black py-1.5 px-2 w-32 text-left">Keterangan</th>
+              <th className="border border-black py-1.5 print:py-1 px-1 w-8">No</th>
+              <th className="border border-black py-1.5 print:py-1 px-2 text-left">Nama Pegawai</th>
+              <th className="border border-black py-1.5 print:py-1 px-2 text-left w-36">Jabatan / Mapel</th>
+              <th className="border border-black py-1.5 print:py-1 px-1 w-24 text-center">Media & Tgl Kirim</th>
+              <th className="border border-black py-1.5 print:py-1 px-2 w-28 text-center">Konfirmasi</th>
+              <th className="border border-black py-1.5 print:py-1 px-2 w-32 text-left">Keterangan</th>
             </tr>
           </thead>
           <tbody>
@@ -1492,17 +1492,17 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
               return (
                 <tr key={teacher.id} className="border-b border-black">
-                  <td className="border border-black text-center py-1.5 font-bold">{idx + 1}</td>
-                  <td className="border border-black px-2 py-1.5">
+                  <td className="border border-black text-center py-1.5 print:py-1 font-bold">{idx + 1}</td>
+                  <td className="border border-black px-2 py-1.5 print:py-1">
                     <div className="font-bold leading-tight">{teacher.name}</div>
-                    <div className="text-[9px] text-gray-700 font-mono">NIY: {teacher.niy || '-'}</div>
+                    <div className="text-[9px] text-gray-700 font-mono leading-tight">NIY: {teacher.niy || '-'}</div>
                   </td>
-                  <td className="border border-black px-2 py-1.5">{teacher.role_title}</td>
-                  <td className="border border-black text-center py-1.5">
+                  <td className="border border-black px-2 py-1.5 print:py-1">{teacher.role_title}</td>
+                  <td className="border border-black text-center py-1.5 print:py-1 leading-tight">
                     {inv?.dispatch_channel === 'whatsapp' ? 'WhatsApp' : 'Fisik'}<br />
                     <span className="text-[9px] text-gray-600">{inv?.dispatch_date || dispatchDate}</span>
                   </td>
-                  <td className="border border-black text-center py-1.5 px-2 font-semibold">
+                  <td className="border border-black text-center py-1.5 print:py-1 px-2 font-semibold">
                     {isConfirmed ? (
                       inv.rsvp_status === 'attending' ? (
                         <span>Akan Hadir</span>
@@ -1517,7 +1517,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                       <span className="font-normal text-gray-500">-</span>
                     )}
                   </td>
-                  <td className="border border-black py-1.5 px-2 text-[9px] text-gray-700">
+                  <td className="border border-black py-1.5 print:py-1 px-2 text-[9px] text-gray-700">
                     {inv?.rsvp_notes || '-'}
                   </td>
                 </tr>
@@ -1527,31 +1527,31 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
         </table>
 
         {/* 2-Column Official Signature Block with Synchronized Rows (Dijamin Sejajar 100%) */}
-        <div className="break-inside-avoid mt-8 px-6">
-          <table className="w-full text-center text-xs font-sans border-none">
+        <div className="signature-block break-inside-avoid mt-4 print:mt-2 px-6 print:px-2">
+          <table className="w-full text-center text-xs font-sans border-none signature-table">
             <tbody>
               {/* Row 1: Tanggal & Mengetahui (Header Row) */}
               <tr>
-                <td className="w-1/2 align-bottom pb-1 px-3">
-                  <p className="text-gray-700 text-xs mb-1 invisible select-none leading-normal" aria-hidden="true">&nbsp;</p>
-                  <p className="text-gray-700 text-xs mb-1 invisible select-none leading-normal" aria-hidden="true">&nbsp;</p>
+                <td className="w-1/2 align-bottom pb-0.5 px-3">
+                  <p className="text-gray-700 text-xs mb-0.5 invisible select-none leading-tight" aria-hidden="true">&nbsp;</p>
+                  <p className="text-gray-700 text-xs mb-0.5 invisible select-none leading-tight" aria-hidden="true">&nbsp;</p>
                 </td>
-                <td className="w-1/2 align-bottom pb-1 px-3">
-                  <p className="text-gray-700 text-xs mb-1 leading-normal">
+                <td className="w-1/2 align-bottom pb-0.5 px-3">
+                  <p className="text-gray-700 text-xs mb-0.5 leading-tight">
                     {schoolProfile.city || 'Gombong'}, {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
-                  <p className="text-gray-700 text-xs mb-1 leading-normal">Mengetahui,</p>
+                  <p className="text-gray-700 text-xs mb-0.5 leading-tight">Mengetahui,</p>
                 </td>
               </tr>
 
               {/* Row 2: Jabatan Penandatangan (Dijamin Sejajar 100%) */}
               <tr>
-                <td className="w-1/2 align-top pb-1 px-3">
+                <td className="w-1/2 align-top pb-0.5 px-3">
                   <p className="font-bold text-xs text-slate-900 print:text-black">
                     Staf Administrasi
                   </p>
                 </td>
-                <td className="w-1/2 align-top pb-1 px-3">
+                <td className="w-1/2 align-top pb-0.5 px-3">
                   <p className="font-bold text-xs text-slate-900 print:text-black">
                     Kepala Sekolah
                   </p>
@@ -1560,7 +1560,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
               {/* Row 3: QR Code / Kolom Tanda Tangan (Dijamin Sejajar 100%) */}
               <tr>
-                <td className="w-1/2 align-middle py-1 px-3">
+                <td className="w-1/2 align-middle py-0.5 px-3">
                   <DigitalSignatureBadge
                     signature={expeditionAdminSig}
                     role="expedition_officer"
@@ -1573,7 +1573,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                     hideSignerInfo={true}
                   />
                 </td>
-                <td className="w-1/2 align-middle py-1 px-3">
+                <td className="w-1/2 align-middle py-0.5 px-3">
                   <DigitalSignatureBadge
                     signature={expeditionHeadmasterSig}
                     role="headmaster"
@@ -1590,7 +1590,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
 
               {/* Row 4: Nama & NIY Penandatangan (Dijamin Sejajar 100%) */}
               <tr>
-                <td className="w-1/2 align-top pt-1 px-3">
+                <td className="w-1/2 align-top pt-0.5 px-3">
                   <p className="font-bold underline text-xs text-slate-950 print:text-black">
                     {schoolProfile.admin_staff_name || 'Staf Administrasi'}
                   </p>
@@ -1598,7 +1598,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                     NIY. {schoolProfile.admin_staff_niy || '-'}
                   </p>
                 </td>
-                <td className="w-1/2 align-top pt-1 px-3">
+                <td className="w-1/2 align-top pt-0.5 px-3">
                   <p className="font-bold underline text-xs text-slate-950 print:text-black">
                     {schoolProfile.headmaster_name || 'Kepala Sekolah'}
                   </p>
@@ -1612,7 +1612,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
         </div>
 
         {/* Official Document Print Footer */}
-        <div className="mt-8 pt-3 border-t-2 border-black text-[9px] text-black flex justify-between items-center print-doc-footer break-inside-avoid">
+        <div className="mt-4 print:mt-2 pt-2 border-t-2 border-black text-[9px] text-black flex justify-between items-center print-doc-footer break-inside-avoid">
           <div className="space-y-0.5">
             <div className="font-bold uppercase tracking-wider text-black">
               dePresent — Sistem Administrasi Rapat & Ekspedisi Kedinasan

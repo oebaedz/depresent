@@ -197,10 +197,12 @@ CREATE TABLE IF NOT EXISTS smp_school_profile (
   waha_group_id TEXT DEFAULT '',
   logo_url TEXT DEFAULT '',
   admin_pin TEXT DEFAULT '1234',
+  meeting_rooms JSONB DEFAULT '[]'::jsonb,
+  meeting_categories JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Pastikan kolom yayasan, PIN, dan kontak penandatangan ada jika tabel sudah terbuat sebelumnya
+-- Pastikan kolom yayasan, PIN, kontak penandatangan, daftar ruang & kategori rapat ada jika tabel sudah terbuat sebelumnya
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS foundation_name TEXT DEFAULT 'YAYASAN PENDIDIKAN HARAPAN BANGSA';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS headmaster_niy TEXT DEFAULT 'YHB-1994-001';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_pin TEXT DEFAULT '1234';
@@ -208,6 +210,8 @@ ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS headmaster_phone TEXT DE
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_staff_name TEXT DEFAULT 'Staf Administrasi';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_staff_niy TEXT DEFAULT '-';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_staff_phone TEXT DEFAULT '';
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS meeting_rooms JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS meeting_categories JSONB DEFAULT '[]'::jsonb;
 
 -- 2. TABEL DATA GURU / PTK (NIY & ptk_id UUID)
 CREATE TABLE IF NOT EXISTS smp_teachers (
