@@ -1402,6 +1402,10 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
       {/* 1 Nomor Surat di Header Rapat, Hapus Kolom No. Surat per Peserta         */}
       {/* ========================================================================= */}
       <div className="hidden print:block print-container p-6 print:p-0 bg-white text-black font-sans leading-snug">
+        <table className="w-full block print:table border-collapse border-none">
+          <tbody className="block print:table-row-group">
+            <tr className="block print:table-row print-wrapper-row">
+              <td className="block print:table-cell p-0 border-none">
         {/* Kop Surat Resmi */}
         <div className="flex items-center gap-4 border-b-4 border-double border-black pb-3 print:pb-2 mb-4 print:mb-2">
           {schoolProfile.logo_url ? (
@@ -1610,9 +1614,21 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
             </tbody>
           </table>
         </div>
+              </td>
+            </tr>
+          </tbody>
+          {/* Ruang kosong di bagian bawah setiap halaman cetak agar konten & TTD tidak menimpa footer */}
+          <tfoot className="hidden print:table-footer-group print-footer-reserve">
+            <tr>
+              <td className="p-0 border-none">
+                <div className="h-[13mm]" aria-hidden="true" />
+              </td>
+            </tr>
+          </tfoot>
+        </table>
 
         {/* Official Document Print Footer */}
-        <div className="mt-4 print:mt-2 pt-2 border-t-2 border-black text-[9px] text-black flex justify-between items-center print-doc-footer break-inside-avoid">
+        <div className="mt-4 print:mt-0 pt-2 border-t-2 border-black text-[9px] text-black flex justify-between items-center print-doc-footer break-inside-avoid">
           <div className="space-y-0.5">
             <div className="font-bold uppercase tracking-wider text-black">
               dePresent — Sistem Administrasi Rapat & Ekspedisi Kedinasan

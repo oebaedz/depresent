@@ -743,6 +743,10 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 
       {/* Official Printable Report Document */}
       <div className="bg-white text-slate-900 p-8 md:p-12 rounded-xl border border-slate-300 shadow-sm max-w-4xl mx-auto report-printable-area print:border-none print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none">
+        <table className="w-full block print:table border-collapse border-none">
+          <tbody className="block print:table-row-group">
+            <tr className="block print:table-row print-wrapper-row">
+              <td className="block print:table-cell p-0 border-none">
         {/* 1. Official Foundation & School Letterhead (Kop Surat) */}
         <div className="border-b-4 border-double border-slate-900 pb-3 print:pb-2 mb-6 print:mb-3 text-center relative font-serif">
           {/* Logo */}
@@ -987,9 +991,21 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
             </tbody>
           </table>
         </div>
+              </td>
+            </tr>
+          </tbody>
+          {/* Ruang kosong di bagian bawah setiap halaman cetak agar konten & TTD tidak menimpa footer */}
+          <tfoot className="hidden print:table-footer-group print-footer-reserve">
+            <tr>
+              <td className="p-0 border-none">
+                <div className="h-[13mm]" aria-hidden="true" />
+              </td>
+            </tr>
+          </tfoot>
+        </table>
 
         {/* Official Document Print Footer */}
-        <div className="mt-8 print:mt-2 pt-3 print:pt-1.5 border-t-2 border-slate-400 text-[9px] text-slate-800 flex justify-between items-center print-doc-footer page-break-inside-avoid break-inside-avoid">
+        <div className="mt-8 print:mt-0 pt-3 print:pt-1.5 border-t-2 border-slate-400 text-[9px] text-slate-800 flex justify-between items-center print-doc-footer page-break-inside-avoid break-inside-avoid">
           <div className="space-y-0.5">
             <div className="font-bold uppercase tracking-wider text-slate-900">
               dePresent — Sistem Manajemen Presensi & Berita Acara Rapat Kedinasan
