@@ -17,9 +17,9 @@ import {
   RefreshCw,
   Image as ImageIcon,
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
 import { Meeting, Teacher, Invitation, SchoolProfile } from '../types';
 import { invokeWahaNotification } from '../lib/waha';
+import { captureElementAsPng } from '../lib/infographicExport';
 
 interface UnconfirmedRsvpModalProps {
   isOpen: boolean;
@@ -41,10 +41,11 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
   letterNumber,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+  const targetInputRef = useRef<HTMLInputElement>(null);
   const [targetGroup, setTargetGroup] = useState<string>(schoolProfile.waha_group_id || '');
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [isSendingWA, setIsSendingWA] = useState(false);
-  const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [isSendingImageOnly, setIsSendingImageOnly] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
@@ -134,46 +135,13 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
 
   const recapText = generateWhatsAppMessage();
 
-  // Helper to capture card node as high-res Canvas
-  const getCanvas = async (): Promise<HTMLCanvasElement | null> => {
-    if (!cardRef.current) return null;
-    return await html2canvas(cardRef.current, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: '#ffffff',
-      logging: false,
-    });
-  };
-
-  // Export card as high-res PNG data URL
-  const generateImage = async (): Promise<string | null> => {
-    if (imageDataUrl) return imageDataUrl;
-    setIsExportingImage(true);
-    try {
-      const canvas = await getCanvas();
-      if (!canvas) return null;
-      const dataUrl = canvas.toDataURL('image/png');
-      setImageDataUrl(dataUrl);
-      return dataUrl;
-    } catch (err) {
-      console.error('Failed to generate image:', err);
-      return null;
-    } finally {
-      setIsExportingImage(false);
-    }
-  };
-
-  // Download image directly as PNG file
+  // Download image directly as PNG file (pixel-identical via html-to-image)
   const handleDownloadImage = async () => {
+    if (!cardRef.current) return;
     setIsExportingImage(true);
+    setStatusMessage(null);
     try {
-      const canvas = await getCanvas();
-      if (!canvas) throw new Error('Canvas element not found');
-
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-      if (!blob) throw new Error('Blob creation failed');
-
+      const { blob } = await captureElementAsPng(cardRef.current);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -183,11 +151,11 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      setStatusMessage({ text: 'Gambar infografis berhasil diunduh!', type: 'success' });
+      setStatusMessage({ text: 'Gambar infografis berhasil diunduh sesuai desain pratinjau!', type: 'success' });
       setTimeout(() => setStatusMessage(null), 3500);
     } catch (err) {
       console.error('Failed to download image:', err);
-      setStatusMessage({ text: 'Gagal membuat file gambar untuk diunduh.', type: 'error' });
+      setStatusMessage({ text: 'Gagal membuat file gambar untuk diunduh. Silakan coba lagi.', type: 'error' });
       setTimeout(() => setStatusMessage(null), 4000);
     } finally {
       setIsExportingImage(false);
@@ -196,13 +164,11 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
 
   // Copy image to clipboard with seamless fallback
   const handleCopyImage = async () => {
+    if (!cardRef.current) return;
     setIsExportingImage(true);
+    setStatusMessage(null);
     try {
-      const canvas = await getCanvas();
-      if (!canvas) throw new Error('Canvas element not found');
-
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-      if (!blob) throw new Error('Blob creation failed');
+      const { blob } = await captureElementAsPng(cardRef.current);
 
       let copiedToClipboard = false;
       if (navigator.clipboard && typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
@@ -222,7 +188,6 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
       }
 
       if (!copiedToClipboard) {
-        // Fallback: Copy text and auto-download file
         navigator.clipboard.writeText(recapText);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -258,10 +223,11 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
     setTimeout(() => setStatusMessage(null), 3000);
   };
 
-  // Send via WAHA to Group
+  // Send image + full recap via WAHA without downloading
   const handleSendToGroup = async () => {
     const target = targetGroup.trim();
     if (!target) {
+      targetInputRef.current?.focus();
       setStatusMessage({ text: 'Masukkan nomor WhatsApp target atau Chat ID grup (misal: 120363xxx@g.us atau 0812xxx)', type: 'error' });
       return;
     }
@@ -269,18 +235,21 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
     setIsSendingWA(true);
     setStatusMessage(null);
 
-    // 1. Generate image base64 if not ready
-    let imgBase64 = imageDataUrl;
-    if (!imgBase64) {
-      imgBase64 = await generateImage();
+    let imgDataUrl: string | undefined;
+    if (cardRef.current) {
+      try {
+        const exported = await captureElementAsPng(cardRef.current);
+        imgDataUrl = exported.dataUrl;
+      } catch (err) {
+        console.warn('Could not capture infographic PNG before WAHA send:', err);
+      }
     }
 
-    // 2. Invoke notification with image + recap text
     const result = await invokeWahaNotification({
       action: 'unconfirmed_rsvp_recap',
       recipient: target,
       message: recapText,
-      image: imgBase64 || undefined,
+      image: imgDataUrl,
       filename: `rekap-belum-konfirmasi-${currentMeeting.id.substring(0, 6)}.png`,
       metadata: {
         meetingId: currentMeeting.id,
@@ -291,9 +260,60 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
     setIsSendingWA(false);
 
     if (result.success) {
-      setStatusMessage({ text: `Berhasil! Rekap & infografis dikirim ke WhatsApp target (${target}).`, type: 'success' });
+      setStatusMessage({
+        text: imgDataUrl
+          ? `Berhasil! Gambar infografis & rekap dikirim langsung via WAHA ke ${target}.`
+          : `Berhasil! Rekap dikirim via WAHA ke ${target}.`,
+        type: 'success',
+      });
     } else {
       setStatusMessage({ text: result.message, type: 'error' });
+    }
+  };
+
+  // Send infographic PNG directly via WAHA with compact caption (no download needed)
+  const handleSendImageOnlyViaWaha = async () => {
+    const target = targetGroup.trim();
+    if (!target) {
+      targetInputRef.current?.focus();
+      setStatusMessage({ text: 'Isi terlebih dahulu Nomor WA / Chat ID Grup Target di kolom atas untuk mengirim gambar via WAHA.', type: 'error' });
+      return;
+    }
+    if (!cardRef.current) return;
+
+    setIsSendingImageOnly(true);
+    setStatusMessage(null);
+
+    try {
+      const { dataUrl } = await captureElementAsPng(cardRef.current);
+      const shortCaption = `📢 *Infografis Rekap Konfirmasi Kehadiran (RSVP)*\nAgenda: *${currentMeeting.title}*\nTanggal: ${formattedDate} (${meetingTime})\nBelum Konfirmasi: *${unconfirmedTeachers.length} guru/pegawai*`;
+
+      const result = await invokeWahaNotification({
+        action: 'unconfirmed_rsvp_recap',
+        recipient: target,
+        message: shortCaption,
+        image: dataUrl,
+        filename: `rekap-belum-konfirmasi-${currentMeeting.id.substring(0, 6)}.png`,
+        metadata: {
+          meetingId: currentMeeting.id,
+          unconfirmedCount: unconfirmedTeachers.length,
+          imageOnly: true,
+        },
+      });
+
+      if (result.success) {
+        setStatusMessage({
+          text: `Berhasil! Gambar infografis dikirim langsung via WAHA ke ${target} tanpa perlu diunduh.`,
+          type: 'success',
+        });
+      } else {
+        setStatusMessage({ text: result.message, type: 'error' });
+      }
+    } catch (err) {
+      console.error('Failed to capture/send image via WAHA:', err);
+      setStatusMessage({ text: 'Gagal memproses gambar infografis untuk dikirim via WAHA.', type: 'error' });
+    } finally {
+      setIsSendingImageOnly(false);
     }
   };
 
@@ -347,6 +367,7 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
                 </label>
                 <div className="flex items-center gap-2">
                   <input
+                    ref={targetInputRef}
                     type="text"
                     value={targetGroup}
                     onChange={(e) => setTargetGroup(e.target.value)}
@@ -364,11 +385,11 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSendToGroup}
-                  disabled={isSendingWA || !targetGroup.trim()}
+                  disabled={isSendingWA || isSendingImageOnly || !targetGroup.trim()}
                   className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-950/40 flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isSendingWA ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  <span>{isSendingWA ? 'Mengirim...' : 'Kirim ke Grup WA'}</span>
+                  <span>{isSendingWA ? 'Mengirim...' : 'Kirim Gambar & Teks WAHA'}</span>
                 </button>
 
                 <button
@@ -413,7 +434,18 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleSendImageOnlyViaWaha}
+                disabled={isSendingImageOnly || isSendingWA || isExportingImage}
+                className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+                title="Langsung kirim gambar infografis ini ke WhatsApp via WAHA tanpa perlu unduh file"
+              >
+                {isSendingImageOnly ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                <span>{isSendingImageOnly ? 'Mengirim Gambar...' : 'Kirim Gambar via WAHA'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleDownloadImage}
@@ -447,13 +479,13 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
           </div>
 
           {/* ========================================================================= */}
-          {/* THE INFOGRAPHIC CARD (THIS NODE WILL BE CAPTURED BY html2canvas AS IMAGE)  */}
+          {/* THE INFOGRAPHIC CARD (CAPTURED AS PIXEL-IDENTICAL PNG VIA html-to-image)  */}
           {/* ========================================================================= */}
           <div className="overflow-x-auto pb-2 flex justify-center">
             <div
               ref={cardRef}
               id="unconfirmed-rsvp-infographic"
-              className="w-[720px] bg-white text-slate-900 p-7 rounded-2xl border-2 border-slate-300 shadow-xl font-sans space-y-5 shrink-0"
+              className="infographic-light-card w-[720px] bg-white text-slate-900 p-7 rounded-2xl border-2 border-slate-300 shadow-xl font-sans space-y-5 shrink-0"
               style={{ minWidth: '720px' }}
             >
               {/* Header Kop Resmi */}

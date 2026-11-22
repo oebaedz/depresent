@@ -113,10 +113,10 @@ serve(async (req) => {
     const body = await req.json()
     const { target, message, file, image, filename } = body
 
-    if (!target || !message) {
+    if (!target || (!message && !file && !image)) {
       return new Response(
         JSON.stringify({
-          error: "target dan message wajib diisi",
+          error: "target dan message atau gambar wajib diisi",
         }),
         {
           status: 400,
@@ -140,15 +140,28 @@ serve(async (req) => {
     // NORMALIZE TARGET
     const chatId = normalizeTarget(target)
 
-    const rawFile = file || (image ? {
-      mimetype: "image/png",
-      filename: filename || "infografis-rekap.png",
-      data: image,
-    } : null)
+    const cleanImageBase64 = typeof image === "string"
+      ? image.replace(/^data:image\/[^;]+;base64,/, "")
+      : ""
+
+    const rawFile = file
+      ? {
+          ...file,
+          data: typeof file.data === "string"
+            ? file.data.replace(/^data:image\/[^;]+;base64,/, "")
+            : file.data,
+        }
+      : cleanImageBase64
+      ? {
+          mimetype: "image/png",
+          filename: filename || "infografis-rekap.png",
+          data: cleanImageBase64,
+        }
+      : null
 
     let response = null
 
-    // Coba kirim via /api/sendImage jika menyertakan file gambar
+    // Kirim via /api/sendImage jika menyertakan file gambar
     if (rawFile) {
       try {
         response = await fetch(\`\${WAHA_URL}/api/sendImage\`, {
@@ -162,16 +175,16 @@ serve(async (req) => {
             session: WAHA_SESSION,
             chatId: chatId,
             file: rawFile,
-            caption: message,
+            caption: message || "",
           }),
         })
       } catch {
-        // Fallback ke sendText jika sendImage tidak tersedia
+        // Lanjut ke fallback di bawah bila endpoint error
       }
     }
 
-    // Fallback atau kirim text biasa ke WAHA (/api/sendText)
-    if (!response || !response.ok) {
+    // Fallback ke sendText jika tidak ada file atau sendImage gagal dan masih ada pesan teks
+    if ((!response || !response.ok) && message) {
       response = await fetch(\`\${WAHA_URL}/api/sendText\`, {
         method: "POST",
         headers: {
@@ -411,8 +424,12 @@ export async function invokeWahaNotification(params: {
     return { success: false, message: errorMsg };
   }
 
-  if (!rawMessage) {
-    const errorMsg = 'Pesan WhatsApp (message) belum diisi.';
+  const cleanBase64 = params.image
+    ? params.image.replace(/^data:image\/[^;]+;base64,/, '')
+    : undefined;
+
+  if (!rawMessage && !cleanBase64) {
+    const errorMsg = 'Pesan WhatsApp (message) atau gambar belum diisi.';
     addWahaLog({
       type: logType,
       target: rawTarget,
@@ -423,22 +440,22 @@ export async function invokeWahaNotification(params: {
     return { success: false, message: errorMsg };
   }
 
-  // 2. Build payload strictly providing { target, message } with compatibility aliases
+  // 2. Build payload strictly providing { target, message } with pure base64 file for WAHA /api/sendImage
   const payload = {
     target: rawTarget,
-    message: rawMessage,
+    message: rawMessage || 'Infografis Rekapitulasi Kehadiran Rapat',
     chatId: rawTarget,
     phone: rawTarget,
     action: params.action,
-    image: params.image,
-    file: params.image
+    image: cleanBase64,
+    file: cleanBase64
       ? {
           mimetype: 'image/png',
           filename: params.filename || 'infografis-rekap.png',
-          data: params.image,
+          data: cleanBase64,
         }
       : undefined,
-    caption: rawMessage,
+    caption: rawMessage || 'Infografis Rekapitulasi Kehadiran Rapat',
     metadata: params.metadata || {},
     timestamp: new Date().toISOString(),
   };

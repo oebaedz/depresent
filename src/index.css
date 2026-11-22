@@ -45,6 +45,24 @@
   html.dark .text-teal-300\/80 {
     color: #ccfbf1;
   }
+
+  /* Keep white infographic cards strictly light-mode crisp even while dark theme is active */
+  html.dark .infographic-light-card {
+    color-scheme: light;
+    color: #0f172a;
+  }
+
+  html.dark .infographic-light-card .text-slate-400 {
+    color: #94a3b8;
+  }
+
+  html.dark .infographic-light-card .text-slate-500 {
+    color: #64748b;
+  }
+
+  html.dark .infographic-light-card .text-slate-600 {
+    color: #475569;
+  }
 }
 
 /* Printing styles for official school reports and ID cards */
