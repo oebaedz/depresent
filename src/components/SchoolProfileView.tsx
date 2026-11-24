@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { School, Save, Check, Globe, Phone, Mail, MapPin, User, Shield, MessageSquare, Image, Upload, Trash2, Building2, Lock, KeyRound, AlertCircle } from 'lucide-react';
-import { SchoolProfile } from '../types';
-import { saveSchoolProfile } from '../lib/storage';
+import React, { useState, useRef, useEffect } from 'react';
+import { School, Save, Check, Globe, Phone, Mail, MapPin, User, Shield, MessageSquare, Image, Upload, Trash2, Building2, Lock, KeyRound, AlertCircle, Plus, Star } from 'lucide-react';
+import { SchoolProfile, WahaGroup } from '../types';
+import { addWahaGroup, deleteWahaGroup, getWahaGroups, saveSchoolProfile, setDefaultWahaGroup } from '../lib/storage';
 
 interface SchoolProfileViewProps {
   profile: SchoolProfile;
@@ -27,6 +27,49 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
   const [newPinInput, setNewPinInput] = useState('');
   const [confirmPinInput, setConfirmPinInput] = useState('');
   const [pinMessage, setPinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // WAHA Groups list management state
+  const [wahaGroups, setWahaGroups] = useState<WahaGroup[]>(() => getWahaGroups(profile));
+  const [newGroupName, setNewGroupName] = useState('');
+  const [newGroupId, setNewGroupId] = useState('');
+  const [groupSaving, setGroupSaving] = useState(false);
+  const [groupNotice, setGroupNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setWahaGroups(getWahaGroups(profile));
+  }, [profile]);
+
+  const handleAddGroup = async () => {
+    const cleanId = newGroupId.trim();
+    if (!cleanId) return;
+    setGroupSaving(true);
+    const res = await addWahaGroup(newGroupName.trim() || cleanId, cleanId, wahaGroups.length === 0);
+    setWahaGroups(res.groups);
+    const defId = res.groups.find((g) => g.is_default)?.group_id || res.groups[0]?.group_id || '';
+    setFormData((prev) => ({ ...prev, waha_group_id: defId, waha_groups: res.groups }));
+    setNewGroupName('');
+    setNewGroupId('');
+    setGroupSaving(false);
+    setGroupNotice(res.syncedToDb ? 'Grup tersimpan ke database.' : 'Grup tersimpan secara lokal.');
+    setTimeout(() => setGroupNotice(null), 3000);
+    onRefresh();
+  };
+
+  const handleSetDefaultGroup = async (id: string) => {
+    const res = await setDefaultWahaGroup(id);
+    setWahaGroups(res.groups);
+    const defId = res.groups.find((g) => g.is_default)?.group_id || '';
+    setFormData((prev) => ({ ...prev, waha_group_id: defId, waha_groups: res.groups }));
+    onRefresh();
+  };
+
+  const handleDeleteGroup = async (id: string) => {
+    const res = await deleteWahaGroup(id);
+    setWahaGroups(res.groups);
+    const defId = res.groups.find((g) => g.is_default)?.group_id || '';
+    setFormData((prev) => ({ ...prev, waha_group_id: defId, waha_groups: res.groups }));
+    onRefresh();
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
@@ -409,22 +452,111 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
               Nama dan nomor ini digunakan untuk integrasi pengiriman tautan persetujuan Tanda Tangan Elektronik Buku Ekspedisi secara resmi via WhatsApp.
             </p>
 
-            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide border-b border-slate-100 dark:border-[#0f4950] pb-2 pt-3 flex items-center gap-1.5">
-              <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Integrasi WhatsApp Group Yayasan / Sekolah (WAHA)</span>
+            <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide border-b border-slate-100 dark:border-[#0f4950] pb-2 pt-3 flex items-center justify-between gap-1.5">
+              <span className="flex items-center gap-1.5">
+                <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>Daftar Grup WhatsApp Tujuan Rekap (WAHA)</span>
+              </span>
+              <span className="text-[10px] font-normal text-slate-500 dark:text-teal-300/70">
+                Tersimpan di DB
+              </span>
             </h3>
 
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-teal-100 mb-1">
-                WhatsApp Group ID (Untuk Kirim Rekapitulasi Rapat)
-              </label>
-              <input
-                type="text"
-                value={formData.waha_group_id}
-                onChange={(e) => setFormData({ ...formData, waha_group_id: e.target.value })}
-                placeholder="120363045612398@g.us atau ID grup WA Anda"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden font-mono"
-              />
+            <div className="p-3.5 bg-slate-50 dark:bg-[#042024] border border-slate-200 dark:border-[#0f4950] rounded-xl space-y-3">
+              {/* Add New Group Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <div className="sm:col-span-5">
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-teal-200 mb-1">
+                    Nama Grup
+                  </label>
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Contoh: Grup Dewan Guru"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+                <div className="sm:col-span-5">
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-teal-200 mb-1">
+                    Chat ID Grup / No. WA
+                  </label>
+                  <input
+                    type="text"
+                    value={newGroupId}
+                    onChange={(e) => setNewGroupId(e.target.value)}
+                    placeholder="120363045612398@g.us"
+                    className="w-full px-3 py-2 border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden font-mono"
+                  />
+                </div>
+                <div className="sm:col-span-2 flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleAddGroup}
+                    disabled={groupSaving || !newGroupId.trim()}
+                    className="w-full px-3 py-2 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 text-white font-semibold rounded-lg flex items-center justify-center gap-1 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah</span>
+                  </button>
+                </div>
+              </div>
+
+              {groupNotice && (
+                <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">{groupNotice}</p>
+              )}
+
+              {/* Saved Groups List */}
+              {wahaGroups.length === 0 ? (
+                <p className="text-[11px] text-slate-500 dark:text-teal-300/70">
+                  Belum ada grup tersimpan. Tambahkan Chat ID grup WhatsApp di atas agar bisa dipilih langsung saat kirim rekap.
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {wahaGroups.map((grp) => (
+                    <div
+                      key={grp.id}
+                      className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950]"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-900 dark:text-white truncate">{grp.name}</span>
+                          {grp.is_default && (
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold shrink-0">
+                              Utama
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-500 dark:text-teal-300/80 truncate">
+                          {grp.group_id}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!grp.is_default && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetDefaultGroup(grp.id)}
+                            className="px-2 py-1 text-[11px] font-medium rounded border border-slate-200 dark:border-[#0f4950] text-slate-600 dark:text-teal-200 hover:bg-slate-100 dark:hover:bg-[#0b383d] flex items-center gap-1 cursor-pointer"
+                            title="Jadikan Grup Utama Default"
+                          >
+                            <Star className="w-3 h-3 text-amber-500" />
+                            <span>Utama</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteGroup(grp.id)}
+                          className="p-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded transition-colors cursor-pointer"
+                          title="Hapus grup dari daftar"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="pt-4 border-t border-slate-200 dark:border-[#0f4950] flex items-center justify-end">

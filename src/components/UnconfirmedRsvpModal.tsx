@@ -16,10 +16,12 @@ import {
   MapPin,
   RefreshCw,
   Image as ImageIcon,
+  Plus,
 } from 'lucide-react';
-import { Meeting, Teacher, Invitation, SchoolProfile } from '../types';
+import { Meeting, Teacher, Invitation, SchoolProfile, WahaGroup } from '../types';
 import { invokeWahaNotification } from '../lib/waha';
 import { captureElementAsPng } from '../lib/infographicExport';
+import { addWahaGroup, getWahaGroups } from '../lib/storage';
 
 interface UnconfirmedRsvpModalProps {
   isOpen: boolean;
@@ -42,7 +44,14 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const targetInputRef = useRef<HTMLInputElement>(null);
-  const [targetGroup, setTargetGroup] = useState<string>(schoolProfile.waha_group_id || '');
+  const [savedGroups, setSavedGroups] = useState<WahaGroup[]>(() => getWahaGroups(schoolProfile));
+  const [targetGroup, setTargetGroup] = useState<string>(() => {
+    const groups = getWahaGroups(schoolProfile);
+    return groups.find((g) => g.is_default)?.group_id || groups[0]?.group_id || schoolProfile.waha_group_id || '';
+  });
+  const [showSaveGroupForm, setShowSaveGroupForm] = useState(false);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [isSavingGroup, setIsSavingGroup] = useState(false);
   const [isExportingImage, setIsExportingImage] = useState(false);
   const [isSendingWA, setIsSendingWA] = useState(false);
   const [isSendingImageOnly, setIsSendingImageOnly] = useState(false);
@@ -52,10 +61,41 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
 
   // Sync group target if schoolProfile changes
   useEffect(() => {
-    if (schoolProfile.waha_group_id && !targetGroup) {
-      setTargetGroup(schoolProfile.waha_group_id);
+    const groups = getWahaGroups(schoolProfile);
+    setSavedGroups(groups);
+    if (!targetGroup) {
+      const def = groups.find((g) => g.is_default)?.group_id || groups[0]?.group_id || schoolProfile.waha_group_id || '';
+      if (def) setTargetGroup(def);
     }
-  }, [schoolProfile.waha_group_id, targetGroup]);
+  }, [schoolProfile, targetGroup]);
+
+  useEffect(() => {
+    const handleGroupsUpdate = (e: Event) => {
+      const custom = e as CustomEvent<WahaGroup[]>;
+      if (Array.isArray(custom.detail)) setSavedGroups(custom.detail);
+      else setSavedGroups(getWahaGroups(schoolProfile));
+    };
+    window.addEventListener('smp_waha_groups_updated', handleGroupsUpdate);
+    return () => window.removeEventListener('smp_waha_groups_updated', handleGroupsUpdate);
+  }, [schoolProfile]);
+
+  const isTargetAlreadySaved = savedGroups.some((g) => g.group_id.trim() === targetGroup.trim());
+
+  const handleSaveNewGroupToDb = async () => {
+    const cleanId = targetGroup.trim();
+    if (!cleanId) return;
+    setIsSavingGroup(true);
+    const res = await addWahaGroup(newGroupName.trim() || cleanId, cleanId, savedGroups.length === 0);
+    setSavedGroups(res.groups);
+    setNewGroupName('');
+    setShowSaveGroupForm(false);
+    setIsSavingGroup(false);
+    setStatusMessage({
+      text: res.syncedToDb ? 'Grup berhasil disimpan ke database.' : 'Grup berhasil disimpan ke daftar lokal.',
+      type: 'success',
+    });
+    setTimeout(() => setStatusMessage(null), 3000);
+  };
 
   if (!isOpen) return null;
 
@@ -377,10 +417,33 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
           {/* Target Group & Fast Action Bar */}
           <div className="bg-slate-50 dark:bg-[#031e21] p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-teal-200 mb-1">
-                  Nomor WA / Chat ID Grup Target:
+              <div className="flex-1 min-w-0 space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-teal-200">
+                  Grup WA / Nomor Target:
                 </label>
+
+                {savedGroups.length > 0 && (
+                  <select
+                    value={isTargetAlreadySaved ? targetGroup.trim() : '__custom__'}
+                    onChange={(e) => {
+                      if (e.target.value !== '__custom__') {
+                        setTargetGroup(e.target.value);
+                        setShowSaveGroupForm(false);
+                      } else {
+                        targetInputRef.current?.focus();
+                      }
+                    }}
+                    className="w-full bg-white dark:bg-[#072b2f] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+                  >
+                    {savedGroups.map((g) => (
+                      <option key={g.id} value={g.group_id}>
+                        {g.name} ({g.group_id}){g.is_default ? ' • Utama' : ''}
+                      </option>
+                    ))}
+                    <option value="__custom__">+ Input Manual Nomor / Chat ID Lain...</option>
+                  </select>
+                )}
+
                 <div className="flex items-center gap-2">
                   <input
                     ref={targetInputRef}
@@ -390,9 +453,48 @@ export const UnconfirmedRsvpModal: React.FC<UnconfirmedRsvpModalProps> = ({
                     placeholder="Contoh: 120363024823924@g.us atau 08123456789"
                     className="w-full bg-white dark:bg-[#072b2f] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-2 text-xs font-mono text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500"
                   />
+                  {targetGroup.trim() && !isTargetAlreadySaved && !showSaveGroupForm && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSaveGroupForm(true)}
+                      className="px-2.5 py-2 rounded-xl bg-teal-700 hover:bg-teal-600 text-white text-[11px] font-semibold whitespace-nowrap shrink-0 flex items-center gap-1 cursor-pointer"
+                      title="Simpan grup ini ke Daftar Grup DB"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Simpan DB</span>
+                    </button>
+                  )}
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-teal-300/70 mt-1">
-                  Dapat menggunakan Chat ID grup WhatsApp (akhiran <code>@g.us</code>) atau nomor ponsel pengurus/grup.
+
+                {showSaveGroupForm && !isTargetAlreadySaved && (
+                  <div className="flex items-center gap-2 p-2 rounded-xl bg-teal-50 dark:bg-[#042024] border border-teal-200 dark:border-[#0f4950]">
+                    <input
+                      type="text"
+                      value={newGroupName}
+                      onChange={(e) => setNewGroupName(e.target.value)}
+                      placeholder="Nama grup (mis. Grup Pengurus)"
+                      className="flex-1 bg-white dark:bg-[#072b2f] border border-slate-300 dark:border-[#0f4950] rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveNewGroupToDb}
+                      disabled={isSavingGroup}
+                      className="px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold whitespace-nowrap cursor-pointer"
+                    >
+                      {isSavingGroup ? 'Simpan...' : 'Simpan'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowSaveGroupForm(false)}
+                      className="px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-slate-800 dark:text-teal-300 cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-slate-500 dark:text-teal-300/70">
+                  Pilih dari daftar grup tersimpan atau masukkan Chat ID grup (akhiran <code>@g.us</code>).
                 </p>
               </div>
 

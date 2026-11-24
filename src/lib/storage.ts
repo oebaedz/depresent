@@ -1,4 +1,4 @@
-import { Attendance, AttendanceMethod, AttendanceStatus, DocumentSignature, DocumentType, Invitation, Meeting, RsvpStatus, SchoolProfile, SignerRole, Teacher } from '../types';
+import { Attendance, AttendanceMethod, AttendanceStatus, AutoReminderConfig, DocumentSignature, DocumentType, Invitation, Meeting, RsvpStatus, SchoolProfile, SignerRole, Teacher, WahaGroup } from '../types';
 import { INITIAL_ATTENDANCES, INITIAL_MEETINGS, INITIAL_SCHOOL_PROFILE, INITIAL_TEACHERS } from './demoData';
 import { getSupabase } from './supabase';
 import { generateUUID, isValidUUID } from './uuid';
@@ -158,6 +158,36 @@ export async function fetchSchoolProfile(): Promise<SchoolProfile> {
       const { data, error } = await supabase.from('smp_school_profile').select('*').limit(1);
       if (!error && data && data.length > 0) {
         const row = data[0];
+        let dbWahaGroups: WahaGroup[] | undefined = Array.isArray(row.waha_groups) ? row.waha_groups : undefined;
+        let dbAutoReminder: AutoReminderConfig | undefined =
+          row.auto_reminder_config && typeof row.auto_reminder_config === 'object' && 'enabled' in row.auto_reminder_config
+            ? row.auto_reminder_config
+            : undefined;
+
+        // Fallback lookup in smp_message_templates if columns waha_groups / auto_reminder_config haven't been added yet
+        if (!dbWahaGroups || !dbAutoReminder) {
+          try {
+            const { data: cfgRows } = await supabase
+              .from('smp_message_templates')
+              .select('id, template_content')
+              .in('id', ['__waha_groups_v1', '__auto_reminder_v1']);
+            if (Array.isArray(cfgRows)) {
+              for (const r of cfgRows) {
+                if (r.id === '__waha_groups_v1' && !dbWahaGroups && r.template_content) {
+                  const parsed = JSON.parse(r.template_content);
+                  if (Array.isArray(parsed)) dbWahaGroups = parsed;
+                }
+                if (r.id === '__auto_reminder_v1' && !dbAutoReminder && r.template_content) {
+                  const parsed = JSON.parse(r.template_content);
+                  if (parsed && typeof parsed === 'object') dbAutoReminder = parsed;
+                }
+              }
+            }
+          } catch {
+            // ignore fallback read error
+          }
+        }
+
         const mapped: SchoolProfile = {
           ...INITIAL_SCHOOL_PROFILE,
           ...row,
@@ -170,6 +200,8 @@ export async function fetchSchoolProfile(): Promise<SchoolProfile> {
           admin_pin: row.admin_pin || INITIAL_SCHOOL_PROFILE.admin_pin || '1234',
           meeting_rooms: Array.isArray(row.meeting_rooms) ? row.meeting_rooms : undefined,
           meeting_categories: Array.isArray(row.meeting_categories) ? row.meeting_categories : undefined,
+          waha_groups: dbWahaGroups,
+          auto_reminder_config: dbAutoReminder,
         };
         localStorage.setItem(KEY_PROFILE, JSON.stringify(mapped));
         if (mapped.admin_pin) {
@@ -188,6 +220,15 @@ export async function fetchSchoolProfile(): Promise<SchoolProfile> {
             localStorage.setItem(KEY_MEETING_CATEGORIES, JSON.stringify(cleanCategories));
             window.dispatchEvent(new CustomEvent('smp_categories_updated', { detail: cleanCategories }));
           }
+        }
+        if (Array.isArray(dbWahaGroups) && dbWahaGroups.length > 0 && typeof window !== 'undefined') {
+          localStorage.setItem(KEY_WAHA_GROUPS, JSON.stringify(dbWahaGroups));
+          window.dispatchEvent(new CustomEvent('smp_waha_groups_updated', { detail: dbWahaGroups }));
+        }
+        if (dbAutoReminder && typeof window !== 'undefined') {
+          const mergedReminder = { ...DEFAULT_AUTO_REMINDER_CONFIG, ...dbAutoReminder };
+          localStorage.setItem(KEY_AUTO_REMINDER, JSON.stringify(mergedReminder));
+          window.dispatchEvent(new CustomEvent('smp_auto_reminder_updated', { detail: mergedReminder }));
         }
         return mapped;
       }
@@ -210,6 +251,14 @@ export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolP
   localStorage.setItem(KEY_PROFILE, JSON.stringify(cleanProfile));
   if (typeof window !== 'undefined') {
     localStorage.setItem('smp_admin_pin', currentPin);
+    if (Array.isArray(cleanProfile.waha_groups)) {
+      localStorage.setItem(KEY_WAHA_GROUPS, JSON.stringify(cleanProfile.waha_groups));
+      window.dispatchEvent(new CustomEvent('smp_waha_groups_updated', { detail: cleanProfile.waha_groups }));
+    }
+    if (cleanProfile.auto_reminder_config) {
+      localStorage.setItem(KEY_AUTO_REMINDER, JSON.stringify(cleanProfile.auto_reminder_config));
+      window.dispatchEvent(new CustomEvent('smp_auto_reminder_updated', { detail: cleanProfile.auto_reminder_config }));
+    }
   }
 
   const supabase = getSupabase();
@@ -227,6 +276,8 @@ export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolP
             error.message?.includes('admin_staff') ||
             error.message?.includes('meeting_rooms') ||
             error.message?.includes('meeting_categories') ||
+            error.message?.includes('waha_groups') ||
+            error.message?.includes('auto_reminder_config') ||
             error.code === 'PGRST204'
           ) {
             const fallback: Record<string, any> = { ...payload };
@@ -236,6 +287,8 @@ export async function saveSchoolProfile(profile: SchoolProfile): Promise<SchoolP
             delete fallback.admin_staff_phone;
             delete fallback.meeting_rooms;
             delete fallback.meeting_categories;
+            delete fallback.waha_groups;
+            delete fallback.auto_reminder_config;
             await supabase.from('smp_school_profile').upsert(fallback);
           } else {
             console.error('Error updating school profile in Supabase:', error.message);
@@ -999,6 +1052,283 @@ export function deleteMeetingRoom(roomToDelete: string): string[] {
 
 export function resetMeetingRooms(): string[] {
   return saveMeetingRooms(DEFAULT_MEETING_ROOMS);
+}
+
+// ---------------------------------------------------------------------------
+// 3.1.6 WAHA WHATSAPP GROUPS LIST (Tersimpan di DB & Lokal)
+// ---------------------------------------------------------------------------
+const KEY_WAHA_GROUPS = 'smp_waha_groups_v1';
+
+export function getWahaGroups(profile?: SchoolProfile): WahaGroup[] {
+  const activeProfile = profile || getCachedProfile();
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(KEY_WAHA_GROUPS);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((g: any) => g && g.group_id);
+        }
+      }
+    } catch {}
+  }
+
+  if (Array.isArray(activeProfile.waha_groups) && activeProfile.waha_groups.length > 0) {
+    return activeProfile.waha_groups.filter((g) => g && g.group_id);
+  }
+
+  if (activeProfile.waha_group_id && activeProfile.waha_group_id.trim()) {
+    return [
+      {
+        id: 'default-school-group',
+        name: 'Grup Utama Sekolah',
+        group_id: activeProfile.waha_group_id.trim(),
+        is_default: true,
+      },
+    ];
+  }
+
+  return [];
+}
+
+export async function saveWahaGroups(groups: WahaGroup[]): Promise<{ groups: WahaGroup[]; syncedToDb: boolean }> {
+  // Deduplicate by group_id
+  const map = new Map<string, WahaGroup>();
+  for (const g of groups) {
+    const cleanGroupId = String(g.group_id || '').trim();
+    const cleanName = String(g.name || '').trim() || cleanGroupId;
+    if (!cleanGroupId) continue;
+    if (!map.has(cleanGroupId)) {
+      map.set(cleanGroupId, {
+        id: g.id || generateUUID(),
+        name: cleanName,
+        group_id: cleanGroupId,
+        is_default: Boolean(g.is_default),
+      });
+    }
+  }
+
+  const finalGroups = Array.from(map.values());
+  if (finalGroups.length > 0 && !finalGroups.some((g) => g.is_default)) {
+    finalGroups[0].is_default = true;
+  }
+  const defaultGroupId = finalGroups.find((g) => g.is_default)?.group_id || finalGroups[0]?.group_id || '';
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(KEY_WAHA_GROUPS, JSON.stringify(finalGroups));
+    const cachedProfile = getCachedProfile();
+    localStorage.setItem(
+      KEY_PROFILE,
+      JSON.stringify({
+        ...cachedProfile,
+        waha_group_id: defaultGroupId,
+        waha_groups: finalGroups,
+      })
+    );
+    window.dispatchEvent(new CustomEvent('smp_waha_groups_updated', { detail: finalGroups }));
+  }
+
+  let syncedToDb = false;
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const cached = getCachedProfile();
+      const { error } = await supabase
+        .from('smp_school_profile')
+        .update({ waha_groups: finalGroups, waha_group_id: defaultGroupId })
+        .eq('id', cached.id);
+
+      if (!error) {
+        syncedToDb = true;
+      } else {
+        // Always update waha_group_id cleanly
+        await supabase
+          .from('smp_school_profile')
+          .update({ waha_group_id: defaultGroupId })
+          .eq('id', cached.id);
+
+        // Fallback store full JSON list in smp_message_templates
+        const { error: fbErr } = await supabase.from('smp_message_templates').upsert({
+          id: '__waha_groups_v1',
+          title: 'Daftar Grup WhatsApp (WAHA)',
+          template_content: JSON.stringify(finalGroups),
+          variables: [],
+          updated_at: new Date().toISOString(),
+        });
+        if (!fbErr) syncedToDb = true;
+      }
+    } catch (e) {
+      console.warn('Could not sync waha_groups to Supabase:', e);
+    }
+  }
+
+  return { groups: finalGroups, syncedToDb };
+}
+
+export async function addWahaGroup(
+  name: string,
+  groupId: string,
+  setAsDefault = false
+): Promise<{ groups: WahaGroup[]; syncedToDb: boolean }> {
+  const cleanId = groupId.trim();
+  const cleanName = name.trim() || cleanId;
+  if (!cleanId) return { groups: getWahaGroups(), syncedToDb: false };
+
+  const current = getWahaGroups();
+  const existingIdx = current.findIndex((g) => g.group_id.trim() === cleanId);
+  let next: WahaGroup[];
+  if (existingIdx >= 0) {
+    next = current.map((g, idx) => ({
+      ...g,
+      name: idx === existingIdx ? cleanName : g.name,
+      is_default: setAsDefault ? idx === existingIdx : g.is_default,
+    }));
+  } else {
+    const base = setAsDefault ? current.map((g) => ({ ...g, is_default: false })) : [...current];
+    next = [
+      ...base,
+      {
+        id: generateUUID(),
+        name: cleanName,
+        group_id: cleanId,
+        is_default: setAsDefault || base.length === 0,
+      },
+    ];
+  }
+  return saveWahaGroups(next);
+}
+
+export async function deleteWahaGroup(id: string): Promise<{ groups: WahaGroup[]; syncedToDb: boolean }> {
+  const current = getWahaGroups().filter((g) => g.id !== id);
+  return saveWahaGroups(current);
+}
+
+export async function setDefaultWahaGroup(id: string): Promise<{ groups: WahaGroup[]; syncedToDb: boolean }> {
+  const current = getWahaGroups().map((g) => ({
+    ...g,
+    is_default: g.id === id,
+  }));
+  return saveWahaGroups(current);
+}
+
+// ---------------------------------------------------------------------------
+// 3.1.7 AUTO REMINDER CONFIG & SENT HISTORY (Tersimpan di DB & Lokal)
+// ---------------------------------------------------------------------------
+const KEY_AUTO_REMINDER = 'smp_auto_reminder_v1';
+const KEY_AUTO_REMINDER_HISTORY = 'smp_auto_reminder_sent_v1';
+
+export const DEFAULT_AUTO_REMINDER_CONFIG: AutoReminderConfig = {
+  enabled: false,
+  remind_before_minutes: 30,
+  rsvp_remind_hours_before: 0,
+  target_mode: 'unpresent_teachers',
+  target_group_id: '',
+};
+
+export interface AutoReminderHistoryItem {
+  key: string; // e.g. "pre_<meetingId>_<date>" or "rsvp_<meetingId>_<date>"
+  meeting_id: string;
+  meeting_title: string;
+  type: 'pre_meeting' | 'rsvp_before';
+  sent_at: string;
+  recipient_count: number;
+  summary: string;
+}
+
+export function getAutoReminderConfig(profile?: SchoolProfile): AutoReminderConfig {
+  const activeProfile = profile || getCachedProfile();
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(KEY_AUTO_REMINDER);
+      if (stored) {
+        return { ...DEFAULT_AUTO_REMINDER_CONFIG, ...JSON.parse(stored) };
+      }
+    } catch {}
+  }
+  if (activeProfile.auto_reminder_config) {
+    return { ...DEFAULT_AUTO_REMINDER_CONFIG, ...activeProfile.auto_reminder_config };
+  }
+  return DEFAULT_AUTO_REMINDER_CONFIG;
+}
+
+export async function saveAutoReminderConfig(
+  config: AutoReminderConfig
+): Promise<{ config: AutoReminderConfig; syncedToDb: boolean }> {
+  const clean: AutoReminderConfig = {
+    ...DEFAULT_AUTO_REMINDER_CONFIG,
+    ...config,
+    remind_before_minutes: Math.max(5, Number(config.remind_before_minutes) || 30),
+    rsvp_remind_hours_before: Math.max(0, Number(config.rsvp_remind_hours_before) || 0),
+  };
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(KEY_AUTO_REMINDER, JSON.stringify(clean));
+    const cachedProfile = getCachedProfile();
+    localStorage.setItem(
+      KEY_PROFILE,
+      JSON.stringify({ ...cachedProfile, auto_reminder_config: clean })
+    );
+    window.dispatchEvent(new CustomEvent('smp_auto_reminder_updated', { detail: clean }));
+  }
+
+  let syncedToDb = false;
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const cached = getCachedProfile();
+      const { error } = await supabase
+        .from('smp_school_profile')
+        .update({ auto_reminder_config: clean })
+        .eq('id', cached.id);
+
+      if (!error) {
+        syncedToDb = true;
+      } else {
+        const { error: fbErr } = await supabase.from('smp_message_templates').upsert({
+          id: '__auto_reminder_v1',
+          title: 'Konfigurasi Auto Reminder',
+          template_content: JSON.stringify(clean),
+          variables: [],
+          updated_at: new Date().toISOString(),
+        });
+        if (!fbErr) syncedToDb = true;
+      }
+    } catch (e) {
+      console.warn('Could not sync auto_reminder_config to Supabase:', e);
+    }
+  }
+
+  return { config: clean, syncedToDb };
+}
+
+export function getAutoReminderHistory(): AutoReminderHistoryItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(KEY_AUTO_REMINDER_HISTORY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function isAutoReminderAlreadySent(key: string): boolean {
+  return getAutoReminderHistory().some((item) => item.key === key);
+}
+
+export function markAutoReminderSent(item: AutoReminderHistoryItem): void {
+  if (typeof window === 'undefined') return;
+  const current = getAutoReminderHistory().filter((x) => x.key !== item.key);
+  const updated = [item, ...current].slice(0, 60);
+  localStorage.setItem(KEY_AUTO_REMINDER_HISTORY, JSON.stringify(updated));
+  window.dispatchEvent(new CustomEvent('smp_auto_reminder_history_updated', { detail: updated }));
+}
+
+export function clearAutoReminderHistory(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(KEY_AUTO_REMINDER_HISTORY);
+  window.dispatchEvent(new CustomEvent('smp_auto_reminder_history_updated', { detail: [] }));
 }
 
 // ---------------------------------------------------------------------------

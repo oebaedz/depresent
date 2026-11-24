@@ -951,7 +951,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
         </div>
 
         {/* 5. Attendance Recapitulation Box */}
-        <div className="bg-slate-50 p-4 print:p-2 rounded-lg border border-slate-300 mb-8 print:mb-2 font-sans text-xs print:bg-white print:border-slate-400 recap-box page-break-inside-avoid break-inside-avoid">
+        <div className="bg-slate-50 p-4 print:px-0 print:py-1.5 rounded-lg print:rounded-none border border-slate-300 print:border-none mb-8 print:mb-2 font-sans text-xs print:bg-white recap-box page-break-inside-avoid break-inside-avoid">
           <h4 className="font-bold text-slate-900 mb-2 print:mb-1 uppercase text-[11px] tracking-wide">
             Rekapitulasi Kehadiran Peserta:
           </h4>

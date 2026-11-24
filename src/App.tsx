@@ -33,7 +33,8 @@ import {
   updateAdminPinInDb,
 } from './lib/storage';
 import { getSupabase } from './lib/supabase';
-import { Menu, Database, AlertTriangle, CheckCircle2, Lock, Sun, Moon } from 'lucide-react';
+import { runAutoReminderCheck } from './lib/autoReminder';
+import { Menu, Database, AlertTriangle, CheckCircle2, Lock, Sun, Moon, BellRing, X } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -136,6 +137,7 @@ export default function App() {
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isVercelModalOpen, setIsVercelModalOpen] = useState(false);
   const [isWahaModalOpen, setIsWahaModalOpen] = useState(false);
+  const [autoReminderToast, setAutoReminderToast] = useState<string | null>(null);
 
   // Admin PIN Protection Gate
   const [adminPin, setAdminPin] = useState<string>(() => {
@@ -348,16 +350,72 @@ export default function App() {
       }
     };
 
+    const handleProfileSubUpdated = () => {
+      setSchoolProfile(getCachedProfile());
+    };
+
     window.addEventListener('smp_attendance_recorded', handleLocalAttendance);
     window.addEventListener('smp_pin_updated', handlePinUpdated);
+    window.addEventListener('smp_waha_groups_updated', handleProfileSubUpdated);
+    window.addEventListener('smp_auto_reminder_updated', handleProfileSubUpdated);
     window.addEventListener('storage', handleStorageEvent);
 
     return () => {
       window.removeEventListener('smp_attendance_recorded', handleLocalAttendance);
       window.removeEventListener('smp_pin_updated', handlePinUpdated);
+      window.removeEventListener('smp_waha_groups_updated', handleProfileSubUpdated);
+      window.removeEventListener('smp_auto_reminder_updated', handleProfileSubUpdated);
       window.removeEventListener('storage', handleStorageEvent);
     };
   }, []);
+
+  // Auto-Reminder Scheduler (active while admin session is unlocked)
+  useEffect(() => {
+    if (
+      rsvpParams ||
+      signParams ||
+      verifyParams ||
+      mobileCheckinMeetingId ||
+      !isAdminUnlocked ||
+      isInitialLoading
+    ) {
+      return;
+    }
+
+    const executeCheck = async () => {
+      const res = await runAutoReminderCheck({
+        meetings,
+        teachers,
+        attendances,
+        invitations,
+        schoolProfile,
+      });
+      if (res.triggeredCount > 0 && res.results.length > 0) {
+        setAutoReminderToast(res.results.join(' • '));
+        setTimeout(() => setAutoReminderToast(null), 6000);
+      }
+    };
+
+    const initialTimer = setTimeout(executeCheck, 4000);
+    const interval = setInterval(executeCheck, 30000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [
+    rsvpParams,
+    signParams,
+    verifyParams,
+    mobileCheckinMeetingId,
+    isAdminUnlocked,
+    isInitialLoading,
+    meetings,
+    teachers,
+    attendances,
+    invitations,
+    schoolProfile,
+  ]);
 
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || meetings[0];
   const targetCheckinMeeting = mobileMeeting || meetings.find((m) => m.id === mobileCheckinMeetingId);
@@ -588,6 +646,7 @@ export default function App() {
                 meetings={meetings}
                 teachers={teachers}
                 attendances={attendances}
+                invitations={invitations}
                 schoolProfile={schoolProfile}
                 onRefresh={loadAllData}
                 onNavigateToReports={() => setActiveTab('reports')}
@@ -680,7 +739,28 @@ export default function App() {
       <WahaModal
         isOpen={isWahaModalOpen}
         onClose={() => setIsWahaModalOpen(false)}
+        meetings={meetings}
+        teachers={teachers}
+        attendances={attendances}
+        invitations={invitations}
+        schoolProfile={schoolProfile}
       />
+
+      {autoReminderToast && (
+        <div className="no-print fixed bottom-4 right-4 z-50 max-w-sm bg-teal-950 text-white border border-emerald-500/40 rounded-xl shadow-2xl p-3 flex items-start gap-2.5 text-xs">
+          <BellRing className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-emerald-300">Auto Reminder Terkirim</div>
+            <p className="text-teal-100 mt-0.5 leading-snug">{autoReminderToast}</p>
+          </div>
+          <button
+            onClick={() => setAutoReminderToast(null)}
+            className="text-teal-300 hover:text-white cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

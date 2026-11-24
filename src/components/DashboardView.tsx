@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
-import { Users, CheckCircle2, AlertTriangle, AlertCircle, HeartPulse, FileSpreadsheet, Send, MessageSquare, Clock, Search, Filter, RefreshCw, XCircle, Share2, Phone } from 'lucide-react';
-import { Attendance, AttendanceStatus, Meeting, Teacher, SchoolProfile } from '../types';
-import { recordAttendance, deleteAttendance } from '../lib/storage';
+import React, { useEffect, useState } from 'react';
+import { Users, CheckCircle2, AlertTriangle, AlertCircle, HeartPulse, FileSpreadsheet, Send, MessageSquare, Clock, Search, Filter, RefreshCw, XCircle, Share2, Phone, BellRing } from 'lucide-react';
+import { Attendance, AttendanceStatus, AutoReminderConfig, Invitation, Meeting, Teacher, SchoolProfile, WahaGroup } from '../types';
+import { recordAttendance, deleteAttendance, getAutoReminderConfig, getWahaGroups } from '../lib/storage';
 import { getWahaConfig, invokeWahaNotification } from '../lib/waha';
 import { AbsentTeachersModal } from './AbsentTeachersModal';
+import { AutoReminderModal } from './AutoReminderModal';
 
 interface DashboardViewProps {
   meetings: Meeting[];
   teachers: Teacher[];
   attendances: Attendance[];
+  invitations?: Invitation[];
   schoolProfile: SchoolProfile;
   onRefresh: () => void;
   onNavigateToReports: () => void;
@@ -19,6 +21,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   meetings,
   teachers,
   attendances,
+  invitations = [],
   schoolProfile,
   onRefresh,
   onNavigateToReports,
@@ -31,6 +34,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [wahaActionLoading, setWahaActionLoading] = useState<string | null>(null);
   const [wahaFeedback, setWahaFeedback] = useState<string | null>(null);
   const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
+  const [isAutoReminderModalOpen, setIsAutoReminderModalOpen] = useState(false);
+
+  const [wahaGroups, setWahaGroups] = useState<WahaGroup[]>(() => getWahaGroups(schoolProfile));
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(() => {
+    const groups = getWahaGroups(schoolProfile);
+    return groups.find((g) => g.is_default)?.group_id || groups[0]?.group_id || schoolProfile.waha_group_id || '';
+  });
+  const [autoReminderEnabled, setAutoReminderEnabled] = useState<boolean>(() => getAutoReminderConfig(schoolProfile).enabled);
+
+  useEffect(() => {
+    const groups = getWahaGroups(schoolProfile);
+    setWahaGroups(groups);
+    if (!selectedGroupId || !groups.some((g) => g.group_id === selectedGroupId)) {
+      const def = groups.find((g) => g.is_default)?.group_id || groups[0]?.group_id || schoolProfile.waha_group_id || '';
+      if (def) setSelectedGroupId(def);
+    }
+    setAutoReminderEnabled(getAutoReminderConfig(schoolProfile).enabled);
+  }, [schoolProfile, selectedGroupId]);
+
+  useEffect(() => {
+    const handleGroupsUpdate = (e: Event) => {
+      const custom = e as CustomEvent<WahaGroup[]>;
+      const nextGroups = Array.isArray(custom.detail) ? custom.detail : getWahaGroups(schoolProfile);
+      setWahaGroups(nextGroups);
+      if (nextGroups.length > 0 && !nextGroups.some((g) => g.group_id === selectedGroupId)) {
+        setSelectedGroupId(nextGroups.find((g) => g.is_default)?.group_id || nextGroups[0].group_id);
+      }
+    };
+    const handleReminderUpdate = (e: Event) => {
+      const custom = e as CustomEvent<AutoReminderConfig>;
+      if (custom.detail) setAutoReminderEnabled(Boolean(custom.detail.enabled));
+    };
+    window.addEventListener('smp_waha_groups_updated', handleGroupsUpdate);
+    window.addEventListener('smp_auto_reminder_updated', handleReminderUpdate);
+    return () => {
+      window.removeEventListener('smp_waha_groups_updated', handleGroupsUpdate);
+      window.removeEventListener('smp_auto_reminder_updated', handleReminderUpdate);
+    };
+  }, [schoolProfile, selectedGroupId]);
 
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || activeMeeting;
 
@@ -83,7 +125,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const handleSendGroupRecap = async () => {
     if (!currentMeeting) return;
     const wahaConfig = getWahaConfig();
-    const groupId = schoolProfile.waha_group_id || 'grup_sekolah';
+    const groupId = selectedGroupId || schoolProfile.waha_group_id || 'grup_sekolah';
 
     setWahaActionLoading('recap');
     setWahaFeedback(null);
@@ -279,21 +321,39 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* WAHA Quick Broadcast Toolbar (Compact 1-row grid on mobile) */}
-      <div className="bg-emerald-50/70 dark:bg-[#042024] border border-emerald-200 dark:border-[#0f4950] p-2.5 sm:p-3.5 rounded-xl flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-        <div className="hidden lg:flex items-center gap-2 min-w-0">
-          <MessageSquare className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0" />
-          <div className="text-xs truncate">
-            <span className="font-bold text-emerald-900 dark:text-emerald-300">WhatsApp WAHA:</span>
-            <span className="text-emerald-800 dark:text-emerald-200/90 ml-1">Kirim ringkasan kehadiran ke grup atau pengingat guru.</span>
-          </div>
+      {/* WAHA Quick Broadcast Toolbar */}
+      <div className="bg-emerald-50/70 dark:bg-[#042024] border border-emerald-200 dark:border-[#0f4950] p-2.5 sm:p-3.5 rounded-xl flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <MessageSquare className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 hidden lg:block" />
+          {wahaGroups.length > 0 ? (
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 shrink-0">Grup:</span>
+              <select
+                value={selectedGroupId}
+                onChange={(e) => setSelectedGroupId(e.target.value)}
+                className="text-[11px] sm:text-xs font-semibold bg-white dark:bg-[#072b2f] border border-emerald-300 dark:border-emerald-700/60 text-slate-900 dark:text-white rounded-lg px-2 py-1 focus:outline-hidden focus:ring-2 focus:ring-emerald-500 min-w-0 flex-1 lg:max-w-[230px] truncate"
+                title="Pilih Grup WhatsApp Tujuan Rekap"
+              >
+                {wahaGroups.map((g) => (
+                  <option key={g.id} value={g.group_id}>
+                    {g.name} ({g.group_id})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="hidden lg:block text-xs truncate">
+              <span className="font-bold text-emerald-900 dark:text-emerald-300">WhatsApp WAHA:</span>
+              <span className="text-emerald-800 dark:text-emerald-200/90 ml-1">Kirim ringkasan kehadiran ke grup atau pengingat guru.</span>
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-3 sm:flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="grid grid-cols-4 sm:flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={handleSendReminderBlast}
             disabled={wahaActionLoading !== null || belumCount === 0}
-            className="px-2 sm:px-3 py-1.5 bg-white dark:bg-[#0b383d] text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700/60 hover:bg-emerald-100 dark:hover:bg-[#0f4950] rounded-lg text-[10.5px] sm:text-xs font-medium transition-colors flex items-center justify-center gap-1 disabled:opacity-50 whitespace-nowrap cursor-pointer"
+            className="px-2 sm:px-3 py-1.5 bg-white dark:bg-[#0b383d] text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700/60 hover:bg-emerald-100 dark:hover:bg-[#0f4950] rounded-lg text-[10px] sm:text-xs font-medium transition-colors flex items-center justify-center gap-1 disabled:opacity-50 whitespace-nowrap cursor-pointer"
           >
             <Send className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
             <span>{wahaActionLoading === 'reminder' ? 'Kirim...' : `Ingatkan (${belumCount})`}</span>
@@ -302,7 +362,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             onClick={handleSendGroupRecap}
             disabled={wahaActionLoading !== null}
-            className="px-2 sm:px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-[10.5px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1 shadow-xs disabled:opacity-50 whitespace-nowrap cursor-pointer"
+            className="px-2 sm:px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-[10px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1 shadow-xs disabled:opacity-50 whitespace-nowrap cursor-pointer"
           >
             <MessageSquare className="w-3 h-3 shrink-0" />
             <span>{wahaActionLoading === 'recap' ? 'Kirim...' : 'Rekap Grup'}</span>
@@ -310,11 +370,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => setIsAbsentModalOpen(true)}
-            className="px-2 sm:px-3 py-1.5 bg-rose-700 hover:bg-rose-600 text-white rounded-lg text-[10.5px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1 shadow-xs whitespace-nowrap cursor-pointer"
+            className="px-2 sm:px-3 py-1.5 bg-rose-700 hover:bg-rose-600 text-white rounded-lg text-[10px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1 shadow-xs whitespace-nowrap cursor-pointer"
             title="Ekspor infografis gambar & kirim daftar pegawai tidak hadir ke grup WA"
           >
             <Share2 className="w-3 h-3 shrink-0" />
             <span>Tidak Hadir</span>
+          </button>
+
+          <button
+            onClick={() => setIsAutoReminderModalOpen(true)}
+            className={`px-2 sm:px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-semibold transition-colors flex items-center justify-center gap-1 border whitespace-nowrap cursor-pointer ${
+              autoReminderEnabled
+                ? 'bg-teal-900 dark:bg-teal-700 text-white border-teal-800 dark:border-teal-500'
+                : 'bg-white dark:bg-[#0b383d] text-slate-700 dark:text-teal-200 border-slate-300 dark:border-teal-700/60 hover:bg-slate-100 dark:hover:bg-[#0f4950]'
+            }`}
+            title="Atur Auto Reminder Rapat & RSVP Otomatis"
+          >
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${autoReminderEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+            <BellRing className="w-3 h-3 shrink-0 hidden sm:block" />
+            <span>Auto</span>
           </button>
         </div>
       </div>
@@ -730,6 +804,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           schoolProfile={schoolProfile}
         />
       )}
+
+      {/* Modal Auto Reminder */}
+      <AutoReminderModal
+        isOpen={isAutoReminderModalOpen}
+        onClose={() => setIsAutoReminderModalOpen(false)}
+        meetings={meetings}
+        teachers={teachers}
+        attendances={attendances}
+        invitations={invitations}
+        schoolProfile={schoolProfile}
+        selectedMeetingId={selectedMeetingId}
+      />
     </div>
   );
 };

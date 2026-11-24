@@ -386,7 +386,7 @@ export async function fetchMessageTemplatesFromDb(): Promise<WahaConfig> {
 export interface WahaLog {
   id: string;
   timestamp: string;
-  type: 'scan_confirm' | 'reminder' | 'group_recap' | 'invitation';
+  type: 'scan_confirm' | 'reminder' | 'group_recap' | 'invitation' | 'auto_reminder';
   target: string; // phone number or group ID
   status: 'success' | 'failed' | 'simulated';
   message: string;
@@ -428,6 +428,7 @@ export async function invokeWahaNotification(params: {
   message: string;
   image?: string; // base64 data URL
   filename?: string;
+  isAutoReminder?: boolean;
   metadata?: Record<string, unknown>;
 }): Promise<{ success: boolean; message: string; responseData?: unknown }> {
   const config = getWahaConfig();
@@ -438,14 +439,15 @@ export async function invokeWahaNotification(params: {
   const rawTarget = String(params.recipient || '').trim();
   const rawMessage = String(params.message || '').trim();
 
-  const logType =
-    params.action === 'check_in_confirmation'
-      ? 'scan_confirm'
-      : params.action === 'meeting_reminder'
-      ? 'reminder'
-      : params.action === 'invitation_dispatch'
-      ? 'invitation'
-      : 'group_recap';
+  const logType: WahaLog['type'] = params.isAutoReminder
+    ? 'auto_reminder'
+    : params.action === 'check_in_confirmation'
+    ? 'scan_confirm'
+    : params.action === 'meeting_reminder'
+    ? 'reminder'
+    : params.action === 'invitation_dispatch'
+    ? 'invitation'
+    : 'group_recap';
 
   // 1. Strict validation matching Edge Function requirements: { target, message }
   if (!rawTarget) {

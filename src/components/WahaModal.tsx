@@ -11,6 +11,7 @@ import {
   Code,
   Terminal,
   Trash2,
+  BellRing,
 } from 'lucide-react';
 import {
   EDGE_FUNCTION_TEMPLATE_CODE,
@@ -20,20 +21,41 @@ import {
   saveWahaConfig,
   WahaLog,
 } from '../lib/waha';
-import { WahaConfig } from '../types';
+import {
+  getCachedAttendances,
+  getCachedInvitations,
+  getCachedMeetings,
+  getCachedProfile,
+  getCachedTeachers,
+} from '../lib/storage';
+import { Attendance, Invitation, Meeting, SchoolProfile, Teacher, WahaConfig } from '../types';
+import { AutoReminderPanel } from './AutoReminderPanel';
 
 interface WahaModalProps {
   isOpen: boolean;
   onClose: () => void;
+  meetings?: Meeting[];
+  teachers?: Teacher[];
+  attendances?: Attendance[];
+  invitations?: Invitation[];
+  schoolProfile?: SchoolProfile;
 }
 
-export const WahaModal: React.FC<WahaModalProps> = ({ isOpen, onClose }) => {
+export const WahaModal: React.FC<WahaModalProps> = ({
+  isOpen,
+  onClose,
+  meetings,
+  teachers,
+  attendances,
+  invitations,
+  schoolProfile,
+}) => {
   const [config, setConfig] = useState<WahaConfig>(getWahaConfig());
   const [logs, setLogs] = useState<WahaLog[]>(getWahaLogs());
   const [testPhone, setTestPhone] = useState('081234567890');
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [testStatus, setTestStatus] = useState<string | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<'config' | 'templates' | 'edge_code' | 'logs'>('config');
+  const [activeSubTab, setActiveSubTab] = useState<'config' | 'auto_reminder' | 'templates' | 'edge_code' | 'logs'>('config');
   const [copiedCode, setCopiedCode] = useState(false);
 
   if (!isOpen) return null;
@@ -107,6 +129,15 @@ export const WahaModal: React.FC<WahaModalProps> = ({ isOpen, onClose }) => {
             }`}
           >
             Konfigurasi & Uji Kirim
+          </button>
+          <button
+            onClick={() => setActiveSubTab('auto_reminder')}
+            className={`pb-2.5 border-b-2 transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer ${
+              activeSubTab === 'auto_reminder' ? 'border-teal-500 text-teal-900 dark:text-teal-200 font-bold' : 'border-transparent hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <BellRing className="w-3.5 h-3.5" />
+            <span>Auto Reminder</span>
           </button>
           <button
             onClick={() => setActiveSubTab('templates')}
@@ -226,6 +257,16 @@ export const WahaModal: React.FC<WahaModalProps> = ({ isOpen, onClose }) => {
                 )}
               </div>
             </div>
+          )}
+
+          {activeSubTab === 'auto_reminder' && (
+            <AutoReminderPanel
+              meetings={meetings || getCachedMeetings()}
+              teachers={teachers || getCachedTeachers()}
+              attendances={attendances || getCachedAttendances()}
+              invitations={invitations || getCachedInvitations()}
+              schoolProfile={schoolProfile || getCachedProfile()}
+            />
           )}
 
           {activeSubTab === 'templates' && (

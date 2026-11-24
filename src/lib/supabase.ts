@@ -195,6 +195,8 @@ CREATE TABLE IF NOT EXISTS smp_school_profile (
   headmaster_nip TEXT DEFAULT '',
   headmaster_rank TEXT NOT NULL DEFAULT 'Pembina Yayasan / Guru Utama',
   waha_group_id TEXT DEFAULT '',
+  waha_groups JSONB DEFAULT '[]'::jsonb,
+  auto_reminder_config JSONB DEFAULT '{}'::jsonb,
   logo_url TEXT DEFAULT '',
   admin_pin TEXT DEFAULT '1234',
   meeting_rooms JSONB DEFAULT '[]'::jsonb,
@@ -202,7 +204,7 @@ CREATE TABLE IF NOT EXISTS smp_school_profile (
   created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Pastikan kolom yayasan, PIN, kontak penandatangan, daftar ruang & kategori rapat ada jika tabel sudah terbuat sebelumnya
+-- Pastikan kolom yayasan, PIN, kontak penandatangan, daftar ruang, kategori rapat, daftar grup WA & auto reminder ada jika tabel sudah terbuat sebelumnya
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS foundation_name TEXT DEFAULT 'YAYASAN PENDIDIKAN HARAPAN BANGSA';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS headmaster_niy TEXT DEFAULT 'YHB-1994-001';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_pin TEXT DEFAULT '1234';
@@ -212,6 +214,8 @@ ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_staff_niy TEXT DEF
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS admin_staff_phone TEXT DEFAULT '';
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS meeting_rooms JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS meeting_categories JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS waha_groups JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE smp_school_profile ADD COLUMN IF NOT EXISTS auto_reminder_config JSONB DEFAULT '{}'::jsonb;
 
 -- 2. TABEL DATA GURU / PTK (NIY & ptk_id UUID)
 CREATE TABLE IF NOT EXISTS smp_teachers (
@@ -502,6 +506,18 @@ ADD COLUMN IF NOT EXISTS admin_staff_niy TEXT DEFAULT '-';
 
 ALTER TABLE smp_school_profile 
 ADD COLUMN IF NOT EXISTS admin_staff_phone TEXT DEFAULT '';
+`;
+
+export const SUPABASE_SQL_WAHA_GROUPS_REMINDER = `-- ============================================================
+-- UPDATE PROFIL SEKOLAH: DAFTAR GRUP WA & PENGATURAN AUTO REMINDER
+-- Jalankan skrip ini di SQL Editor Supabase agar daftar grup WA
+-- dan jadwal auto reminder tersimpan permanen di tabel smp_school_profile:
+-- ============================================================
+ALTER TABLE smp_school_profile
+ADD COLUMN IF NOT EXISTS waha_groups JSONB DEFAULT '[]'::jsonb;
+
+ALTER TABLE smp_school_profile
+ADD COLUMN IF NOT EXISTS auto_reminder_config JSONB DEFAULT '{}'::jsonb;
 `;
 
 

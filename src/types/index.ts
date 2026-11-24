@@ -51,6 +51,28 @@ export interface Attendance {
   created_at?: string;
 }
 
+export interface WahaGroup {
+  id: string;
+  name: string;
+  group_id: string;
+  is_default?: boolean;
+}
+
+export type AutoReminderTargetMode =
+  | 'unpresent_teachers'
+  | 'unconfirmed_rsvp'
+  | 'group'
+  | 'both_teachers_and_group';
+
+export interface AutoReminderConfig {
+  enabled: boolean;
+  remind_before_minutes: number;
+  rsvp_remind_hours_before: number;
+  target_mode: AutoReminderTargetMode;
+  target_group_id?: string;
+  last_run_at?: string;
+}
+
 export interface SchoolProfile {
   id: string;
   foundation_name: string; // Nama Yayasan di atas nama sekolah (contoh: YAYASAN PENDIDIKAN HARAPAN BANGSA)
@@ -72,6 +94,8 @@ export interface SchoolProfile {
   admin_staff_niy?: string; // NIY Staf Administrasi
   admin_staff_phone?: string; // No HP / WhatsApp Staf Administrasi untuk TTD Ekspedisi
   waha_group_id: string; // e.g. "120363024823924@g.us"
+  waha_groups?: WahaGroup[]; // Daftar grup WhatsApp tersimpan di database
+  auto_reminder_config?: AutoReminderConfig; // Konfigurasi auto reminder rapat & RSVP
   logo_url?: string;
   admin_pin?: string; // PIN akses admin tersinkronisasi di database (default: '1234')
   meeting_rooms?: string[]; // Daftar tempat/ruang rapat dinamis

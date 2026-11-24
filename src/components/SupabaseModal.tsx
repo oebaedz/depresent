@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Database, Check, Copy, AlertTriangle, ExternalLink, RefreshCw, Globe, UploadCloud, CheckCircle2, Sparkles, UserCheck } from 'lucide-react';
-import { getSupabaseCredentials, saveSupabaseCredentials, SUPABASE_SQL_SCHEMA, SUPABASE_SQL_MIGRATION_V4, SUPABASE_SQL_INVITATIONS, SUPABASE_SQL_LETTER_NUMBER, SUPABASE_SQL_SIGNATURES, SUPABASE_SQL_MESSAGE_TEMPLATES, SUPABASE_SQL_SIGNER_PROFILES, testSupabaseConnection } from '../lib/supabase';
+import { getSupabaseCredentials, saveSupabaseCredentials, SUPABASE_SQL_SCHEMA, SUPABASE_SQL_MIGRATION_V4, SUPABASE_SQL_INVITATIONS, SUPABASE_SQL_LETTER_NUMBER, SUPABASE_SQL_SIGNATURES, SUPABASE_SQL_MESSAGE_TEMPLATES, SUPABASE_SQL_SIGNER_PROFILES, SUPABASE_SQL_WAHA_GROUPS_REMINDER, testSupabaseConnection } from '../lib/supabase';
 import { syncInitialDataToSupabase } from '../lib/storage';
 
 interface SupabaseModalProps {
@@ -29,6 +29,7 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
   const [copiedSignaturesSql, setCopiedSignaturesSql] = useState(false);
   const [copiedTemplatesSql, setCopiedTemplatesSql] = useState(false);
   const [copiedSignerProfilesSql, setCopiedSignerProfilesSql] = useState(false);
+  const [copiedWahaGroupsSql, setCopiedWahaGroupsSql] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
@@ -522,6 +523,49 @@ export const SupabaseModal: React.FC<SupabaseModalProps> = ({ isOpen, onClose, o
             </p>
             <div className="rounded-lg bg-sky-950/90 p-2 text-sky-100 font-mono text-[11px] select-all overflow-x-auto max-h-24">
               <pre>{SUPABASE_SQL_SIGNER_PROFILES}</pre>
+            </div>
+          </div>
+
+
+          {/* Migration Card for waha_groups & auto_reminder_config */}
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 dark:bg-emerald-950/40 p-4 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <h4 className="text-xs font-bold text-emerald-950 dark:text-emerald-200 uppercase tracking-wide">
+                  Kolom Daftar Grup WA & Auto Reminder (smp_school_profile)
+                </h4>
+              </div>
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(SUPABASE_SQL_WAHA_GROUPS_REMINDER);
+                  setCopiedWahaGroupsSql(true);
+                  setTimeout(() => setCopiedWahaGroupsSql(false), 2500);
+                }}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                  copiedWahaGroupsSql
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-950 dark:text-emerald-100 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-200 dark:hover:bg-emerald-800'
+                }`}
+              >
+                {copiedWahaGroupsSql ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Tersalin!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Salin SQL Grup WA & Reminder</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <p className="text-[11px] text-emerald-900 dark:text-emerald-200/90 leading-relaxed">
+              Jalankan skrip ini di SQL Editor Supabase agar kolom <code>waha_groups</code> dan <code>auto_reminder_config</code> tersedia langsung di tabel <code>smp_school_profile</code>:
+            </p>
+            <div className="rounded-lg bg-emerald-950/90 p-2 text-emerald-100 font-mono text-[11px] select-all overflow-x-auto max-h-24">
+              <pre>{SUPABASE_SQL_WAHA_GROUPS_REMINDER}</pre>
             </div>
           </div>
 
