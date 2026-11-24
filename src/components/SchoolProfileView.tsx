@@ -98,25 +98,25 @@ export const SchoolProfileView: React.FC<SchoolProfileViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-5">
       {/* Header */}
-      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Profil Yayasan, Sekolah & Kop Surat</h2>
+      <div className={`bg-white dark:bg-[#072b2f] p-3.5 sm:p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex-col md:flex-row md:items-center justify-between gap-3 ${saveSuccess ? 'flex' : 'hidden md:flex'}`}>
+        <div className="hidden md:block">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Profil Yayasan, Sekolah & Kop Surat</h2>
           <p className="text-xs text-slate-500 dark:text-teal-200/80 mt-0.5">
             Nama Yayasan akan otomatis tampil di atas Nama Sekolah pada kop surat resmi laporan presensi.
           </p>
         </div>
 
         {saveSuccess && (
-          <div className="px-3.5 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+          <div className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-lg text-xs font-semibold flex items-center gap-1.5">
             <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>Profil & logo yayasan berhasil disimpan!</span>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
         {/* Left: Form */}
         <div className="lg:col-span-7 bg-white dark:bg-[#072b2f] p-6 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs">
           <form onSubmit={handleSubmit} className="space-y-5 text-xs">

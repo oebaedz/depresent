@@ -26,6 +26,8 @@ import {
   Share2,
   ShieldCheck,
   Phone,
+  MoreHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 import { Invitation, Meeting, RsvpStatus, SchoolProfile, Teacher, WahaConfig, DocumentSignature, SignerRole } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
@@ -89,6 +91,7 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
   // Template Editor Modal State
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isUnconfirmedModalOpen, setIsUnconfirmedModalOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [wahaConfig, setWahaConfig] = useState<WahaConfig>(() => getWahaConfig());
 
   // Sinkronkan template pesan dari database Supabase saat dimuat
@@ -747,11 +750,11 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
   }, [meetingTeachers, searchQuery, filterRsvp, currentMeetingInvitationsMap]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-5">
       {/* Toast Notification */}
       {toastMessage && (
         <div
-          className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border text-sm font-medium transition-all ${
+          className={`fixed bottom-4 right-4 left-4 sm:left-auto z-50 px-3.5 py-2.5 rounded-xl shadow-xl flex items-center gap-2.5 border text-xs sm:text-sm font-medium transition-all ${
             toastMessage.type === 'error'
               ? 'bg-rose-950 text-rose-200 border-rose-800'
               : toastMessage.type === 'info'
@@ -760,39 +763,55 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
           }`}
         >
           {toastMessage.type === 'error' ? (
-            <AlertCircle className="w-4 h-4 text-rose-400" />
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
           ) : (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           )}
           <span>{toastMessage.text}</span>
         </div>
       )}
 
       {/* Screen Only Top Bar */}
-      <div className="no-print space-y-4">
-        {/* Header Title */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5">
-              <span className="p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
-                <Mail className="w-5 h-5" />
-              </span>
-              Surat Undangan & Buku Ekspedisi
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-teal-200/70 mt-1">
-              Penerbitan surat dinas bersama, pengiriman tautan RSVP via WhatsApp WAHA, dan pencatatan buku ekspedisi kedinasan.
+      <div className="no-print space-y-3 sm:space-y-4">
+        {/* Header Title & Streamlined Actions */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
+          <div className="hidden md:block min-w-0">
+            <h2 className="text-base lg:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <Mail className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
+              <span>Surat Undangan &amp; Buku Ekspedisi</span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-teal-200/70 mt-0.5">
+              Penerbitan surat dinas, pengiriman RSVP WhatsApp, dan buku ekspedisi kedinasan.
             </p>
           </div>
 
-          {/* Primary Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Primary + Compact Action Controls (1 clean row on mobile) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap lg:flex-nowrap relative">
             <button
               onClick={() => setIsUnconfirmedModalOpen(true)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[11px] sm:text-xs font-semibold shadow-xs transition-colors whitespace-nowrap cursor-pointer"
               title="Ekspor infografis gambar & kirim daftar guru belum konfirmasi ke WhatsApp grup"
             >
-              <Share2 className="w-4 h-4" />
-              Kirim Rekap Belum RSVP ke Grup
+              <Share2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Rekap Belum RSVP</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 dark:bg-[#072b2f] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-[11px] sm:text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs whitespace-nowrap cursor-pointer"
+              title="Cetak Laporan Ekspedisi"
+            >
+              <Printer className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+              <span>Cetak</span>
+            </button>
+
+            {/* Desktop Secondary Actions (visible >= xl) */}
+            <button
+              onClick={handleExportXLSX}
+              className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-semibold shadow-xs transition-colors whitespace-nowrap cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+              <span>Excel</span>
             </button>
 
             <button
@@ -800,242 +819,270 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                 setWahaConfig(getWahaConfig());
                 setIsTemplateModalOpen(true);
               }}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 dark:bg-[#072b2f] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs cursor-pointer"
+              className="hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 dark:bg-[#072b2f] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs whitespace-nowrap cursor-pointer"
             >
-              <Settings2 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-              Edit Template Pesan
-            </button>
-
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 dark:bg-[#072b2f] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs cursor-pointer"
-            >
-              <Printer className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-              Cetak Laporan Ekspedisi
+              <Settings2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+              <span>Template</span>
             </button>
 
             <button
               onClick={handleSendExpeditionSignWa}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
+              className={`hidden xl:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-colors whitespace-nowrap cursor-pointer ${
                 isExpeditionFullySigned
                   ? 'bg-blue-900/90 hover:bg-blue-800 text-white border border-blue-500'
-                  : isExpeditionAdminSigned
-                  ? 'bg-gradient-to-r from-teal-700 to-indigo-700 hover:from-teal-600 hover:to-indigo-600 text-white'
-                  : 'bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white'
+                  : 'bg-indigo-700 hover:bg-indigo-600 text-white'
               }`}
-              title="Kirim tautan persetujuan TTD Ekspedisi (QR Verifikasi) ke WhatsApp Staf Administrasi / Kepala Sekolah"
+              title="Kirim tautan persetujuan TTD Ekspedisi ke WhatsApp"
             >
-              <ShieldCheck className="w-4 h-4" />
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
               <span>
                 {isExpeditionFullySigned
-                  ? '✓ Ekspedisi Lengkap Disahkan'
+                  ? 'Ekspedisi Sah'
                   : isExpeditionAdminSigned
-                  ? 'Kirim TTD Kepala Sekolah (WA)'
-                  : 'Kirim TTD Staf Admin (WA)'}
+                  ? 'TTD Kepsek (WA)'
+                  : 'TTD Admin (WA)'}
               </span>
             </button>
 
-            <button
-              onClick={handleExportXLSX}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              Ekspor Excel (.xlsx)
-            </button>
+            {/* Overflow Menu for Mobile / Tablet (< xl) */}
+            <div className="relative xl:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 dark:bg-[#072b2f] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-[11px] sm:text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs whitespace-nowrap cursor-pointer"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+                <span>Lainnya</span>
+                <ChevronDown className="w-3 h-3 opacity-70" />
+              </button>
+
+              {isMoreMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setIsMoreMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-1.5 w-56 z-40 bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-xl shadow-xl py-1.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        handleExportXLSX();
+                      }}
+                      className="w-full px-3.5 py-2 text-left flex items-center gap-2 text-slate-700 dark:text-teal-100 hover:bg-slate-50 dark:hover:bg-[#0b383d] cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Ekspor Excel (.xlsx)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        setWahaConfig(getWahaConfig());
+                        setIsTemplateModalOpen(true);
+                      }}
+                      className="w-full px-3.5 py-2 text-left flex items-center gap-2 text-slate-700 dark:text-teal-100 hover:bg-slate-50 dark:hover:bg-[#0b383d] cursor-pointer"
+                    >
+                      <Settings2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
+                      <span>Edit Template Pesan</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        handleSendExpeditionSignWa();
+                      }}
+                      className="w-full px-3.5 py-2 text-left flex items-center gap-2 text-slate-700 dark:text-teal-100 hover:bg-slate-50 dark:hover:bg-[#0b383d] cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      <span>
+                        {isExpeditionFullySigned
+                          ? 'Ekspedisi Lengkap Disahkan'
+                          : isExpeditionAdminSigned
+                          ? 'Kirim TTD Kepala Sekolah (WA)'
+                          : 'Kirim TTD Staf Admin (WA)'}
+                      </span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Meeting Selector & Single Letter Numbering Bar */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Select Meeting (Sorted with nearest upcoming meeting first) */}
-          <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-4 shadow-xs space-y-2">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-teal-300/80">
-              Pilih Agenda Rapat (Terdekat)
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 sm:gap-4">
+          {/* Select Meeting */}
+          <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-xl p-3 sm:p-4 shadow-xs space-y-1.5">
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-teal-200">
+              Agenda Rapat
             </label>
             <select
               value={selectedMeetingId}
               onChange={(e) => setSelectedMeetingId(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-2 text-xs font-medium text-slate-900 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
+              className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-900 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
             >
               {sortedMeetingsList.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.status === 'active' ? '🟢 [AKTIF] ' : m.status === 'upcoming' ? '⏱️ ' : '✓ '}
-                  {m.meeting_date} • {m.title} ({m.category})
+                  {m.status === 'active' ? '[Aktif] ' : ''}
+                  {m.meeting_date} · {m.title}
                 </option>
               ))}
             </select>
 
             {currentMeeting && (
-              <div className="pt-1 text-[11px] text-slate-500 dark:text-teal-200/70 space-y-0.5">
-                <p>📍 {currentMeeting.room} • ⏰ {currentMeeting.start_time.slice(0, 5)} - {currentMeeting.end_time.slice(0, 5)} WIB</p>
-                <p>👤 Pimpinan: <span className="font-semibold text-slate-700 dark:text-teal-200">{currentMeeting.leader_name}</span></p>
-              </div>
+              <p className="text-[11px] text-slate-500 dark:text-teal-200/75 truncate">
+                {currentMeeting.room} · {currentMeeting.start_time.slice(0, 5)}–{currentMeeting.end_time.slice(0, 5)} WIB · {currentMeeting.leader_name}
+              </p>
             )}
           </div>
 
-          {/* 1 Nomor Surat untuk 1 Kegiatan (Berlaku untuk semua peserta) */}
-          <div className="lg:col-span-2 bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-4 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-teal-300/80">
-                Nomor Surat Kedinasan (1 Nomor untuk Kegiatan Ini)
+          {/* 1 Nomor Surat untuk 1 Kegiatan */}
+          <div className="lg:col-span-2 bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-xl p-3 sm:p-4 shadow-xs space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-teal-200 truncate">
+                Nomor Surat Dinas &amp; Tanggal Kirim
               </span>
               <button
                 type="button"
                 onClick={handleApplyLetterNumber}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30 text-xs font-semibold transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30 text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Save className="w-3.5 h-3.5" />
-                Simpan & Terapkan Nomor
+                <Save className="w-3 h-3 shrink-0" />
+                <span>Terapkan</span>
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="sm:col-span-2">
-                <label className="block text-[11px] text-slate-500 dark:text-teal-200/70 mb-1">
-                  Nomor Surat Dinas Rapat
-                </label>
                 <input
                   type="text"
                   value={letterNumber}
                   onChange={(e) => setLetterNumber(e.target.value)}
-                  placeholder={`Contoh: ${getDefaultLetterNumber(currentMeeting?.meeting_date || dispatchDate)}`}
-                  className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-1.5 text-xs text-slate-900 dark:text-teal-100 font-mono font-medium focus:outline-hidden focus:border-teal-500"
+                  placeholder={`No. Surat: ${getDefaultLetterNumber(currentMeeting?.meeting_date || dispatchDate)}`}
+                  aria-label="Nomor Surat Dinas Rapat"
+                  className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-teal-100 font-mono font-medium focus:outline-hidden focus:border-teal-500"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-500 dark:text-teal-200/70 mb-1">
-                  Tanggal Pengiriman
-                </label>
                 <input
                   type="date"
                   value={dispatchDate}
                   onChange={(e) => setDispatchDate(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-2.5 py-1.5 text-xs text-slate-900 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
+                  aria-label="Tanggal Pengiriman"
+                  className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-lg px-2.5 py-1.5 text-xs text-slate-900 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
                 />
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-400 dark:text-teal-200/60">
-              Nomor surat ini tercantum pada pesan WhatsApp guru, kop surat ekspedisi, serta rekapitulasi kehadiran.
+            <p className="hidden sm:block text-[11px] text-slate-400 dark:text-teal-200/60">
+              Nomor surat tercantum otomatis pada pesan WhatsApp guru dan kop surat laporan ekspedisi.
             </p>
           </div>
         </div>
 
-        {/* Metric Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-slate-500 dark:text-teal-200/70 block">Total Undangan</span>
-            <span className="text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums">{stats.total}</span>
+        {/* Metric Cards (Compact 3x2 grid on mobile, 6x1 on desktop) */}
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+          <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-xl p-2.5 sm:p-3.5 shadow-xs">
+            <span className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-teal-200/75 block truncate">Undangan</span>
+            <span className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white font-mono tabular-nums">{stats.total}</span>
           </div>
 
-          <div className="bg-white dark:bg-[#072b2f] border border-teal-500/30 rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-teal-600 dark:text-teal-400 block">Terkirim WA</span>
-            <span className="text-2xl font-bold text-teal-600 dark:text-teal-400 font-mono tabular-nums">{stats.sentCount}</span>
+          <div className="bg-white dark:bg-[#072b2f] border border-teal-500/30 rounded-xl p-2.5 sm:p-3.5 shadow-xs">
+            <span className="text-[10px] sm:text-[11px] font-medium text-teal-600 dark:text-teal-400 block truncate">Terkirim WA</span>
+            <span className="text-lg sm:text-2xl font-bold text-teal-600 dark:text-teal-400 font-mono tabular-nums">{stats.sentCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-[#072b2f] border border-emerald-500/30 rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 block">Akan Hadir</span>
-            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">{stats.attendingCount}</span>
+          <div className="bg-white dark:bg-[#072b2f] border border-emerald-500/30 rounded-xl p-2.5 sm:p-3.5 shadow-xs">
+            <span className="text-[10px] sm:text-[11px] font-medium text-emerald-600 dark:text-emerald-400 block truncate">Akan Hadir</span>
+            <span className="text-lg sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono tabular-nums">{stats.attendingCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-[#072b2f] border border-amber-500/30 rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 block">Izin</span>
-            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">{stats.permissionCount}</span>
+          <div className="bg-white dark:bg-[#072b2f] border border-amber-500/30 rounded-xl p-2.5 sm:p-3.5 shadow-xs">
+            <span className="text-[10px] sm:text-[11px] font-medium text-amber-600 dark:text-amber-400 block truncate">Izin</span>
+            <span className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">{stats.permissionCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-[#072b2f] border border-sky-500/30 rounded-2xl p-3.5 shadow-xs">
-            <span className="text-[11px] font-medium text-sky-600 dark:text-sky-400 block">Sakit</span>
-            <span className="text-2xl font-bold text-sky-600 dark:text-sky-400 font-mono tabular-nums">{stats.sickCount}</span>
+          <div className="bg-white dark:bg-[#072b2f] border border-sky-500/30 rounded-xl p-2.5 sm:p-3.5 shadow-xs">
+            <span className="text-[10px] sm:text-[11px] font-medium text-sky-600 dark:text-sky-400 block truncate">Sakit</span>
+            <span className="text-lg sm:text-2xl font-bold text-sky-600 dark:text-sky-400 font-mono tabular-nums">{stats.sickCount}</span>
           </div>
 
-          <div className="bg-white dark:bg-[#072b2f] border border-amber-500/30 rounded-2xl p-3.5 shadow-xs flex flex-col justify-between">
-            <div>
-              <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400 block">Belum Konfirmasi</span>
-              <span className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">{stats.unconfirmedCount}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsUnconfirmedModalOpen(true)}
-              className="mt-2 text-[10px] font-bold text-amber-700 dark:text-amber-300 hover:underline flex items-center gap-1 cursor-pointer"
-              title="Kirim daftar guru belum konfirmasi (gambar infografis & teks) ke grup WA"
-            >
-              <Share2 className="w-3 h-3" />
-              <span>Kirim ke Grup WA</span>
-            </button>
+          <div className="bg-white dark:bg-[#072b2f] border border-amber-500/30 rounded-xl p-2.5 sm:p-3.5 shadow-xs">
+            <span className="text-[10px] sm:text-[11px] font-medium text-amber-600 dark:text-amber-400 block truncate">Belum RSVP</span>
+            <span className="text-lg sm:text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono tabular-nums">{stats.unconfirmedCount}</span>
           </div>
         </div>
 
         {/* Bulk Action & Filters */}
-        <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-xl p-2.5 sm:p-3.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5">
           {/* Search & Status Filter */}
-          <div className="flex items-center gap-2.5 flex-1 flex-wrap">
-            <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-              <Search className="w-4 h-4 text-slate-400 dark:text-teal-300/60 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="flex items-center gap-2 flex-1">
+            <div className="relative flex-1 min-w-0 sm:max-w-xs">
+              <Search className="w-3.5 h-3.5 text-slate-400 dark:text-teal-300/60 absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari nama guru, NIY..."
-                className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-teal-100 placeholder-slate-400 dark:placeholder-teal-300/40 focus:outline-hidden focus:border-teal-500"
+                placeholder="Cari nama / NIY..."
+                className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-teal-100 placeholder-slate-400 dark:placeholder-teal-300/40 focus:outline-hidden focus:border-teal-500"
               />
             </div>
 
             <select
               value={filterRsvp}
               onChange={(e) => setFilterRsvp(e.target.value)}
-              className="bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-teal-100 focus:outline-hidden focus:border-teal-500"
+              className="bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-lg px-2.5 py-1.5 text-[11px] sm:text-xs font-medium text-slate-800 dark:text-teal-100 focus:outline-hidden focus:border-teal-500 shrink-0"
             >
-              <option value="all">Semua Status RSVP</option>
-              <option value="unsent">Belum Terkirim WA</option>
+              <option value="all">Semua RSVP</option>
+              <option value="unsent">Belum Kirim WA</option>
               <option value="attending">Akan Hadir</option>
               <option value="permission">Izin</option>
               <option value="sick">Sakit</option>
-              <option value="unconfirmed">Belum Konfirmasi</option>
+              <option value="unconfirmed">Belum RSVP</option>
             </select>
           </div>
 
-          {/* Bulk Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Re-Chat Belum Konfirmasi */}
+          {/* Bulk Action Buttons (Compact 2-col on mobile) */}
+          <div className="grid grid-cols-2 sm:flex items-center gap-2 shrink-0">
             <button
               onClick={handleSendRechatBulk}
               disabled={isSendingRechatBulk || isSendingBulk || stats.unconfirmedCount === 0}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-700 to-amber-600 hover:from-amber-600 hover:to-amber-500 text-white text-xs font-bold shadow-md shadow-amber-950/30 transition-all disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-600 text-white text-[11px] sm:text-xs font-semibold shadow-xs transition-all disabled:opacity-50 whitespace-nowrap cursor-pointer"
               title="Kirim pesan pengingat RSVP ke semua guru yang belum konfirmasi"
             >
               {isSendingRechatBulk ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>
-                    Re-Chat ({rechatProgress?.current}/{rechatProgress?.total})...
+                    Re-Chat ({rechatProgress?.current}/{rechatProgress?.total})
                   </span>
                 </>
               ) : (
                 <>
-                  <BellRing className="w-3.5 h-3.5" />
-                  <span>Re-Chat Belum Konfirmasi ({stats.unconfirmedCount})</span>
+                  <BellRing className="w-3.5 h-3.5 shrink-0" />
+                  <span>Re-Chat ({stats.unconfirmedCount})</span>
                 </>
               )}
             </button>
 
-            {/* Bulk WhatsApp Dispatch Button */}
             <button
               onClick={handleSendBulkWA}
               disabled={isSendingBulk || isSendingRechatBulk || stats.total === 0}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-700 to-teal-600 hover:from-teal-600 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-teal-950/30 transition-all disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-teal-700 hover:bg-teal-600 text-white text-[11px] sm:text-xs font-semibold shadow-xs transition-all disabled:opacity-50 whitespace-nowrap cursor-pointer"
             >
               {isSendingBulk ? (
                 <>
-                  <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>
-                    Mengirim ({bulkProgress?.current}/{bulkProgress?.total})...
+                    Kirim ({bulkProgress?.current}/{bulkProgress?.total})
                   </span>
                 </>
               ) : (
                 <>
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Kirim Undangan WhatsApp (Massal)</span>
+                  <Send className="w-3.5 h-3.5 shrink-0" />
+                  <span>Kirim WA Massal</span>
                 </>
               )}
             </button>
@@ -1232,95 +1279,78 @@ export const InvitationsView: React.FC<InvitationsViewProps> = ({
                 const rsvp = inv?.rsvp_status || 'unconfirmed';
 
                 return (
-                  <div key={teacher.id} className="p-3.5 space-y-2.5 bg-white dark:bg-[#072b2f]">
+                  <div key={teacher.id} className="p-3 space-y-2 bg-white dark:bg-[#072b2f]">
                     {/* Header: Nama & Status RSVP */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-[10px] text-slate-400 dark:text-teal-400/80">#{idx + 1}</span>
+                          <span className="font-mono text-[10px] text-slate-400 dark:text-teal-400/80 tabular-nums">#{idx + 1}</span>
                           <h4 className="font-bold text-slate-900 dark:text-white text-xs leading-snug truncate">
                             {teacher.name}
                           </h4>
                         </div>
-                        <p className="text-[10px] text-slate-400 dark:text-teal-300/70 font-mono mt-0.5">
-                          NIY: {teacher.niy || '-'}
+                        <p className="text-[10.5px] text-slate-500 dark:text-teal-300/80 mt-0.5 truncate">
+                          <span className="font-mono">NIY {teacher.niy || '-'}</span>
+                          <span aria-hidden="true"> · </span>
+                          <span>{teacher.teacher_group || 'Guru Mapel'}</span>
                         </p>
                       </div>
 
-                      {/* Status RSVP Badge */}
+                      {/* Status RSVP */}
                       <div className="shrink-0">
                         {rsvp === 'attending' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30">
                             <CheckCircle2 className="w-2.5 h-2.5" />
-                            Akan Hadir
+                            Hadir
                           </span>
                         )}
                         {rsvp === 'permission' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30">
                             <AlertCircle className="w-2.5 h-2.5" />
                             Izin
                           </span>
                         )}
                         {rsvp === 'sick' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30">
                             <HeartPulse className="w-2.5 h-2.5" />
                             Sakit
                           </span>
                         )}
                         {rsvp === 'unconfirmed' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 dark:bg-[#031e21] text-slate-500 dark:text-teal-300/70 border border-slate-200 dark:border-[#0f4950]">
-                            Belum Konfirmasi
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-[#031e21] text-slate-500 dark:text-teal-300/70">
+                            Belum RSVP
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Poin Penting: Kelompok / Jabatan, No. WhatsApp, Distribusi */}
-                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 dark:bg-[#031e21] p-2.5 rounded-lg border border-slate-200 dark:border-[#0f4950]">
-                      <div>
-                        <span className="text-[9.5px] text-slate-400 dark:text-teal-400/70 block uppercase font-bold tracking-wider">
-                          Kelompok / Jabatan
-                        </span>
-                        <span className="font-semibold text-slate-800 dark:text-teal-100 truncate block">
-                          {teacher.teacher_group || 'Guru Mapel'}
-                        </span>
-                        <span className="text-[10px] text-slate-500 dark:text-teal-300/70 truncate block">
-                          {teacher.role_title}
-                        </span>
-                      </div>
-
-                      <div>
-                        <span className="text-[9.5px] text-slate-400 dark:text-teal-400/70 block uppercase font-bold tracking-wider">
-                          No. WhatsApp / HP
-                        </span>
+                    {/* Compact Info Strip: No HP & Status Kirim */}
+                    <div className="flex items-center justify-between gap-2 text-[10.5px] bg-slate-50 dark:bg-[#031e21] px-2.5 py-1.5 rounded-lg border border-slate-200/80 dark:border-[#0f4950]">
+                      <div className="min-w-0 truncate">
                         {teacher.phone_wa ? (
                           <a
                             href={`https://wa.me/${teacher.phone_wa.replace(/\D/g, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="font-mono text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold truncate"
+                            className="font-mono text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-medium"
                           >
                             <Phone className="w-2.5 h-2.5 shrink-0" />
                             <span>{teacher.phone_wa}</span>
                           </a>
                         ) : (
-                          <span className="text-rose-400 italic text-[10px]">Belum ada</span>
+                          <span className="text-rose-400 italic">No. WA belum ada</span>
                         )}
-                        <div className="mt-1">
-                          {isSent ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                              <CheckCircle2 className="w-2.5 h-2.5" />
-                              Terkirim WA
-                              {inv?.sent_at && (
-                                <span className="font-mono font-normal text-[9px] text-slate-400 dark:text-teal-300/60">
-                                  ({new Date(inv.sent_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })})
-                                </span>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 dark:text-teal-300/60">Belum Dikirim</span>
-                          )}
-                        </div>
+                      </div>
+
+                      <div className="shrink-0">
+                        {isSent ? (
+                          <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            <span>Terkirim</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-teal-300/60">Belum kirim</span>
+                        )}
                       </div>
                     </div>
 

@@ -267,13 +267,13 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-5">
       {/* Top Banner & Meeting Selector */}
-      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+      <div className="bg-white dark:bg-[#072b2f] p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-4">
+        <div className="hidden md:block">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-teal-500 animate-ping" />
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Pemindai QR Panitia (Scan Kartu Guru)</h2>
+            <span className="w-2 h-2 rounded-full bg-teal-500 animate-ping" />
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">Pemindai QR Panitia (Scan Kartu Guru)</h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-teal-200/80 mt-0.5">
             Arahkan kamera ke QR Code pada ID Card guru untuk mencatat kehadiran seketika.
@@ -281,12 +281,12 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
         </div>
 
         {/* Selected Meeting */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full md:w-auto">
-          <label className="text-xs font-semibold text-slate-600 dark:text-teal-100 shrink-0">Agenda Rapat:</label>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <label className="text-xs font-semibold text-slate-600 dark:text-teal-100 shrink-0">Agenda:</label>
           <select
             value={selectedMeetingId}
             onChange={(e) => setSelectedMeetingId(e.target.value)}
-            className="text-xs font-medium border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-1.5 bg-slate-50 dark:bg-[#031e21] text-slate-800 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden w-full sm:w-auto sm:max-w-xs truncate min-w-0"
+            className="text-xs font-medium border border-slate-300 dark:border-[#0f4950] rounded-lg px-2.5 py-1.5 bg-slate-50 dark:bg-[#031e21] text-slate-800 dark:text-white focus:ring-2 focus:ring-teal-600 focus:outline-hidden flex-1 md:w-auto md:max-w-xs truncate min-w-0"
           >
             {meetings.map((m) => (
               <option key={m.id} value={m.id} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
@@ -299,25 +299,25 @@ export const ScannerView: React.FC<ScannerViewProps> = ({ meetings, teachers, on
 
       {/* Warning / Status Banner for Locked Meeting */}
       {selectedMeeting?.is_locked && (
-        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs font-semibold flex items-center gap-2.5 shadow-xs">
-          <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs font-semibold flex items-center gap-2.5 shadow-xs">
+          <Lock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
           <div>
-            <span className="font-bold block">Agenda Rapat Telah Disahkan Secara Elektronik & Terkunci Resmi</span>
+            <span className="font-bold block">Agenda Rapat Disahkan & Terkunci Resmi</span>
             <span className="text-[11px] font-normal text-amber-800 dark:text-amber-300/90 block mt-0.5">
-              Presensi baru ditutup secara otomatis untuk melindungi keabsahan dan integritas hukum dokumen kedinasan.
+              Presensi baru ditutup otomatis untuk menjaga integritas dokumen kedinasan.
             </span>
           </div>
         </div>
       )}
 
       {/* Main Grid: Camera Scanner (Left) & Live Confirmation Card / Manual Search (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-5">
         {/* Left Column: Camera Viewport */}
-        <div className="lg:col-span-7 bg-white dark:bg-[#072b2f] p-6 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="lg:col-span-7 bg-white dark:bg-[#072b2f] p-3.5 sm:p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs space-y-3 sm:space-y-4">
+          <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Camera className="w-5 h-5 text-teal-800 dark:text-teal-300" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Jendela Pemindai Kamera</h3>
+              <Camera className="w-4 h-4 sm:w-5 sm:h-5 text-teal-800 dark:text-teal-300" />
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Pemindai Kamera</h3>
             </div>
 
             {/* Camera Selector */}

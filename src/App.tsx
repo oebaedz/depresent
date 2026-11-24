@@ -497,12 +497,12 @@ export default function App() {
       {/* 2. Right Main Viewport Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
         {/* Top Contextual Header Bar */}
-        <header className="sticky top-0 z-30 bg-white dark:bg-[#072b2f] border-b border-slate-200 dark:border-[#0f4950] h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between no-print transition-colors duration-150 shadow-xs">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="sticky top-0 z-30 bg-white dark:bg-[#072b2f] border-b border-slate-200 dark:border-[#0f4950] h-13 sm:h-15 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 no-print transition-colors duration-150 shadow-xs">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {/* Mobile Hamburger Button */}
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-lg text-slate-600 dark:text-teal-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#0b383d] cursor-pointer"
+              className="lg:hidden p-2 -ml-1 rounded-lg text-slate-600 dark:text-teal-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#0b383d] cursor-pointer shrink-0"
               title="Buka Menu"
             >
               <Menu className="w-5 h-5" />
@@ -510,39 +510,39 @@ export default function App() {
 
             {/* Breadcrumb / Current View Title */}
             <div className="min-w-0">
-              <h1 className="text-base font-bold text-slate-900 dark:text-white truncate leading-none">
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate leading-tight">
                 {pageTitles[activeTab].title}
               </h1>
-              <p className="text-[11px] text-slate-500 dark:text-teal-300/80 mt-1 truncate">
+              <p className="hidden sm:block text-[11px] text-slate-500 dark:text-teal-300/80 mt-0.5 truncate">
                 {pageTitles[activeTab].subtitle}
               </p>
             </div>
           </div>
 
-          {/* Quick Header Badges / Status */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          {/* Quick Header Actions */}
+          <div className="flex items-center gap-2 shrink-0">
             {schoolProfile.school_name && (
-              <span className="hidden sm:inline-block text-xs font-semibold text-teal-800 dark:text-teal-200 bg-teal-50 dark:bg-[#0b383d] border border-teal-200 dark:border-teal-700/60 px-2.5 py-1 rounded-md truncate max-w-[200px]">
+              <span className="hidden md:inline-block text-xs font-semibold text-teal-800 dark:text-teal-200 bg-teal-50 dark:bg-[#0b383d] border border-teal-200 dark:border-teal-700/60 px-2.5 py-1 rounded-md truncate max-w-[200px]">
                 {schoolProfile.school_name}
               </span>
             )}
 
-            {/* Dark Mode Toggle Button */}
+            {/* Dark Mode Toggle Button (Compact icon-only on mobile) */}
             <button
               onClick={toggleTheme}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-teal-700/60 rounded-lg transition-all shadow-xs cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-teal-700/60 rounded-lg transition-all shadow-xs cursor-pointer whitespace-nowrap"
               title={theme === 'dark' ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap (Dark Teal)'}
               aria-label="Toggle Mode Gelap dan Terang"
             >
               {theme === 'dark' ? (
                 <>
-                  <Sun className="w-4 h-4 text-amber-300" />
-                  <span className="font-medium">Mode Terang</span>
+                  <Sun className="w-4 h-4 text-amber-300 shrink-0" />
+                  <span className="hidden sm:inline font-medium">Mode Terang</span>
                 </>
               ) : (
                 <>
-                  <Moon className="w-4 h-4 text-teal-700" />
-                  <span className="font-medium">Mode Gelap</span>
+                  <Moon className="w-4 h-4 text-teal-700 shrink-0" />
+                  <span className="hidden sm:inline font-medium">Mode Gelap</span>
                 </>
               )}
             </button>
@@ -551,7 +551,7 @@ export default function App() {
 
         {/* Database Notice Banner */}
         {supabaseStatus === 'tables_missing' && activeTab !== 'projector' && (
-          <aside aria-label="Status database" className="no-print bg-amber-500 text-slate-950 px-4 py-2.5 text-xs font-medium border-b border-amber-600">
+          <aside aria-label="Status database" className="no-print bg-amber-500 text-slate-950 px-3 sm:px-4 py-2 text-[11px] sm:text-xs font-medium border-b border-amber-600">
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-slate-950 shrink-0" />
@@ -570,7 +570,7 @@ export default function App() {
         )}
 
         {/* 3. Dynamic Active View Content Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-5 lg:p-7 max-w-7xl w-full mx-auto">
           {isInitialLoading && getSupabase() ? (
             <div className="space-y-6 animate-pulse">
               <div className="h-16 bg-slate-200 dark:bg-[#072b2f] rounded-2xl border border-slate-300 dark:border-[#0f4950]" />

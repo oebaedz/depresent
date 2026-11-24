@@ -348,56 +348,58 @@ export const MeetingsView: React.FC<MeetingsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-5">
       {/* Header Bar */}
-      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Agenda Rapat & Kegiatan Yayasan (Tabel smp_meetings)</h2>
+      <div className="bg-white dark:bg-[#072b2f] p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-4">
+        <div className="hidden md:block min-w-0">
+          <h2 className="text-base lg:text-lg font-bold text-slate-900 dark:text-white">Agenda Rapat &amp; Kegiatan Yayasan</h2>
           <p className="text-xs text-slate-500 dark:text-teal-200/80 mt-0.5">
             Pimpinan rapat, notulis, tempat rapat, dan target peserta dapat diatur secara fleksibel.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+          <button
+            onClick={handleOpenAdd}
+            className="flex-1 md:flex-initial px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-white bg-teal-800 hover:bg-teal-700 dark:bg-teal-700 dark:hover:bg-teal-600 rounded-lg transition-colors shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            <span>Agenda Baru</span>
+          </button>
+
           {/* Menu Input & Kelola Tempat Rapat */}
           <button
             onClick={() => setIsRoomModalOpen(true)}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-[#0f4950] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-[#0f4950] rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             title="Kelola daftar tempat/ruang rapat dinamis"
           >
-            <MapPin className="w-3.5 h-3.5 text-teal-800 dark:text-teal-300" />
-            <span>Daftar Tempat Rapat</span>
+            <MapPin className="w-3.5 h-3.5 text-teal-800 dark:text-teal-300 shrink-0" />
+            <span className="hidden sm:inline">Tempat Rapat</span>
+            <span className="sm:hidden">Tempat</span>
           </button>
 
           {/* Menu Input & Kelola Kategori Rapat */}
           <button
             onClick={() => setIsCategoryModalOpen(true)}
-            className="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-[#0f4950] rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-teal-100 bg-slate-100 dark:bg-[#0b383d] hover:bg-slate-200 dark:hover:bg-[#0f4950] border border-slate-300 dark:border-[#0f4950] rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             title="Kelola daftar kategori rapat"
           >
-            <Tag className="w-3.5 h-3.5 text-teal-800 dark:text-teal-300" />
-            <span>Daftar Kategori Rapat</span>
-          </button>
-
-          <button
-            onClick={handleOpenAdd}
-            className="px-4 py-2 text-xs font-semibold text-white bg-teal-800 hover:bg-teal-700 dark:bg-teal-700 dark:hover:bg-teal-600 rounded-lg transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Buat Agenda Rapat Baru</span>
+            <Tag className="w-3.5 h-3.5 text-teal-800 dark:text-teal-300 shrink-0" />
+            <span className="hidden sm:inline">Kategori Rapat</span>
+            <span className="sm:hidden">Kategori</span>
           </button>
         </div>
       </div>
 
       {actionSuccessMsg && (
-        <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+        <div className="p-2.5 sm:p-3.5 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
           <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{actionSuccessMsg}</span>
         </div>
       )}
 
       {/* Meeting Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
         {sortedMeetings.map((m) => {
           const isActive = m.status === 'active';
           const isCompleted = m.status === 'completed';

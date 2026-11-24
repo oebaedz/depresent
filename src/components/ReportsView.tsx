@@ -21,6 +21,8 @@ import {
   Unlock,
   ArrowRight,
   Clock,
+  MoreHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 import { Attendance, Meeting, SchoolProfile, Teacher, DocumentSignature, SignerRole } from '../types';
 import { sortTeachersStructuralFirst } from '../lib/teacherGroups';
@@ -46,6 +48,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>(meetings[0]?.id || '');
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
   const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   const currentMeeting = meetings.find((m) => m.id === selectedMeetingId) || meetings[0];
 
@@ -343,94 +346,145 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 sm:space-y-5">
       {/* Top Header & Actions */}
-      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
-        <div>
+      <div className="bg-white dark:bg-[#072b2f] p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-4 no-print">
+        <div className="hidden md:block min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Laporan Resmi & Berkas Presensi Kedinasan</h2>
+            <h2 className="text-base lg:text-lg font-bold text-slate-900 dark:text-white">Laporan Resmi &amp; Berkas Presensi</h2>
             {currentMeeting?.is_locked && (
-              <span className="text-[10px] font-bold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+              <span className="text-[10px] font-bold text-amber-900 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-700 px-2 py-0.5 rounded-md flex items-center gap-1">
                 <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                <span>Terkunci Resmi</span>
+                <span>Terkunci</span>
               </span>
             )}
             {isCustomMeeting && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-teal-100 dark:bg-[#031e21] text-teal-900 dark:text-teal-200 border border-teal-200 dark:border-teal-800">
-                Rapat Khusus ({total} Peserta)
+                Khusus ({total})
               </span>
             )}
           </div>
           <p className="text-xs text-slate-500 dark:text-teal-200/80 mt-0.5">
-            Format resmi ber-Kop Surat Yayasan, daftar hadir ber-NIY, tanda tangan pimpinan rapat & notulis.
+            Format siap cetak Kop Surat Yayasan, daftar hadir ber-NIY, dan tanda tangan elektronik.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full lg:w-auto">
           {/* Select Meeting */}
           <select
             value={selectedMeetingId}
             onChange={(e) => setSelectedMeetingId(e.target.value)}
-            className="text-xs font-semibold border border-slate-300 dark:border-[#0f4950] rounded-lg px-3 py-2 bg-slate-50 dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden w-full sm:w-auto sm:max-w-xs truncate min-w-0"
+            className="text-xs font-semibold border border-slate-300 dark:border-[#0f4950] rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2 bg-slate-50 dark:bg-[#031e21] text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:outline-hidden w-full sm:w-auto sm:max-w-xs truncate min-w-0"
           >
             {meetings.map((m) => (
               <option key={m.id} value={m.id} className="bg-white dark:bg-[#072b2f] text-slate-900 dark:text-white">
-                {m.title} ({m.meeting_date}){m.is_locked ? ' 🔒' : ''}{m.target_type === 'custom' ? ' [Khusus]' : ''}
+                {m.title} ({m.meeting_date}){m.is_locked ? ' [Terkunci]' : ''}
               </option>
             ))}
           </select>
 
-          {/* Lock / Unlock Meeting Button */}
-          <button
-            onClick={handleToggleLock}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer ${
-              currentMeeting?.is_locked
-                ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                : 'bg-slate-700 hover:bg-slate-600 text-white'
-            }`}
-            title={currentMeeting?.is_locked ? 'Buka Kunci Rapat' : 'Kunci Dokumen & Rapat Ini'}
-          >
-            {currentMeeting?.is_locked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-            <span>{currentMeeting?.is_locked ? 'Buka Kunci' : 'Kunci Rapat'}</span>
-          </button>
+          <div className="flex items-center gap-1.5 sm:gap-2 relative">
+            {/* Print PDF Button (Primary) */}
+            <button
+              onClick={handlePrint}
+              className="flex-1 sm:flex-initial px-3 py-1.5 bg-teal-800 hover:bg-teal-700 text-white rounded-lg text-[11px] sm:text-xs font-semibold transition-colors shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5 shrink-0" />
+              <span>Cetak PDF</span>
+            </button>
 
-          {/* Kirim Rekap Tidak Hadir ke WA Grup Button */}
-          <button
-            onClick={() => setIsAbsentModalOpen(true)}
-            className="px-3.5 py-2 bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-600 hover:to-rose-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-            title="Ekspor infografis gambar & kirim daftar pegawai tidak hadir ke grup WhatsApp"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Kirim Rekap Tidak Hadir ke Grup WA</span>
-          </button>
+            {/* Kirim Rekap Tidak Hadir ke WA Grup Button */}
+            <button
+              onClick={() => setIsAbsentModalOpen(true)}
+              className="flex-1 sm:flex-initial px-3 py-1.5 bg-rose-700 hover:bg-rose-600 text-white rounded-lg text-[11px] sm:text-xs font-semibold transition-colors shadow-xs flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+              title="Ekspor infografis gambar & kirim daftar pegawai tidak hadir ke grup WhatsApp"
+            >
+              <Share2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Tidak Hadir</span>
+            </button>
 
-          {/* Export XLSX Button */}
-          <button
-            onClick={handleExportXLSX}
-            className="px-3.5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>Ekspor File Excel (.xlsx)</span>
-          </button>
+            {/* Desktop Secondary Buttons (>= xl) */}
+            <button
+              onClick={handleExportXLSX}
+              className="hidden xl:inline-flex px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 shrink-0" />
+              <span>Excel</span>
+            </button>
 
-          {/* Print PDF Button */}
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2 bg-teal-800 hover:bg-teal-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Cetak Dokumen Resmi (PDF)</span>
-          </button>
+            <button
+              onClick={handleToggleLock}
+              className={`hidden xl:inline-flex px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                currentMeeting?.is_locked
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                  : 'bg-slate-700 hover:bg-slate-600 text-white'
+              }`}
+              title={currentMeeting?.is_locked ? 'Buka Kunci Rapat' : 'Kunci Dokumen & Rapat Ini'}
+            >
+              {currentMeeting?.is_locked ? <Unlock className="w-3.5 h-3.5 shrink-0" /> : <Lock className="w-3.5 h-3.5 shrink-0" />}
+              <span>{currentMeeting?.is_locked ? 'Buka Kunci' : 'Kunci'}</span>
+            </button>
+
+            {/* Mobile / Tablet Overflow Menu (< xl) */}
+            <div className="relative xl:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 dark:bg-[#031e21] dark:hover:bg-[#0b383d] text-slate-800 dark:text-teal-100 text-[11px] sm:text-xs font-semibold border border-slate-300 dark:border-[#0f4950] transition-colors shadow-xs whitespace-nowrap cursor-pointer"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+                <span>Lainnya</span>
+                <ChevronDown className="w-3 h-3 opacity-70" />
+              </button>
+
+              {isMoreMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-30"
+                    onClick={() => setIsMoreMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-1.5 w-48 z-40 bg-white dark:bg-[#072b2f] border border-slate-200 dark:border-[#0f4950] rounded-xl shadow-xl py-1.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        handleExportXLSX();
+                      }}
+                      className="w-full px-3.5 py-2 text-left flex items-center gap-2 text-slate-700 dark:text-teal-100 hover:bg-slate-50 dark:hover:bg-[#0b383d] cursor-pointer"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Ekspor Excel (.xlsx)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        handleToggleLock();
+                      }}
+                      className="w-full px-3.5 py-2 text-left flex items-center gap-2 text-slate-700 dark:text-teal-100 hover:bg-slate-50 dark:hover:bg-[#0b383d] cursor-pointer"
+                    >
+                      {currentMeeting?.is_locked ? (
+                        <Unlock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      ) : (
+                        <Lock className="w-3.5 h-3.5 text-slate-600 dark:text-teal-300 shrink-0" />
+                      )}
+                      <span>{currentMeeting?.is_locked ? 'Buka Kunci Rapat' : 'Kunci Rapat Resmi'}</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Warning / Status Banner for Locked Meeting */}
       {currentMeeting?.is_locked && (
-        <div className="p-3 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 rounded-lg text-xs font-semibold flex items-center justify-between gap-2 no-print shadow-xs">
+        <div className="p-2.5 sm:p-3 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 rounded-lg text-[11px] sm:text-xs font-semibold flex items-center justify-between gap-2 no-print shadow-xs">
           <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+            <Lock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
             <span>
-              Agenda rapat ini telah <strong>Disahkan & Terkunci Resmi</strong>. Data presensi dan penandatanganan dilindungi demi integritas hukum dokumen.
+              Rapat ini telah <strong>Disahkan &amp; Terkunci Resmi</strong>.
             </span>
           </div>
           <button
@@ -443,52 +497,46 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
       )}
 
       {exportSuccess && (
-        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-lg text-xs font-medium flex items-center gap-2 no-print">
-          <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+        <div className="p-2.5 sm:p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-lg text-xs font-medium flex items-center gap-2 no-print">
+          <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{exportSuccess}</span>
         </div>
       )}
 
       {signatureFeedback && (
-        <div className="p-3 bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200 rounded-lg text-xs font-medium flex items-center gap-2 no-print shadow-xs animate-in fade-in duration-200">
+        <div className="p-2.5 sm:p-3 bg-teal-50 dark:bg-teal-950/60 border border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200 rounded-lg text-xs font-medium flex items-center gap-2 no-print shadow-xs animate-in fade-in duration-200">
           <CheckCircle2 className="w-4 h-4 text-teal-600 dark:text-teal-400 shrink-0" />
           <span>{signatureFeedback}</span>
         </div>
       )}
 
       {/* PANEL KONTROL ALUR TANDA TANGAN DIGITAL BERJENJANG (WHATSAPP & SUPABASE DB) */}
-      <div className="bg-white dark:bg-[#072b2f] p-5 rounded-xl border border-slate-300 dark:border-[#0f4950] shadow-xs no-print space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-[#0f4950] pb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="p-2 rounded-lg bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30">
-              <ShieldCheck className="w-5 h-5" />
-            </span>
+      <div className="bg-white dark:bg-[#072b2f] p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-[#0f4950] shadow-xs no-print space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-[#0f4950] pb-2.5">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-teal-700 dark:text-teal-300 shrink-0" />
             <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                Alur Persetujuan & Tanda Tangan Digital (WhatsApp)
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                <span>Persetujuan TTD Digital (WhatsApp)</span>
                 {isHeadmasterSigned ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                    Lengkap (3/3 Sah)
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300">
+                    3/3 Sah
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                    Progres: {(isSecretarySigned ? 1 : 0) + (isLeaderSigned ? 1 : 0)} / 3 Tahap
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300">
+                    {(isSecretarySigned ? 1 : 0) + (isLeaderSigned ? 1 : 0)} / 3 Tahap
                   </span>
                 )}
               </h3>
-              <p className="text-xs text-slate-600 dark:text-teal-200/90 font-medium">
-                Alur berjenjang: Notulis memverifikasi presensi ➔ Pimpinan menyetujui jalannya rapat ➔ Kepala Sekolah mengesahkan dokumen dengan QR Code verifikasi otentik.
+              <p className="hidden sm:block text-[11px] text-slate-600 dark:text-teal-200/80 mt-0.5">
+                Alur berjenjang: Notulis ➔ Pimpinan Rapat ➔ Kepala Sekolah.
               </p>
             </div>
-          </div>
-
-          <div className="text-[11px] text-slate-600 dark:text-teal-300 bg-slate-100 dark:bg-[#031e21] px-3 py-1.5 rounded-lg border border-slate-300 dark:border-[#0f4950] shrink-0 font-medium">
-            Penyimpanan: <span className="font-bold text-teal-800 dark:text-teal-300">Supabase DB</span>
           </div>
         </div>
 
         {/* 3 Sequential Steps Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3.5">
           {/* TAHAP 1: NOTULIS RAPAT */}
           <div className={`p-4 rounded-xl border transition-all ${
             isSecretarySigned
