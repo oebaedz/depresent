@@ -703,7 +703,7 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                   <p className="text-xs font-mono font-bold text-teal-800 dark:text-teal-300 mt-1">
                     Kode Verifikasi: {currentSigner.verification_code}
                   </p>
-                  {currentMeeting?.is_locked && (
+                  {currentMeeting?.is_locked && docParam === 'attendance_report' && (
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 mt-2">
                       <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
                       <span>Agenda Rapat Telah Terkunci Resmi</span>
@@ -768,7 +768,9 @@ export const SignatureApprovalView: React.FC<SignatureApprovalViewProps> = ({
                 )}
 
                 <div className="p-3 sm:p-3.5 rounded-xl bg-slate-50 dark:bg-[#031e21] border border-slate-200 dark:border-[#0f4950] text-xs text-slate-700 dark:text-teal-200 leading-relaxed">
-                  Dengan mengklik tombol di bawah ini, saya menyatakan telah memeriksa dan menyetujui seluruh data kehadiran dan berita acara rapat ini secara sah.
+                  {docParam === 'expedition_book'
+                    ? 'Dengan mengklik tombol di bawah ini, saya menyatakan telah memeriksa dan menyetujui seluruh data tanda terima surat undangan dan buku ekspedisi rapat ini secara sah.'
+                    : 'Dengan mengklik tombol di bawah ini, saya menyatakan telah memeriksa dan menyetujui seluruh data kehadiran dan berita acara rapat ini secara sah.'}
                   <span className="block mt-1 text-teal-800 dark:text-teal-300 font-semibold">
                     ✓ Pengesahan ini otomatis menerbitkan QR Code Verifikasi Kedinasan resmi yang dapat dipindai publik.
                   </span>

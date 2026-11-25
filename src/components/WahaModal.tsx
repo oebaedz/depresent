@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   MessageSquare,
@@ -14,6 +14,7 @@ import {
   BellRing,
 } from 'lucide-react';
 import {
+  DEFAULT_WAHA_CONFIG,
   EDGE_FUNCTION_TEMPLATE_CODE,
   getWahaConfig,
   getWahaLogs,
@@ -57,6 +58,23 @@ export const WahaModal: React.FC<WahaModalProps> = ({
   const [testStatus, setTestStatus] = useState<string | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<'config' | 'auto_reminder' | 'templates' | 'edge_code' | 'logs'>('config');
   const [copiedCode, setCopiedCode] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setConfig(getWahaConfig());
+      setLogs(getWahaLogs());
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleCfgUpdate = (e: Event) => {
+      const custom = e as CustomEvent<WahaConfig>;
+      if (custom.detail) setConfig(custom.detail);
+      else setConfig(getWahaConfig());
+    };
+    window.addEventListener('smp_waha_config_updated', handleCfgUpdate);
+    return () => window.removeEventListener('smp_waha_config_updated', handleCfgUpdate);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -334,6 +352,32 @@ export const WahaModal: React.FC<WahaModalProps> = ({
                   className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono"
                 />
                 <p className="text-[11px] text-slate-500 dark:text-teal-200/70 mt-0.5">Placeholder: <code>{'{agenda}'}</code>, <code>{'{nama}'}</code>, <code>{'{tanggal}'}</code>, <code>{'{jam}'}</code>, <code>{'{ruang}'}</code>, <code>{'{pimpinan}'}</code>, <code>{'{link_rsvp}'}</code>, <code>{'{nama_sekolah}'}</code></p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-teal-100 mb-1">
+                  6. Template Rekap Pegawai Tidak Hadir ke Grup WA
+                </label>
+                <textarea
+                  rows={6}
+                  value={config.message_template_absent_recap ?? DEFAULT_WAHA_CONFIG.message_template_absent_recap ?? ''}
+                  onChange={(e) => setConfig({ ...config, message_template_absent_recap: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-teal-200/70 mt-0.5">Placeholder: <code>{'{nama_sekolah}'}</code>, <code>{'{rapat}'}</code>, <code>{'{tanggal}'}</code>, <code>{'{waktu}'}</code>, <code>{'{ruang}'}</code>, <code>{'{pimpinan}'}</code>, <code>{'{total}'}</code>, <code>{'{hadir}'}</code>, <code>{'{terlambat}'}</code>, <code>{'{izin}'}</code>, <code>{'{sakit}'}</code>, <code>{'{tidak_hadir}'}</code>, <code>{'{persen}'}</code>, <code>{'{daftar_tidak_hadir}'}</code></p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-teal-100 mb-1">
+                  7. Template Rekap Belum Konfirmasi RSVP ke Grup WA
+                </label>
+                <textarea
+                  rows={6}
+                  value={config.message_template_rsvp_recap ?? DEFAULT_WAHA_CONFIG.message_template_rsvp_recap ?? ''}
+                  onChange={(e) => setConfig({ ...config, message_template_rsvp_recap: e.target.value })}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 dark:border-[#0f4950] rounded-lg bg-white dark:bg-[#031e21] text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-teal-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-teal-200/70 mt-0.5">Placeholder: <code>{'{nama_sekolah}'}</code>, <code>{'{rapat}'}</code>, <code>{'{no_surat}'}</code>, <code>{'{tanggal}'}</code>, <code>{'{waktu}'}</code>, <code>{'{ruang}'}</code>, <code>{'{pimpinan}'}</code>, <code>{'{total}'}</code>, <code>{'{konfirmasi}'}</code>, <code>{'{hadir}'}</code>, <code>{'{izin}'}</code>, <code>{'{sakit}'}</code>, <code>{'{belum}'}</code>, <code>{'{daftar_belum_rsvp}'}</code></p>
               </div>
             </div>
           )}

@@ -109,6 +109,8 @@ export interface WahaConfig {
   message_template_scan: string;
   message_template_reminder: string;
   message_template_recap: string;
+  message_template_absent_recap?: string;
+  message_template_rsvp_recap?: string;
   message_template_invitation?: string;
   message_template_rechat?: string;
 }

@@ -33,8 +33,9 @@ import {
   updateAdminPinInDb,
 } from './lib/storage';
 import { getSupabase } from './lib/supabase';
+import { fetchMessageTemplatesFromDb } from './lib/waha';
 import { runAutoReminderCheck } from './lib/autoReminder';
-import { Menu, Database, AlertTriangle, CheckCircle2, Lock, Sun, Moon, BellRing, X } from 'lucide-react';
+import { Menu, Database, AlertTriangle, CheckCircle2, Lock, Sun, Moon, BellRing, X, RefreshCw } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
@@ -134,6 +135,7 @@ export default function App() {
   // Connection & Modals
   const [supabaseStatus, setSupabaseStatus] = useState<'local' | 'tables_missing' | 'connected' | 'demo'>('local');
   const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [isRefreshingData, setIsRefreshingData] = useState<boolean>(false);
   const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
   const [isVercelModalOpen, setIsVercelModalOpen] = useState(false);
   const [isWahaModalOpen, setIsWahaModalOpen] = useState(false);
@@ -234,6 +236,7 @@ export default function App() {
         fetchMeetings(),
         fetchAttendances(),
         fetchInvitations(),
+        fetchMessageTemplatesFromDb(),
       ]);
 
       setSchoolProfile(profileData);
@@ -257,6 +260,16 @@ export default function App() {
       setIsInitialLoading(false);
     }
   }, [selectedMeetingId]);
+
+  const handleGlobalRefresh = useCallback(async () => {
+    if (isRefreshingData) return;
+    setIsRefreshingData(true);
+    try {
+      await loadAllData();
+    } finally {
+      setIsRefreshingData(false);
+    }
+  }, [isRefreshingData, loadAllData]);
 
   useEffect(() => {
     loadAllData();
@@ -578,12 +591,24 @@ export default function App() {
           </div>
 
           {/* Quick Header Actions */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {schoolProfile.school_name && (
               <span className="hidden md:inline-block text-xs font-semibold text-teal-800 dark:text-teal-200 bg-teal-50 dark:bg-[#0b383d] border border-teal-200 dark:border-teal-700/60 px-2.5 py-1 rounded-md truncate max-w-[200px]">
                 {schoolProfile.school_name}
               </span>
             )}
+
+            {/* Global Refresh Data Button (moved from Dashboard for manual Supabase sync across all views) */}
+            <button
+              onClick={handleGlobalRefresh}
+              disabled={isRefreshingData}
+              className="inline-flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 text-xs font-semibold text-teal-800 dark:text-teal-100 bg-teal-50 dark:bg-[#0b383d] hover:bg-teal-100 dark:hover:bg-[#0f4950] border border-teal-300 dark:border-teal-700/60 rounded-lg transition-all shadow-xs cursor-pointer whitespace-nowrap disabled:opacity-60"
+              title="Segarkan Data Terbaru dari Database Supabase"
+              aria-label="Segarkan Data Database"
+            >
+              <RefreshCw className={`w-4 h-4 text-teal-700 dark:text-teal-300 shrink-0 ${isRefreshingData ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline font-medium">{isRefreshingData ? 'Menyegarkan...' : 'Segarkan'}</span>
+            </button>
 
             {/* Dark Mode Toggle Button (Compact icon-only on mobile) */}
             <button

@@ -2055,9 +2055,11 @@ export async function signDocumentStep(
     (s) => s.document_type === docType && s.step_order === target.step_order + 1
   );
 
-  // Jika ini adalah tahap pengesahan akhir (Kepala Sekolah atau tahap penutup alur tanda tangan):
-  // Otomatis kunci rapat (is_locked = true) dan selesaikan agenda agar data kehadiran & pengesahan berintegritas hukum
-  if (!nextSigner && (docType === 'attendance_report' || target.signer_role === 'headmaster')) {
+  // Jika ini adalah tahap pengesahan akhir dokumen Daftar Hadir Rapat (`attendance_report`):
+  // Otomatis kunci rapat (is_locked = true) dan selesaikan agenda agar data kehadiran & pengesahan berintegritas hukum.
+  // Pengesahan Buku Ekspedisi (`expedition_book`) TIDAK mengunci atau menyelesaikan rapat.
+  const shouldLockAndCompleteMeeting = !nextSigner && docType === 'attendance_report';
+  if (shouldLockAndCompleteMeeting) {
     const meetings = getCachedMeetings();
     const currentM = meetings.find((m) => m.id === meetingId);
     if (currentM) {
@@ -2075,7 +2077,11 @@ export async function signDocumentStep(
     signature: updated,
     nextSignerRole: nextSigner?.signer_role,
     message: `Dokumen berhasil disetujui dan disahkan secara elektronik. Kode Verifikasi: ${verificationCode}.${
-      !nextSigner ? ' Seluruh alur pengesahan telah selesai dan rapat otomatis terkunci resmi.' : ''
+      shouldLockAndCompleteMeeting
+        ? ' Seluruh alur pengesahan daftar hadir telah selesai dan rapat otomatis terkunci resmi.'
+        : !nextSigner
+        ? ' Seluruh alur pengesahan buku ekspedisi telah selesai.'
+        : ''
     }`,
   };
 }

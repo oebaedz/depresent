@@ -18,9 +18,11 @@ import {
   Image as ImageIcon,
   UserX,
   Plus,
+  Edit3,
+  RotateCcw,
 } from 'lucide-react';
 import { Meeting, Teacher, Attendance, SchoolProfile, WahaGroup } from '../types';
-import { invokeWahaNotification } from '../lib/waha';
+import { DEFAULT_WAHA_CONFIG, getWahaConfig, invokeWahaNotification, saveWahaConfig } from '../lib/waha';
 import { captureElementAsPng } from '../lib/infographicExport';
 import { addWahaGroup, getWahaGroups } from '../lib/storage';
 
@@ -57,6 +59,131 @@ export const AbsentTeachersModal: React.FC<AbsentTeachersModalProps> = ({
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [copiedText, setCopiedText] = useState(false);
   const [copiedImage, setCopiedImage] = useState(false);
+  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
+  const [templateDraft, setTemplateDraft] = useState<string>(
+    () => getWahaConfig().message_template_absent_recap || DEFAULT_WAHA_CONFIG.message_template_absent_recap || ''
+  );
+
+  // Filter participants for this meeting
+  const activeTeachers =
+    currentMeeting.target_type === 'custom' && currentMeeting.invited_teacher_ids?.length
+      ? teachers.filter((t) => currentMeeting.invited_teacher_ids!.includes(t.id))
+      : teachers;
+
+  const attendanceMap = new Map<string, Attendance>();
+  attendances
+    .filter((a) => a.meeting_id === currentMeeting.id)
+    .forEach((a) => attendanceMap.set(a.teacher_id, a));
+
+  let hadir = 0;
+  let terlambat = 0;
+  let izin = 0;
+  let sakit = 0;
+  const absentTeachers: { teacher: Teacher; notes: string }[] = [];
+
+  activeTeachers.forEach((t) => {
+    const att = attendanceMap.get(t.id);
+    if (att) {
+      if (att.status === 'hadir') hadir++;
+      else if (att.status === 'terlambat') terlambat++;
+      else if (att.status === 'izin') izin++;
+      else if (att.status === 'sakit') sakit++;
+      else if (att.status === 'alpa') {
+        absentTeachers.push({ teacher: t, notes: att.notes || 'Tanpa Keterangan (Alpa)' });
+      }
+    } else {
+      if (currentMeeting.status === 'completed') {
+        absentTeachers.push({ teacher: t, notes: 'Tidak Hadir hingga Rapat Ditutup' });
+      } else {
+        absentTeachers.push({ teacher: t, notes: 'Belum Hadir / Belum Presensi' });
+      }
+    }
+  });
+
+  const total = activeTeachers.length;
+  const rate = total > 0 ? Math.round(((hadir + terlambat) / total) * 100) : 0;
+
+  const formattedDate = new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  const meetingTime = `${currentMeeting.start_time?.slice(0, 5) || currentMeeting.start_time} - ${currentMeeting.end_time?.slice(0, 5) || currentMeeting.end_time} WIB`;
+
+  const renderWhatsAppMessage = (templateOverride?: string) => {
+    const wahaConfig = getWahaConfig();
+    const tpl =
+      templateOverride ??
+      wahaConfig.message_template_absent_recap ??
+      DEFAULT_WAHA_CONFIG.message_template_absent_recap ??
+      '';
+
+    let absentListBlock = '';
+    if (absentTeachers.length > 0) {
+      absentListBlock += `🚫 *DAFTAR GURU/PEGAWAI TIDAK HADIR:*\n`;
+      absentTeachers.forEach((item, i) => {
+        absentListBlock += `${i + 1}. *${item.teacher.name}* (NIY: ${item.teacher.niy || '-'} - ${item.teacher.role_title}) [${item.notes}]\n`;
+      });
+      absentListBlock += `\nLaporan ini dicatat secara resmi ke dalam SPJ Daftar Hadir Kegiatan Sekolah.`;
+    } else {
+      absentListBlock = `Alhamdulillah, seluruh guru & pegawai hadir lengkap (Nihil Tidak Hadir).`;
+    }
+
+    return tpl
+      .replace(/\{nama_sekolah\}/g, schoolProfile.school_name || 'SMP')
+      .replace(/\{rapat\}/g, currentMeeting.title)
+      .replace(/\{tanggal\}/g, formattedDate)
+      .replace(/\{waktu\}/g, meetingTime)
+      .replace(/\{ruang\}/g, currentMeeting.room)
+      .replace(/\{pimpinan\}/g, currentMeeting.leader_name)
+      .replace(/\{total\}/g, String(total))
+      .replace(/\{hadir\}/g, String(hadir))
+      .replace(/\{terlambat\}/g, String(terlambat))
+      .replace(/\{izin\}/g, String(izin))
+      .replace(/\{sakit\}/g, String(sakit))
+      .replace(/\{tidak_hadir\}/g, String(absentTeachers.length))
+      .replace(/\{persen\}/g, String(rate))
+      .replace(/\{daftar_tidak_hadir\}/g, absentListBlock);
+  };
+
+  const [editedRecapText, setEditedRecapText] = useState<string>(() => renderWhatsAppMessage());
+
+  useEffect(() => {
+    if (isOpen) {
+      const cfg = getWahaConfig();
+      const tpl = cfg.message_template_absent_recap || DEFAULT_WAHA_CONFIG.message_template_absent_recap || '';
+      setTemplateDraft(tpl);
+      setEditedRecapText(renderWhatsAppMessage(tpl));
+      setIsEditingTemplate(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, currentMeeting.id]);
+
+  const recapText = editedRecapText;
+
+  const handleSaveTemplateToDb = () => {
+    const currentCfg = getWahaConfig();
+    saveWahaConfig({
+      ...currentCfg,
+      message_template_absent_recap: templateDraft,
+    });
+    setEditedRecapText(renderWhatsAppMessage(templateDraft));
+    setIsEditingTemplate(false);
+    setStatusMessage({ text: 'Template rekap pegawai tidak hadir berhasil disimpan ke database!', type: 'success' });
+    setTimeout(() => setStatusMessage(null), 3500);
+  };
+
+  const handleResetTemplate = () => {
+    const def = DEFAULT_WAHA_CONFIG.message_template_absent_recap || '';
+    setTemplateDraft(def);
+    const currentCfg = getWahaConfig();
+    saveWahaConfig({ ...currentCfg, message_template_absent_recap: def });
+    setEditedRecapText(renderWhatsAppMessage(def));
+    setStatusMessage({ text: 'Template dikembalikan ke format bawaan.', type: 'info' });
+    setTimeout(() => setStatusMessage(null), 3000);
+  };
 
   useEffect(() => {
     const groups = getWahaGroups(schoolProfile);
@@ -96,97 +223,6 @@ export const AbsentTeachersModal: React.FC<AbsentTeachersModalProps> = ({
   };
 
   if (!isOpen) return null;
-
-  // Filter participants for this meeting
-  const activeTeachers =
-    currentMeeting.target_type === 'custom' && currentMeeting.invited_teacher_ids?.length
-      ? teachers.filter((t) => currentMeeting.invited_teacher_ids!.includes(t.id))
-      : teachers;
-
-  const attendanceMap = new Map<string, Attendance>();
-  attendances
-    .filter((a) => a.meeting_id === currentMeeting.id)
-    .forEach((a) => attendanceMap.set(a.teacher_id, a));
-
-  let hadir = 0;
-  let terlambat = 0;
-  let izin = 0;
-  let sakit = 0;
-  let tidakHadirCount = 0;
-  const absentTeachers: { teacher: Teacher; notes: string }[] = [];
-
-  activeTeachers.forEach((t) => {
-    const att = attendanceMap.get(t.id);
-    if (att) {
-      if (att.status === 'hadir') hadir++;
-      else if (att.status === 'terlambat') terlambat++;
-      else if (att.status === 'izin') izin++;
-      else if (att.status === 'sakit') sakit++;
-      else if (att.status === 'alpa') {
-        tidakHadirCount++;
-        absentTeachers.push({ teacher: t, notes: att.notes || 'Tanpa Keterangan (Alpa)' });
-      }
-    } else {
-      // If no attendance record
-      if (currentMeeting.status === 'completed') {
-        tidakHadirCount++;
-        absentTeachers.push({ teacher: t, notes: 'Tidak Hadir hingga Rapat Ditutup' });
-      } else {
-        // Rapat sedang berlangsung / aktif: belum hadir
-        tidakHadirCount++;
-        absentTeachers.push({ teacher: t, notes: 'Belum Hadir / Belum Presensi' });
-      }
-    }
-  });
-
-  const total = activeTeachers.length;
-  const rate = total > 0 ? Math.round(((hadir + terlambat) / total) * 100) : 0;
-
-  const formattedDate = new Date(currentMeeting.meeting_date).toLocaleDateString('id-ID', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  const meetingTime = `${currentMeeting.start_time?.slice(0, 5) || currentMeeting.start_time} - ${currentMeeting.end_time?.slice(0, 5) || currentMeeting.end_time} WIB`;
-
-  // Generate formatted WhatsApp announcement
-  const generateWhatsAppMessage = () => {
-    let text = `📋 *LAPORAN KEHADIRAN & DAFTAR PEGAWAI TIDAK HADIR*\n`;
-    text += `*${schoolProfile.school_name || 'SMP MUHAMMADIYAH 1 GOMBONG'}*\n\n`;
-    text += `Agenda: *${currentMeeting.title}*\n`;
-    text += `• Hari/Tanggal: ${formattedDate}\n`;
-    text += `• Waktu: ${meetingTime}\n`;
-    text += `• Ruangan: ${currentMeeting.room}\n`;
-    text += `• Pimpinan Rapat: ${currentMeeting.leader_name}\n\n`;
-
-    text += `📊 *REKAPITULASI KEHADIRAN KEDINASAN:*\n`;
-    text += `• Total Pegawai Terdaftar: ${total} orang\n`;
-    text += `• Hadir Tepat Waktu: ${hadir} orang\n`;
-    text += `• Hadir Terlambat: ${terlambat} orang\n`;
-    text += `• Izin: ${izin} orang\n`;
-    text += `• Sakit: ${sakit} orang\n`;
-    text += `• *Tidak Hadir: ${absentTeachers.length} orang*\n`;
-    text += `• *Tingkat Kehadiran: ${rate}%*\n\n`;
-
-    if (absentTeachers.length > 0) {
-      text += `🚫 *DAFTAR GURU/PEGAWAI TIDAK HADIR:*\n`;
-      absentTeachers.forEach((item, i) => {
-        text += `${i + 1}. *${item.teacher.name}* (NIY: ${item.teacher.niy || '-'} - ${item.teacher.role_title}) [${item.notes}]\n`;
-      });
-      text += `\nLaporan ini dicatat secara resmi ke dalam SPJ Daftar Hadir Kegiatan Sekolah.\n\n`;
-    } else {
-      text += `Alhamdulillah, seluruh guru & pegawai hadir lengkap (Nihil Tidak Hadir).\n\n`;
-    }
-
-    text += `Terima kasih atas disiplin dan dedikasi Bapak/Ibu semua.\n_Wassalamu'alaikum Wr. Wb._\n\n`;
-    text += `_${schoolProfile.school_name}_\n`;
-    text += `_dePresent made by Mr Zee_`;
-    return text;
-  };
-
-  const recapText = generateWhatsAppMessage();
 
   // Download image directly as PNG file (pixel-identical via html-to-image)
   const handleDownloadImage = async () => {
@@ -768,28 +804,79 @@ export const AbsentTeachersModal: React.FC<AbsentTeachersModalProps> = ({
             </div>
           </div>
 
-          {/* Text Message Preview */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          {/* Editable WhatsApp Message & Template Editor */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-teal-200 flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Format Teks Pesan WhatsApp untuk Grup:</span>
+                <span>{isEditingTemplate ? 'Edit Template Default (DB):' : 'Format Teks Pesan WhatsApp (Dapat Diedit):'}</span>
               </label>
-              <button
-                type="button"
-                onClick={handleCopyText}
-                className="text-xs font-semibold text-teal-600 dark:text-teal-300 hover:underline cursor-pointer flex items-center gap-1"
-              >
-                {copiedText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copiedText ? 'Tersalin' : 'Salin Teks'}</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTemplate((prev) => !prev)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border flex items-center gap-1 cursor-pointer transition-colors ${
+                    isEditingTemplate
+                      ? 'bg-teal-700 text-white border-teal-700'
+                      : 'bg-slate-100 dark:bg-[#0b383d] text-slate-700 dark:text-teal-100 border-slate-300 dark:border-[#0f4950]'
+                  }`}
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>{isEditingTemplate ? 'Mode Pesan Siap Kirim' : 'Edit Template Default'}</span>
+                </button>
+                {isEditingTemplate && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSaveTemplateToDb}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-700 hover:bg-emerald-600 text-white flex items-center gap-1 cursor-pointer"
+                    >
+                      <Check className="w-3 h-3" />
+                      <span>Simpan ke DB</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetTemplate}
+                      className="px-2 py-1 rounded-lg text-[11px] font-medium text-slate-600 dark:text-teal-300 border border-slate-300 dark:border-[#0f4950] flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Reset</span>
+                    </button>
+                  </>
+                )}
+                {!isEditingTemplate && (
+                  <button
+                    type="button"
+                    onClick={handleCopyText}
+                    className="text-xs font-semibold text-teal-600 dark:text-teal-300 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    {copiedText ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedText ? 'Tersalin' : 'Salin Teks'}</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <textarea
-              readOnly
-              rows={8}
-              value={recapText}
-              className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl p-3 text-xs font-mono text-slate-800 dark:text-teal-100 leading-relaxed focus:outline-hidden"
-            />
+
+            {isEditingTemplate ? (
+              <div className="space-y-1.5">
+                <textarea
+                  rows={8}
+                  value={templateDraft}
+                  onChange={(e) => setTemplateDraft(e.target.value)}
+                  className="w-full bg-white dark:bg-[#031e21] border border-teal-400 dark:border-teal-600 rounded-xl p-3 text-xs font-mono text-slate-800 dark:text-teal-100 leading-relaxed focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-teal-300/70">
+                  Placeholder: <code>{'{nama_sekolah}'}</code>, <code>{'{rapat}'}</code>, <code>{'{tanggal}'}</code>, <code>{'{waktu}'}</code>, <code>{'{ruang}'}</code>, <code>{'{pimpinan}'}</code>, <code>{'{total}'}</code>, <code>{'{hadir}'}</code>, <code>{'{terlambat}'}</code>, <code>{'{izin}'}</code>, <code>{'{sakit}'}</code>, <code>{'{tidak_hadir}'}</code>, <code>{'{persen}'}</code>, <code>{'{daftar_tidak_hadir}'}</code>
+                </p>
+              </div>
+            ) : (
+              <textarea
+                rows={8}
+                value={editedRecapText}
+                onChange={(e) => setEditedRecapText(e.target.value)}
+                className="w-full bg-slate-50 dark:bg-[#031e21] border border-slate-300 dark:border-[#0f4950] rounded-xl p-3 text-xs font-mono text-slate-800 dark:text-teal-100 leading-relaxed focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+              />
+            )}
           </div>
         </div>
 

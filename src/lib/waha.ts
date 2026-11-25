@@ -10,6 +10,56 @@ export const DEFAULT_WAHA_CONFIG: WahaConfig = {
   message_template_scan: 'Halo Bpk/Ibu *{nama}*, presensi kehadiran kegiatan/rapat *{rapat}* berhasil dicatat pada pukul *{jam} WIB* (Status: *{status}*). Terima kasih.',
   message_template_reminder: 'Pemberitahuan Sekolah:\nRapat/Kegiatan: *{rapat}*\nTanggal: {tanggal} pukul {jam} WIB\nRuang: {ruang}\nPemimpin: {pimpinan}\n\nMohon Bapak/Ibu hadir tepat waktu dan membawa ID Card fisik untuk presensi QR. Terima kasih.',
   message_template_recap: '📋 *REKAPITULASI KEHADIRAN RAPAT*\nAgenda: *{rapat}*\nTanggal: {tanggal} ({waktu} WIB)\nLokasi: {ruang}\n\n• Total Guru: {total} orang\n• Hadir Tepat Waktu: {hadir}\n• Terlambat: {terlambat}\n• Izin / Sakit: {izin}\n• Belum Presensi: {belum}\n\n*Persentase Kehadiran: {persen}%*\n_dePresent SMP_',
+  message_template_absent_recap: `📋 *LAPORAN KEHADIRAN & DAFTAR PEGAWAI TIDAK HADIR*
+*{nama_sekolah}*
+
+Agenda: *{rapat}*
+• Hari/Tanggal: {tanggal}
+• Waktu: {waktu}
+• Ruangan: {ruang}
+• Pimpinan Rapat: {pimpinan}
+
+📊 *REKAPITULASI KEHADIRAN KEDINASAN:*
+• Total Pegawai Terdaftar: {total} orang
+• Hadir Tepat Waktu: {hadir} orang
+• Hadir Terlambat: {terlambat} orang
+• Izin: {izin} orang
+• Sakit: {sakit} orang
+• *Tidak Hadir: {tidak_hadir} orang*
+• *Tingkat Kehadiran: {persen}%*
+
+{daftar_tidak_hadir}
+
+Terima kasih atas disiplin dan dedikasi Bapak/Ibu semua.
+_Wassalamu'alaikum Wr. Wb._
+
+_{nama_sekolah}_
+_dePresent made by Mr Zee_`,
+  message_template_rsvp_recap: `📢 *PEMBERITAHUAN: REKAP KONFIRMASI KEHADIRAN (RSVP)*
+*{nama_sekolah}*
+
+Agenda: *{rapat}*
+• No. Surat: {no_surat}
+• Hari/Tanggal: {tanggal}
+• Waktu: {waktu}
+• Ruangan: {ruang}
+• Pimpinan Rapat: {pimpinan}
+
+📊 *REKAPITULASI RSVP SEMENTARA:*
+• Total Undangan: {total} orang
+• Sudah Konfirmasi: {konfirmasi} orang
+  - Hadir: {hadir}
+  - Izin: {izin}
+  - Sakit: {sakit}
+• *Belum Konfirmasi: {belum} orang*
+
+{daftar_belum_rsvp}
+
+Terima kasih atas kerja samanya.
+_Wassalamu'alaikum Wr. Wb._
+
+_Panitia Kegiatan & Tata Usaha_
+_dePresent made by Mr Zee_`,
   message_template_invitation: `*SURAT UNDANGAN KEDINASAN*
 Nomor: {no_surat}
 Perihal: Undangan {agenda}
@@ -287,6 +337,7 @@ export function getWahaConfig(): WahaConfig {
 export function saveWahaConfig(config: WahaConfig) {
   if (typeof window !== 'undefined') {
     localStorage.setItem(STORAGE_KEY_WAHA, JSON.stringify(config));
+    window.dispatchEvent(new CustomEvent('smp_waha_config_updated', { detail: config }));
   }
   // Lakukan sinkronisasi langsung ke database Supabase
   saveMessageTemplatesToDb(config).catch((err) => {
@@ -334,6 +385,20 @@ export async function saveMessageTemplatesToDb(config: WahaConfig): Promise<{ su
         updated_at: new Date().toISOString(),
       },
       {
+        id: 'absent_recap',
+        title: 'Template Rekap Pegawai Tidak Hadir ke Grup',
+        template_content: config.message_template_absent_recap || DEFAULT_WAHA_CONFIG.message_template_absent_recap,
+        variables: ['{nama_sekolah}', '{rapat}', '{tanggal}', '{waktu}', '{ruang}', '{pimpinan}', '{total}', '{hadir}', '{terlambat}', '{izin}', '{sakit}', '{tidak_hadir}', '{persen}', '{daftar_tidak_hadir}'],
+        updated_at: new Date().toISOString(),
+      },
+      {
+        id: 'rsvp_recap',
+        title: 'Template Rekap Belum Konfirmasi RSVP ke Grup',
+        template_content: config.message_template_rsvp_recap || DEFAULT_WAHA_CONFIG.message_template_rsvp_recap,
+        variables: ['{nama_sekolah}', '{rapat}', '{no_surat}', '{tanggal}', '{waktu}', '{ruang}', '{pimpinan}', '{total}', '{konfirmasi}', '{hadir}', '{izin}', '{sakit}', '{belum}', '{daftar_belum_rsvp}'],
+        updated_at: new Date().toISOString(),
+      },
+      {
         id: 'scan',
         title: 'Template Konfirmasi Presensi Hadir',
         template_content: config.message_template_scan || DEFAULT_WAHA_CONFIG.message_template_scan,
@@ -372,6 +437,8 @@ export async function fetchMessageTemplatesFromDb(): Promise<WahaConfig> {
         if (row.id === 'rechat' && row.template_content) updatedConfig.message_template_rechat = row.template_content;
         if (row.id === 'reminder' && row.template_content) updatedConfig.message_template_reminder = row.template_content;
         if (row.id === 'recap' && row.template_content) updatedConfig.message_template_recap = row.template_content;
+        if (row.id === 'absent_recap' && row.template_content) updatedConfig.message_template_absent_recap = row.template_content;
+        if (row.id === 'rsvp_recap' && row.template_content) updatedConfig.message_template_rsvp_recap = row.template_content;
         if (row.id === 'scan' && row.template_content) updatedConfig.message_template_scan = row.template_content;
       });
       localStorage.setItem(STORAGE_KEY_WAHA, JSON.stringify(updatedConfig));
